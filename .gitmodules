@@ -1,0 +1,3 @@
+[submodule "lib/glucose"]
+	path = lib/glucose
+	url = https://github.com/semiexp/glucose.git
