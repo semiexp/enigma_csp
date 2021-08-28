@@ -1,3 +1,4 @@
+#[cfg(target_os = "linux")]
 fn main() {
     cc::Build::new()
         .cpp(true)
@@ -10,6 +11,12 @@ fn main() {
         //        .cpp_link_stdlib("c++")
         .include("lib/glucose")
         .flag("-std=c++17")
+        .warnings(false)
         .compile("calc");
     println!("cargo:rerun-if-changed=lib/glucose_bridge.cpp");
+}
+
+#[cfg(not(target_os = "linux"))]
+fn main() {
+    // TODO: build on non-linux target is temporarily disabled for rust-analyzer running on Windows
 }
