@@ -1,9 +1,14 @@
+pub mod csp;
 pub mod glucose;
+pub mod norm_csp;
+pub mod normalizer;
 
-#[cfg(test)]
-mod tests {
-    #[test]
-    fn it_works() {
-        assert_eq!(2 + 2, 4);
-    }
+#[derive(Clone, Copy)]
+pub enum CmpOp {
+    Eq,
+    Ne,
+    Le,
+    Lt,
+    Ge,
+    Gt,
 }
