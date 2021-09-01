@@ -102,7 +102,7 @@ fn normalize_stmt(env: &mut NormalizerEnv, stmt: Stmt) {
     match stmt {
         Stmt::Expr(mut expr) => {
             // TODO: apply Tseitin transformation to avoid the exponential explosion of constraints caused by Iff/Xor
-            let constraints = normalize_bool_expr(env, &mut expr, false);
+            let constraints = normalize_bool_expr(env, &expr, false);
             for c in constraints {
                 env.norm.add_constraint(c);
             }
@@ -157,35 +157,31 @@ fn tseitin_transformation_bool(
 }
 
 /// Normalize `expr` into a set of `Constraint`s. If `neg` is `true`, not(`expr`) is normalized instead.
-/// `expr` may be modified during the execution of this function, but it is restored before returning.
-fn normalize_bool_expr(env: &mut NormalizerEnv, expr: &mut BoolExpr, neg: bool) -> Vec<Constraint> {
+fn normalize_bool_expr(env: &mut NormalizerEnv, expr: &BoolExpr, neg: bool) -> Vec<Constraint> {
     match (expr, neg) {
-        (&mut BoolExpr::Const(b), neg) => {
+        (&BoolExpr::Const(b), neg) => {
             if b ^ neg {
                 vec![]
             } else {
                 vec![Constraint::new()]
             }
         }
-        (&mut BoolExpr::Var(v), neg) => {
+        (&BoolExpr::Var(v), neg) => {
             let nv = env.convert_bool_var(v);
             let mut constraint = Constraint::new();
             constraint.add_bool(BoolLit::new(nv, neg));
             vec![constraint]
         }
-        (&mut BoolExpr::NVar(v), neg) => {
+        (&BoolExpr::NVar(v), neg) => {
             let mut constraint = Constraint::new();
             constraint.add_bool(BoolLit::new(v, neg));
             vec![constraint]
         }
-        (BoolExpr::And(es), false) | (BoolExpr::Or(es), true) => {
-            let mut ret = vec![];
-            for e in es {
-                let sub = normalize_bool_expr(env, e, neg);
-                ret.extend(sub);
-            }
-            ret
-        }
+        (BoolExpr::And(es), false) | (BoolExpr::Or(es), true) => normalize_conjunction(
+            es.into_iter()
+                .map(|e| normalize_bool_expr(env, e, neg))
+                .collect(),
+        ),
         (BoolExpr::And(es), true) | (BoolExpr::Or(es), false) => {
             let constrs = es
                 .into_iter()
@@ -195,58 +191,46 @@ fn normalize_bool_expr(env: &mut NormalizerEnv, expr: &mut BoolExpr, neg: bool) 
         }
         (BoolExpr::Not(e), neg) => normalize_bool_expr(env, e, !neg),
         (BoolExpr::Xor(e1, e2), false) | (BoolExpr::Iff(e1, e2), true) => {
-            let mut e1_data = Box::new(BoolExpr::Const(false));
-            let mut e2_data = Box::new(BoolExpr::Const(false));
-            std::mem::swap(e1, &mut e1_data);
-            std::mem::swap(e2, &mut e2_data);
-            let mut tmp_expr = BoolExpr::Or(vec![e1_data, e2_data]);
-            let mut ret = normalize_bool_expr(env, &mut tmp_expr, false);
-
-            let (mut x, mut y) = tmp_expr.decompose_binary_or();
-            tmp_expr = BoolExpr::Or(vec![Box::new(BoolExpr::Not(x)), Box::new(BoolExpr::Not(y))]);
-            ret.extend(normalize_bool_expr(env, &mut tmp_expr, false));
-
-            let (mut x, mut y) = tmp_expr.decompose_binary_or();
-            x = x.decompose_neg();
-            y = y.decompose_neg();
-            std::mem::swap(e1, &mut x);
-            std::mem::swap(e2, &mut y);
-
-            ret
+            let sub1 = vec![
+                normalize_bool_expr(env, e1, false),
+                normalize_bool_expr(env, e2, false),
+            ];
+            let sub2 = vec![
+                normalize_bool_expr(env, e1, true),
+                normalize_bool_expr(env, e2, true),
+            ];
+            normalize_conjunction(vec![
+                normalize_disjunction(env, sub1),
+                normalize_disjunction(env, sub2),
+            ])
         }
         (BoolExpr::Xor(e1, e2), true) | (BoolExpr::Iff(e1, e2), false) => {
-            let mut e1_data = Box::new(BoolExpr::Const(false));
-            let mut e2_data = Box::new(BoolExpr::Const(false));
-            std::mem::swap(e1, &mut e1_data);
-            std::mem::swap(e2, &mut e2_data);
-            let mut tmp_expr = BoolExpr::Or(vec![e1_data, Box::new(BoolExpr::Not(e2_data))]);
-            let mut ret = normalize_bool_expr(env, &mut tmp_expr, false);
-
-            let (x, mut y) = tmp_expr.decompose_binary_or();
-            y = y.decompose_neg();
-            tmp_expr = BoolExpr::Or(vec![Box::new(BoolExpr::Not(x)), y]);
-            ret.extend(normalize_bool_expr(env, &mut tmp_expr, false));
-
-            let (mut x, mut y) = tmp_expr.decompose_binary_or();
-            x = x.decompose_neg();
-            std::mem::swap(e1, &mut x);
-            std::mem::swap(e2, &mut y);
-
-            ret
+            let sub1 = vec![
+                normalize_bool_expr(env, e1, false),
+                normalize_bool_expr(env, e2, true),
+            ];
+            let sub2 = vec![
+                normalize_bool_expr(env, e1, true),
+                normalize_bool_expr(env, e2, false),
+            ];
+            normalize_conjunction(vec![
+                normalize_disjunction(env, sub1),
+                normalize_disjunction(env, sub2),
+            ])
         }
-        (BoolExpr::Imp(e1, e2), _) => {
-            let mut e1_data = Box::new(BoolExpr::Const(false));
-            let mut e2_data = Box::new(BoolExpr::Const(false));
-            std::mem::swap(e1, &mut e1_data);
-            std::mem::swap(e2, &mut e2_data);
-            let mut tmp_expr = BoolExpr::Or(vec![Box::new(BoolExpr::Not(e1_data)), e2_data]);
-            let ret = normalize_bool_expr(env, &mut tmp_expr, neg);
-
-            let (mut x, mut y) = tmp_expr.decompose_binary_or();
-            x = x.decompose_neg();
-            std::mem::swap(e1, &mut x);
-            std::mem::swap(e2, &mut y);
-            ret
+        (BoolExpr::Imp(e1, e2), false) => {
+            let constrs = vec![
+                normalize_bool_expr(env, e1, true),
+                normalize_bool_expr(env, e2, false),
+            ];
+            normalize_disjunction(env, constrs)
+        }
+        (BoolExpr::Imp(e1, e2), true) => {
+            let constrs = vec![
+                normalize_bool_expr(env, e1, false),
+                normalize_bool_expr(env, e2, true),
+            ];
+            normalize_conjunction(constrs)
         }
         (BoolExpr::Cmp(op, e1, e2), _) => {
             let op = if neg {
@@ -270,6 +254,14 @@ fn normalize_bool_expr(env: &mut NormalizerEnv, expr: &mut BoolExpr, neg: bool) 
             return vec![constraint];
         }
     }
+}
+
+fn normalize_conjunction(constrs: Vec<Vec<Constraint>>) -> Vec<Constraint> {
+    let mut ret = vec![];
+    for constr in constrs {
+        ret.extend(constr);
+    }
+    ret
 }
 
 fn normalize_disjunction(
@@ -307,14 +299,14 @@ fn normalize_disjunction(
     }
 }
 
-fn normalize_int_expr(env: &mut NormalizerEnv, expr: &mut IntExpr) -> LinearSum {
+fn normalize_int_expr(env: &mut NormalizerEnv, expr: &IntExpr) -> LinearSum {
     match expr {
-        &mut IntExpr::Const(c) => LinearSum::constant(c),
-        &mut IntExpr::Var(v) => {
+        &IntExpr::Const(c) => LinearSum::constant(c),
+        &IntExpr::Var(v) => {
             let nv = env.convert_int_var(v);
             LinearSum::singleton(nv)
         }
-        &mut IntExpr::NVar(v) => LinearSum::singleton(v),
+        &IntExpr::NVar(v) => LinearSum::singleton(v),
         IntExpr::Linear(es) => {
             let mut ret = LinearSum::new();
             for (e, coef) in es {
