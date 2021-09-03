@@ -57,11 +57,11 @@ impl NormalizeMap {
         }
     }
 
-    fn get_bool_var(&self, var: BoolVar) -> Option<NBoolVar> {
+    pub fn get_bool_var(&self, var: BoolVar) -> Option<NBoolVar> {
         self.bool_map[var.0]
     }
 
-    fn get_int_var(&self, var: IntVar) -> Option<NIntVar> {
+    pub fn get_int_var(&self, var: IntVar) -> Option<NIntVar> {
         self.int_map[var.0]
     }
 }
@@ -513,7 +513,7 @@ mod tests {
             normalize(&mut self.csp, &mut self.norm, &mut self.map);
 
             let mut unfixed_bool_vars = BTreeSet::<NBoolVar>::new();
-            for i in 0..self.norm.num_bool_var {
+            for i in 0..self.norm.vars.num_bool_var {
                 unfixed_bool_vars.insert(NBoolVar(i));
             }
 
@@ -531,7 +531,7 @@ mod tests {
             self.unfixed_bool_vars = unfixed_bool_vars.into_iter().collect::<Vec<_>>();
 
             let mut unfixed_int_vars = BTreeSet::<NIntVar>::new();
-            for i in 0..self.norm.int_var.len() {
+            for i in 0..self.norm.vars.int_var.len() {
                 unfixed_int_vars.insert(NIntVar(i));
             }
 
@@ -620,7 +620,7 @@ mod tests {
                 return self.is_satisfied_norm(assignment);
             }
             let var = self.unfixed_int_vars[idx];
-            let dom = self.norm.int_var[var.0];
+            let dom = self.norm.vars.int_var[var.0];
             for i in dom.enumerate() {
                 assignment.int_val.insert(var, i);
                 if self.has_satisfying_assignment_int(idx + 1, assignment) {

@@ -162,30 +162,36 @@ impl Constraint {
     }
 }
 
-pub struct NormCSP {
+pub(super) struct NormCSPVars {
     pub(super) num_bool_var: usize,
     pub(super) int_var: Vec<super::csp::Domain>,
+}
+
+pub struct NormCSP {
+    pub(super) vars: NormCSPVars,
     pub(super) constraints: Vec<Constraint>,
 }
 
 impl NormCSP {
     pub fn new() -> NormCSP {
         NormCSP {
-            num_bool_var: 0,
-            int_var: vec![],
+            vars: NormCSPVars {
+                num_bool_var: 0,
+                int_var: vec![],
+            },
             constraints: vec![],
         }
     }
 
     pub fn new_bool_var(&mut self) -> BoolVar {
-        let id = self.num_bool_var;
-        self.num_bool_var += 1;
+        let id = self.vars.num_bool_var;
+        self.vars.num_bool_var += 1;
         BoolVar(id)
     }
 
     pub fn new_int_var(&mut self, domain: super::csp::Domain) -> IntVar {
-        let id = self.int_var.len();
-        self.int_var.push(domain);
+        let id = self.vars.int_var.len();
+        self.vars.int_var.push(domain);
         IntVar(id)
     }
 
@@ -197,7 +203,7 @@ impl NormCSP {
         let mut ret = Domain::range(linear_sum.constant, linear_sum.constant);
 
         for (var, coef) in &linear_sum.term {
-            ret = ret + self.int_var[var.0] * *coef;
+            ret = ret + self.vars.int_var[var.0] * *coef;
         }
 
         ret

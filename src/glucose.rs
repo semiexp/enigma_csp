@@ -1,3 +1,5 @@
+use std::ops::{Drop, Not};
+
 #[repr(C)]
 struct Opaque {
     _private: [u8; 0],
@@ -23,6 +25,22 @@ pub struct Lit(i32);
 impl Lit {
     pub fn new(var: Var, negated: bool) -> Lit {
         Lit(var.0 * 2 + if negated { 1 } else { 0 })
+    }
+
+    pub fn var(self) -> Var {
+        Var(self.0 / 2)
+    }
+
+    pub fn is_negated(self) -> bool {
+        self.0 % 2 == 1
+    }
+}
+
+impl Not for Lit {
+    type Output = Lit;
+
+    fn not(self) -> Self::Output {
+        Lit(self.0 ^ 1)
     }
 }
 
@@ -65,6 +83,15 @@ impl Solver {
     }
 }
 
+impl Drop for Solver {
+    fn drop(&mut self) {
+        unsafe {
+            Glucose_DestroySolver(self.ptr);
+        }
+    }
+}
+
+#[derive(Clone, Copy)]
 pub struct Model<'a> {
     solver: &'a Solver,
 }
