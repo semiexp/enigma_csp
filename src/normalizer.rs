@@ -779,6 +779,16 @@ mod tests {
     }
 
     #[test]
+    fn test_normalization_linear_2() {
+        let mut tester = NormalizerTester::new();
+
+        let a = tester.new_int_var(Domain::range(0, 2));
+        let b = tester.new_int_var(Domain::range(0, 2));
+        tester.add_expr((a.expr() + b.expr()).ge(IntExpr::Const(3)));
+
+        tester.check();
+    }
+    #[test]
     fn test_normalization_if() {
         let mut tester = NormalizerTester::new();
 

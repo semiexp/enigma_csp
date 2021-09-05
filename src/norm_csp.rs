@@ -6,10 +6,10 @@ use std::ops::{Add, AddAssign, Mul, MulAssign, Sub, SubAssign};
 use super::csp::Domain;
 use super::CmpOp;
 
-#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug)]
 pub struct BoolVar(pub(super) usize);
 
-#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug)]
 pub struct IntVar(pub(super) usize);
 
 pub struct BoolLit {
@@ -23,7 +23,7 @@ impl BoolLit {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct LinearSum {
     pub(super) term: BTreeMap<IntVar, i32>,
     pub(super) constant: i32,
@@ -75,6 +75,7 @@ impl AddAssign<LinearSum> for LinearSum {
         for (&key, &value) in rhs.term.iter() {
             self.add_coef(key, value);
         }
+        self.add_constant(rhs.constant);
     }
 }
 
@@ -93,6 +94,7 @@ impl SubAssign<LinearSum> for LinearSum {
         for (&key, &value) in rhs.term.iter() {
             self.add_coef(key, -value);
         }
+        self.add_constant(-rhs.constant);
     }
 }
 
