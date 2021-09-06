@@ -2,6 +2,7 @@ use super::csp::{BoolExpr, BoolVar, CSPVars, Domain, IntExpr, IntVar, Stmt, CSP}
 use super::norm_csp::BoolVar as NBoolVar;
 use super::norm_csp::IntVar as NIntVar;
 use super::norm_csp::{BoolLit, Constraint, LinearLit, LinearSum, NormCSP};
+use crate::util;
 
 use super::CmpOp;
 
@@ -456,6 +457,7 @@ mod tests {
         }
     }
 
+    #[derive(Clone)]
     struct NAssignment {
         bool_val: BTreeMap<NBoolVar, bool>,
         int_val: BTreeMap<NIntVar, i32>,
@@ -503,8 +505,6 @@ mod tests {
         norm: NormCSP,
         bool_vars: Vec<BoolVar>,
         int_vars: Vec<(IntVar, Domain)>,
-        unfixed_bool_vars: Vec<NBoolVar>,
-        unfixed_int_vars: Vec<NIntVar>,
         map: NormalizeMap,
     }
 
@@ -516,20 +516,18 @@ mod tests {
                 norm: NormCSP::new(),
                 bool_vars: vec![],
                 int_vars: vec![],
-                unfixed_bool_vars: vec![],
-                unfixed_int_vars: vec![],
                 map: NormalizeMap::new(),
             }
         }
 
         fn new_bool_var(&mut self) -> BoolVar {
-            let mut ret = self.csp.new_bool_var();
+            let ret = self.csp.new_bool_var();
             self.bool_vars.push(ret);
             ret
         }
 
         fn new_int_var(&mut self, domain: Domain) -> IntVar {
-            let mut ret = self.csp.new_int_var(domain.clone());
+            let ret = self.csp.new_int_var(domain.clone());
             self.int_vars.push((ret, domain));
             ret
         }
@@ -562,7 +560,7 @@ mod tests {
                     }
                 }
             }
-            self.unfixed_bool_vars = unfixed_bool_vars.into_iter().collect::<Vec<_>>();
+            let unfixed_bool_vars = unfixed_bool_vars.into_iter().collect::<Vec<_>>();
 
             let mut unfixed_int_vars = BTreeSet::<NIntVar>::new();
             for i in 0..self.norm.vars.int_var.len() {
@@ -580,88 +578,73 @@ mod tests {
                     }
                 }
             }
-            self.unfixed_int_vars = unfixed_int_vars.into_iter().collect::<Vec<_>>();
+            let unfixed_int_vars = unfixed_int_vars.into_iter().collect::<Vec<_>>();
 
-            let mut assignment = Assignment {
-                bool_val: BTreeMap::new(),
-                int_val: BTreeMap::new(),
-            };
-            self.exhaustive_test_bool_var(0, &mut assignment);
-        }
-
-        fn exhaustive_test_bool_var(&self, idx: usize, assignment: &mut Assignment) {
-            if idx == self.bool_vars.len() {
-                self.exhaustive_test_int_var(0, assignment);
-                return;
+            let mut bool_domains = vec![];
+            for _ in &self.bool_vars {
+                bool_domains.push(vec![false, true]);
             }
-            let var = self.bool_vars[idx];
-            assignment.bool_val.insert(var, false);
-            self.exhaustive_test_bool_var(idx + 1, assignment);
-            assignment.bool_val.insert(var, true);
-            self.exhaustive_test_bool_var(idx + 1, assignment);
-        }
+            let mut int_domains = vec![];
+            for (_, domain) in &self.int_vars {
+                int_domains.push(domain.enumerate());
+            }
 
-        fn exhaustive_test_int_var(&self, idx: usize, assignment: &mut Assignment) {
-            if idx == self.int_vars.len() {
-                let is_sat_csp = self.is_satisfied_csp(assignment);
-                println!("{:?}: {}", assignment, is_sat_csp);
+            let mut unfixed_bool_domains = vec![];
+            for _ in &unfixed_bool_vars {
+                unfixed_bool_domains.push(vec![false, true]);
+            }
+            let mut unfixed_int_domains = vec![];
+            for nv in &unfixed_int_vars {
+                unfixed_int_domains.push(self.norm.vars.int_var[nv.0].enumerate());
+            }
 
-                let mut n_assignment = NAssignment {
+            for (vb, vi) in util::product_binary(
+                &util::product_multi(&bool_domains),
+                &util::product_multi(&int_domains),
+            ) {
+                let mut assignment = Assignment {
                     bool_val: BTreeMap::new(),
                     int_val: BTreeMap::new(),
                 };
-                for (var, v) in &assignment.bool_val {
-                    n_assignment
-                        .bool_val
-                        .insert(self.map.get_bool_var(*var).unwrap(), *v);
+                for i in 0..self.bool_vars.len() {
+                    assignment.bool_val.insert(self.bool_vars[i], vb[i]);
                 }
-                for (var, v) in &assignment.int_val {
-                    n_assignment
-                        .int_val
-                        .insert(self.map.get_int_var(*var).unwrap(), *v);
+                for i in 0..self.int_vars.len() {
+                    assignment.int_val.insert(self.int_vars[i].0, vi[i]);
                 }
-
-                let is_sat_norm = self.has_satisfying_assignment_bool(0, &mut n_assignment);
-
+                let is_sat_csp = self.is_satisfied_csp(&assignment);
+                let mut is_sat_norm = false;
+                {
+                    let mut n_assignment = NAssignment {
+                        bool_val: BTreeMap::new(),
+                        int_val: BTreeMap::new(),
+                    };
+                    for i in 0..self.bool_vars.len() {
+                        n_assignment
+                            .bool_val
+                            .insert(self.map.get_bool_var(self.bool_vars[i]).unwrap(), vb[i]);
+                    }
+                    for i in 0..self.int_vars.len() {
+                        n_assignment
+                            .int_val
+                            .insert(self.map.get_int_var(self.int_vars[i].0).unwrap(), vi[i]);
+                    }
+                    for (ub, ui) in util::product_binary(
+                        &util::product_multi(&unfixed_bool_domains),
+                        &util::product_multi(&unfixed_int_domains),
+                    ) {
+                        let mut n_assignment = n_assignment.clone();
+                        for i in 0..unfixed_bool_vars.len() {
+                            n_assignment.bool_val.insert(unfixed_bool_vars[i], ub[i]);
+                        }
+                        for i in 0..unfixed_int_vars.len() {
+                            n_assignment.int_val.insert(unfixed_int_vars[i], ui[i]);
+                        }
+                        is_sat_norm |= self.is_satisfied_norm(&n_assignment);
+                    }
+                }
                 assert_eq!(is_sat_csp, is_sat_norm, "assignment: {:?}", assignment);
-                return;
             }
-            let var = self.int_vars[idx].0;
-            for i in self.int_vars[idx].1.enumerate() {
-                assignment.int_val.insert(var, i);
-                self.exhaustive_test_int_var(idx + 1, assignment);
-            }
-        }
-
-        fn has_satisfying_assignment_bool(&self, idx: usize, assignment: &mut NAssignment) -> bool {
-            if idx == self.unfixed_bool_vars.len() {
-                return self.has_satisfying_assignment_int(0, assignment);
-            }
-            let var = self.unfixed_bool_vars[idx];
-            assignment.bool_val.insert(var, false);
-            if self.has_satisfying_assignment_bool(idx + 1, assignment) {
-                return true;
-            }
-            assignment.bool_val.insert(var, true);
-            if self.has_satisfying_assignment_bool(idx + 1, assignment) {
-                return true;
-            }
-            false
-        }
-
-        fn has_satisfying_assignment_int(&self, idx: usize, assignment: &mut NAssignment) -> bool {
-            if idx == self.unfixed_int_vars.len() {
-                return self.is_satisfied_norm(assignment);
-            }
-            let var = self.unfixed_int_vars[idx];
-            let dom = self.norm.vars.int_var[var.0];
-            for i in dom.enumerate() {
-                assignment.int_val.insert(var, i);
-                if self.has_satisfying_assignment_int(idx + 1, assignment) {
-                    return true;
-                }
-            }
-            false
         }
 
         fn is_satisfied_csp(&self, assignment: &Assignment) -> bool {

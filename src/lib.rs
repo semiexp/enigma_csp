@@ -5,6 +5,7 @@ pub mod integration;
 pub mod norm_csp;
 pub mod normalizer;
 pub mod sat;
+mod util;
 
 #[derive(Clone, Copy, Hash)]
 pub enum CmpOp {
