@@ -6,10 +6,10 @@ use std::ops::{Add, AddAssign, Mul, MulAssign, Sub, SubAssign};
 use super::csp::Domain;
 use super::CmpOp;
 
-#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug)]
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug, Hash)]
 pub struct BoolVar(pub(super) usize);
 
-#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug)]
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug, Hash)]
 pub struct IntVar(pub(super) usize);
 
 pub struct BoolLit {

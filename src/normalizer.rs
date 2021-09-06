@@ -109,10 +109,14 @@ pub fn normalize(csp: &mut CSP, norm: &mut NormCSP, map: &mut NormalizeMap) {
 fn normalize_stmt(env: &mut NormalizerEnv, stmt: Stmt) {
     match stmt {
         Stmt::Expr(mut expr) => {
-            // TODO: apply Tseitin transformation to avoid the exponential explosion of constraints caused by Iff/Xor
-            let constraints = normalize_bool_expr(env, &expr, false);
-            for c in constraints {
-                env.norm.add_constraint(c);
+            let mut exprs = vec![];
+            tseitin_transformation_bool(env, &mut exprs, &mut expr, false);
+            exprs.push(expr);
+            for expr in exprs {
+                let constraints = normalize_bool_expr(env, &expr, false);
+                for c in constraints {
+                    env.norm.add_constraint(c);
+                }
             }
         }
         Stmt::AllDifferent(exprs) => {
@@ -145,6 +149,7 @@ fn tseitin_transformation_bool(
                 let mut f2 = BoolExpr::NVar(v2);
                 std::mem::swap(e2.as_mut(), &mut f2);
 
+                // TODO: use cache
                 tseitin_transformation_bool(env, extra, &mut f1, true);
                 extra.push(BoolExpr::Iff(Box::new(f1), Box::new(BoolExpr::NVar(v1))));
 
@@ -160,7 +165,28 @@ fn tseitin_transformation_bool(
             tseitin_transformation_bool(env, extra, e1, transform);
             tseitin_transformation_bool(env, extra, e2, transform);
         }
-        BoolExpr::Cmp(_, e1, e2) => todo!(),
+        BoolExpr::Cmp(_, e1, e2) => {
+            tseitin_transformation_int(env, extra, e1);
+            tseitin_transformation_int(env, extra, e2);
+        }
+    }
+}
+
+fn tseitin_transformation_int(
+    env: &mut NormalizerEnv,
+    extra: &mut Vec<BoolExpr>,
+    expr: &mut IntExpr,
+) {
+    match expr {
+        IntExpr::Const(_) | IntExpr::Var(_) | IntExpr::NVar(_) => (),
+        IntExpr::Linear(terms) => terms
+            .iter_mut()
+            .for_each(|term| tseitin_transformation_int(env, extra, &mut term.0)),
+        IntExpr::If(c, t, f) => {
+            tseitin_transformation_bool(env, extra, c, true);
+            tseitin_transformation_int(env, extra, t);
+            tseitin_transformation_int(env, extra, f);
+        }
     }
 }
 
@@ -713,12 +739,25 @@ mod tests {
     }
 
     #[test]
-    fn test_normalization_xor() {
+    fn test_normalization_xor1() {
         let mut tester = NormalizerTester::new();
 
         let x = tester.new_bool_var();
         let y = tester.new_bool_var();
         tester.add_expr(x.expr() ^ y.expr());
+
+        tester.check();
+    }
+
+    #[test]
+    fn test_normalization_xor2() {
+        let mut tester = NormalizerTester::new();
+
+        let x = tester.new_bool_var();
+        let y = tester.new_bool_var();
+        let z = tester.new_bool_var();
+        let w = tester.new_bool_var();
+        tester.add_expr(x.expr() ^ y.expr() ^ z.expr() ^ w.expr());
 
         tester.check();
     }
@@ -732,6 +771,22 @@ mod tests {
         tester.add_expr(x.expr().iff(y.expr()));
 
         tester.check();
+    }
+
+    #[test]
+    fn test_normalization_many_xor() {
+        let mut csp = CSP::new();
+
+        let mut expr = csp.new_bool_var().expr();
+        for _ in 0..20 {
+            expr = csp.new_bool_var().expr() ^ expr;
+        }
+        csp.add_constraint(Stmt::Expr(expr));
+
+        let mut norm_csp = NormCSP::new();
+        let mut map = NormalizeMap::new();
+        normalize(&mut csp, &mut norm_csp, &mut map);
+        assert!(norm_csp.constraints.len() <= 200);
     }
 
     #[test]

@@ -6,7 +6,7 @@ pub mod norm_csp;
 pub mod normalizer;
 pub mod sat;
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Hash)]
 pub enum CmpOp {
     Eq,
     Ne,

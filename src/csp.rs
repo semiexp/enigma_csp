@@ -103,7 +103,7 @@ impl IntVarData {
     }
 }
 
-#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug)]
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug, Hash)]
 pub struct BoolVar(pub(super) usize);
 
 impl BoolVar {
@@ -112,7 +112,7 @@ impl BoolVar {
     }
 }
 
-#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug)]
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug, Hash)]
 pub struct IntVar(pub(super) usize);
 
 impl IntVar {
@@ -128,7 +128,7 @@ pub enum Stmt {
     // TODO: graph constraints go here
 }
 
-#[derive(Clone)]
+#[derive(Clone, Hash)]
 pub enum BoolExpr {
     Const(bool),
     Var(BoolVar),
@@ -214,7 +214,7 @@ impl Not for BoolExpr {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Hash)]
 pub enum IntExpr {
     Const(i32),
     Var(IntVar),
