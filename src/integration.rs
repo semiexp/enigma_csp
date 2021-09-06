@@ -77,8 +77,6 @@ impl IntegratedSolver {
                     for &var in &bool_vars {
                         let val = model.get_bool(var);
                         assignment.set_bool(var, val);
-                        // TODO: the following fails:
-                        // refutation.push(Box::new(var.expr() ^ BoolExpr::Const(val)));
                         if val {
                             refutation.push(Box::new(!var.expr()));
                         } else {
@@ -410,6 +408,26 @@ mod tests {
         let _ = model.get_int(a);
         let _ = model.get_int(b);
         let _ = model.get_int(c);
+    }
+
+    #[test]
+    fn test_integration_solve_twice() {
+        let mut solver = IntegratedSolver::new();
+
+        let x = solver.new_bool_var();
+        let y = solver.new_bool_var();
+        solver.add_expr((x.expr() ^ BoolExpr::Const(false)) | (y.expr() ^ BoolExpr::Const(true)));
+
+        {
+            let model = solver.solve();
+            assert!(model.is_some());
+        }
+
+        solver.add_expr(x.expr() ^ y.expr());
+        {
+            let model = solver.solve();
+            assert!(model.is_some());
+        }
     }
 
     #[test]

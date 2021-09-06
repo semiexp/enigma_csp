@@ -12,6 +12,7 @@ pub struct BoolVar(pub(super) usize);
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug, Hash)]
 pub struct IntVar(pub(super) usize);
 
+#[derive(Debug)]
 pub struct BoolLit {
     pub(super) var: BoolVar,
     pub(super) negated: bool,
@@ -147,6 +148,7 @@ impl LinearLit {
     }
 }
 
+#[derive(Debug)]
 pub struct Constraint {
     pub(super) bool_lit: Vec<BoolLit>,
     pub(super) linear_lit: Vec<LinearLit>,

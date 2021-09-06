@@ -312,9 +312,12 @@ fn normalize_disjunction(
         let mut ret = vec![];
         let mut aux = Constraint::new();
 
+        if constrs.iter().any(|constr| constr.len() == 0) {
+            return vec![];
+        }
         for mut constr in constrs {
             if constr.len() == 0 {
-                continue;
+                unreachable!();
             } else if constr.len() == 1 {
                 let c = constr.remove(0);
                 aux.bool_lit.extend(c.bool_lit);
@@ -649,6 +652,16 @@ mod tests {
         let mut map = NormalizeMap::new();
         normalize(&mut csp, &mut norm_csp, &mut map);
         assert!(norm_csp.constraints.len() <= 200);
+    }
+
+    #[test]
+    fn test_normalization_xor_constant() {
+        let mut tester = NormalizerTester::new();
+
+        let x = tester.new_bool_var();
+        tester.add_expr(x.expr() ^ BoolExpr::Const(false));
+
+        tester.check();
     }
 
     #[test]
