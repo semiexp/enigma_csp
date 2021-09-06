@@ -1,6 +1,9 @@
-use super::norm_csp::{BoolLit, BoolVar, Constraint, NormCSP, NormCSPVars};
+use super::norm_csp::{BoolLit, BoolVar, Constraint, IntVar, LinearSum, NormCSP, NormCSPVars};
 use super::sat::{Lit, SATModel, Var, VarArray, SAT};
+use super::CmpOp;
 
+/// Order encoding of an integer variable with domain of `domain`.
+/// `vars[i]` is the logical variable representing (the value of this int variable) >= `domain[i+1]`.
 pub struct OrderEncoding {
     domain: Vec<i32>,
     vars: VarArray,
@@ -45,12 +48,53 @@ impl EncodeMap {
         }
     }
 
-    pub fn get_bool_var(&self, var: BoolVar) -> Option<Lit> {
-        self.bool_map[var.0]
+    fn convert_int_var(&mut self, norm_vars: &NormCSPVars, sat: &mut SAT, var: IntVar) {
+        // Currently, only order encoding is supported
+        let id = var.0;
+
+        while self.int_map.len() <= id {
+            self.int_map.push(None);
+        }
+
+        if self.int_map[id].is_none() {
+            let domain = norm_vars.int_var[id].enumerate();
+            assert_ne!(domain.len(), 0);
+            let vars = sat.new_vars((domain.len() - 1) as i32);
+            for i in 1..vars.len() {
+                // vars[i] implies vars[i - 1]
+                sat.add_clause(vec![vars.at(i).as_lit(true), vars.at(i - 1).as_lit(false)]);
+            }
+
+            self.int_map[id] = Some(OrderEncoding { domain, vars });
+        }
     }
 
-    pub fn get_int_value<'a, 'b>(&'a self, model: SATModel<'b>) -> i32 {
-        todo!();
+    pub fn get_bool_var(&self, var: BoolVar) -> Option<Lit> {
+        if var.0 < self.bool_map.len() {
+            self.bool_map[var.0]
+        } else {
+            None
+        }
+    }
+
+    pub fn get_int_value(&self, model: &SATModel, var: IntVar) -> Option<i32> {
+        if var.0 >= self.int_map.len() || self.int_map[var.0].is_none() {
+            return None;
+        }
+        let encoding = self.int_map[var.0].as_ref().unwrap();
+
+        // Find the number of true value in `encoding.vars`
+        let mut left = 0;
+        let mut right = encoding.vars.len();
+        while left < right {
+            let mid = (left + right + 1) / 2;
+            if model.assignment(encoding.vars.at(mid - 1)) {
+                left = mid;
+            } else {
+                right = mid - 1;
+            }
+        }
+        Some(encoding.domain[left as usize])
     }
 }
 
@@ -67,6 +111,11 @@ impl<'a, 'b, 'c> EncoderEnv<'a, 'b, 'c> {
 }
 
 pub fn encode(norm: &mut NormCSP, sat: &mut SAT, map: &mut EncodeMap) {
+    // TODO: don't encode an int variables more than once
+    for i in 0..norm.vars.int_var.len() {
+        map.convert_int_var(&mut norm.vars, sat, IntVar(i));
+    }
+
     let mut env = EncoderEnv {
         norm_vars: &mut norm.vars,
         sat,
@@ -90,6 +139,132 @@ fn encode_constraint(env: &mut EncoderEnv, constr: Constraint) {
 
         env.sat.add_clause(clause);
         return;
+    } else if constr.linear_lit.len() == 1 {
+        let mut constr = constr;
+        let mut linear_lit = constr.linear_lit.remove(0);
+
+        let bool_lit = constr
+            .bool_lit
+            .into_iter()
+            .map(|lit| env.convert_bool_lit(lit))
+            .collect::<Vec<_>>();
+
+        match linear_lit.op {
+            CmpOp::Eq => {
+                encode_linear_ge(env, &linear_lit.sum, &bool_lit);
+                linear_lit.sum *= -1;
+                encode_linear_ge(env, &linear_lit.sum, &bool_lit);
+            }
+            CmpOp::Ne => todo!(),
+            CmpOp::Le => {
+                linear_lit.sum *= -1;
+                encode_linear_ge(env, &linear_lit.sum, &bool_lit);
+            }
+            CmpOp::Lt => {
+                linear_lit.sum *= -1;
+                linear_lit.sum.add_constant(-1);
+                encode_linear_ge(env, &linear_lit.sum, &bool_lit);
+            }
+            CmpOp::Ge => {
+                encode_linear_ge(env, &linear_lit.sum, &bool_lit);
+            }
+            CmpOp::Gt => {
+                linear_lit.sum.add_constant(-1);
+                encode_linear_ge(env, &linear_lit.sum, &bool_lit);
+            }
+        }
+        return;
     }
     todo!();
+}
+
+/// Helper struct for encoding linear constraints on variables represented in order encoding.
+/// With this struct, all coefficients can be virtually treated as positive.
+struct LinearInfoForOrderEncoding<'a> {
+    coef: Vec<i32>,
+    encoding: Vec<&'a OrderEncoding>,
+}
+
+impl<'a> LinearInfoForOrderEncoding<'a> {
+    pub fn new(coef: Vec<i32>, encoding: Vec<&'a OrderEncoding>) -> LinearInfoForOrderEncoding<'a> {
+        LinearInfoForOrderEncoding { coef, encoding }
+    }
+
+    fn len(&self) -> usize {
+        self.coef.len()
+    }
+
+    /// Coefficient of the i-th variable (after normalizing negative coefficients)
+    fn coef(&self, i: usize) -> i32 {
+        self.coef[i].abs()
+    }
+
+    fn domain_size(&self, i: usize) -> usize {
+        self.encoding[i].domain.len()
+    }
+
+    /// j-th smallest domain value for the i-th variable (after normalizing negative coefficients)
+    fn domain(&self, i: usize, j: usize) -> i32 {
+        if self.coef[i] > 0 {
+            self.encoding[i].domain[j]
+        } else {
+            -self.encoding[i].domain[self.encoding[i].domain.len() - 1 - j]
+        }
+    }
+
+    /// The literal asserting that (the value of the i-th variable) is at least `domain(i, j)`.
+    fn at_least(&self, i: usize, j: usize) -> Lit {
+        assert!(0 < j && j < self.encoding[i].domain.len());
+        if self.coef[i] > 0 {
+            self.encoding[i].vars.at((j - 1) as i32).as_lit(false)
+        } else {
+            self.encoding[i]
+                .vars
+                .at((self.encoding[i].domain.len() - 1 - j) as i32)
+                .as_lit(true)
+        }
+    }
+}
+
+fn encode_linear_ge(env: &mut EncoderEnv, sum: &LinearSum, bool_lit: &Vec<Lit>) {
+    // TODO: better ordering of variables
+    let mut coef = vec![];
+    let mut encoding = vec![];
+    for (v, c) in sum.terms() {
+        assert_ne!(c, 0);
+        coef.push(c);
+        encoding.push(env.map.int_map[v.0].as_ref().unwrap());
+    }
+    let info = LinearInfoForOrderEncoding::new(coef, encoding);
+
+    fn encode_sub(
+        info: &LinearInfoForOrderEncoding,
+        sat: &mut SAT,
+        clause: &mut Vec<Lit>,
+        idx: usize,
+        constant: i32,
+    ) {
+        if idx == info.len() {
+            if constant < 0 {
+                sat.add_clause(clause.clone());
+            }
+            return;
+        }
+        let domain_size = info.domain_size(idx);
+        for j in 0..domain_size {
+            let new_constant = constant
+                .checked_add(info.domain(idx, j).checked_mul(info.coef(idx)).unwrap())
+                .unwrap();
+            if j + 1 < domain_size {
+                clause.push(info.at_least(idx, j + 1));
+            }
+            encode_sub(info, sat, clause, idx + 1, new_constant);
+            if j + 1 < domain_size {
+                clause.pop();
+            }
+        }
+    }
+
+    let mut clause = bool_lit.clone();
+    encode_sub(&info, &mut env.sat, &mut clause, 0, sum.constant);
 }

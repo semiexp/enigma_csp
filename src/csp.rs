@@ -16,6 +16,14 @@ impl Domain {
     pub fn enumerate(&self) -> Vec<i32> {
         (self.low..=self.high).into_iter().collect::<Vec<_>>()
     }
+
+    pub fn lower_bound(&self) -> i32 {
+        self.low
+    }
+
+    pub fn upper_bound(&self) -> i32 {
+        self.high
+    }
 }
 
 impl Add<Domain> for Domain {
@@ -266,6 +274,7 @@ impl Mul<i32> for IntExpr {
 }
 
 pub(super) struct CSPVars {
+    // TODO: remove `pub(super)`
     pub(super) bool_var: Vec<BoolVarData>,
     pub(super) int_var: Vec<IntVarData>,
 }

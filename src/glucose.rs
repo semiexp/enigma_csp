@@ -19,7 +19,7 @@ extern "C" {
 pub struct Var(i32);
 
 #[repr(C)]
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub struct Lit(i32);
 
 impl Lit {

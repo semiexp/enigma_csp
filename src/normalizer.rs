@@ -58,11 +58,19 @@ impl NormalizeMap {
     }
 
     pub fn get_bool_var(&self, var: BoolVar) -> Option<NBoolVar> {
-        self.bool_map[var.0]
+        if var.0 < self.bool_map.len() {
+            self.bool_map[var.0]
+        } else {
+            None
+        }
     }
 
     pub fn get_int_var(&self, var: IntVar) -> Option<NIntVar> {
-        self.int_map[var.0]
+        if var.0 < self.int_map.len() {
+            self.int_map[var.0]
+        } else {
+            None
+        }
     }
 }
 

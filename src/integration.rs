@@ -1,4 +1,4 @@
-use super::csp::{BoolExpr, BoolVar, Domain, IntVar, Stmt, CSP};
+use super::csp::{BoolExpr, BoolVar, Domain, IntExpr, IntVar, Stmt, CSP};
 use super::encoder::{encode, EncodeMap};
 use super::norm_csp::NormCSP;
 use super::normalizer::{normalize, NormalizeMap};
@@ -45,6 +45,7 @@ impl IntegratedSolver {
 
         match self.sat.solve() {
             Some(model) => Some(Model {
+                csp: &self.csp,
                 normalize_map: &self.normalize_map,
                 encode_map: &self.encode_map,
                 model,
@@ -55,6 +56,7 @@ impl IntegratedSolver {
 }
 
 pub struct Model<'a> {
+    csp: &'a CSP,
     normalize_map: &'a NormalizeMap,
     encode_map: &'a EncodeMap,
     model: SATModel<'a>,
@@ -62,9 +64,18 @@ pub struct Model<'a> {
 
 impl<'a> Model<'a> {
     pub fn get_bool(&self, var: BoolVar) -> bool {
-        let norm_var = self.normalize_map.get_bool_var(var).unwrap(); // TODO: remove `unwrap`
-        let sat_lit = self.encode_map.get_bool_var(norm_var).unwrap(); // TODO: remove `unwrap`
-        self.model.assignment(sat_lit.var()) ^ sat_lit.is_negated()
+        self.normalize_map
+            .get_bool_var(var)
+            .and_then(|norm_var| self.encode_map.get_bool_var(norm_var))
+            .map(|sat_lit| self.model.assignment(sat_lit.var()) ^ sat_lit.is_negated())
+            .unwrap_or(false) // unused variable optimization
+    }
+
+    pub fn get_int(&self, var: IntVar) -> i32 {
+        self.normalize_map
+            .get_int_var(var)
+            .and_then(|norm_var| self.encode_map.get_int_value(&self.model, norm_var))
+            .unwrap_or(self.csp.vars.int_var[var.0].domain.lower_bound()) // unused variable optimization
     }
 }
 
@@ -144,5 +155,74 @@ mod tests {
 
         let model = solver.solve();
         assert!(model.is_none());
+    }
+
+    #[test]
+    fn test_integration_simple_linear1() {
+        let mut solver = IntegratedSolver::new();
+
+        let a = solver.new_int_var(Domain::range(0, 2));
+        let b = solver.new_int_var(Domain::range(0, 2));
+        solver.add_expr((a.expr() + b.expr()).ge(IntExpr::Const(3)));
+        solver.add_expr(a.expr().gt(b.expr()));
+
+        let model = solver.solve();
+        assert!(model.is_some());
+        let model = model.unwrap();
+        assert_eq!(model.get_int(a), 2);
+        assert_eq!(model.get_int(b), 1);
+    }
+
+    #[test]
+    fn test_integration_simple_linear2() {
+        let mut solver = IntegratedSolver::new();
+
+        let a = solver.new_int_var(Domain::range(1, 4));
+        let b = solver.new_int_var(Domain::range(1, 4));
+        let c = solver.new_int_var(Domain::range(1, 4));
+        solver.add_expr((a.expr() + b.expr() + c.expr()).ge(IntExpr::Const(9)));
+        solver.add_expr(a.expr().gt(b.expr()));
+        solver.add_expr(b.expr().gt(c.expr()));
+
+        let model = solver.solve();
+        assert!(model.is_some());
+        let model = model.unwrap();
+        assert_eq!(model.get_int(a), 4);
+        assert_eq!(model.get_int(b), 3);
+        assert_eq!(model.get_int(c), 2);
+    }
+
+    #[test]
+    fn test_integration_unused_bool() {
+        let mut solver = IntegratedSolver::new();
+
+        let x = solver.new_bool_var();
+        let y = solver.new_bool_var();
+        let z = solver.new_bool_var();
+        solver.add_expr(y.expr() | z.expr());
+
+        let model = solver.solve();
+        assert!(model.is_some());
+        let model = model.unwrap();
+        let _ = model.get_bool(x);
+        let _ = model.get_bool(y);
+        let _ = model.get_bool(z);
+    }
+
+    #[test]
+    fn test_integration_unused_int() {
+        let mut solver = IntegratedSolver::new();
+
+        let a = solver.new_int_var(Domain::range(0, 2));
+        let b = solver.new_int_var(Domain::range(0, 2));
+        let c = solver.new_int_var(Domain::range(0, 2));
+        solver.add_expr(a.expr().gt(b.expr()));
+
+        let model = solver.solve();
+        assert!(model.is_some());
+        let model = model.unwrap();
+        let _ = model.get_int(a);
+        let _ = model.get_int(b);
+        let _ = model.get_int(c);
     }
 }

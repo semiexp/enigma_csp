@@ -68,6 +68,10 @@ impl LinearSum {
             self.term.insert(var, new_coef);
         }
     }
+
+    pub fn terms(&self) -> Vec<(IntVar, i32)> {
+        self.term.iter().map(|(v, c)| (*v, *c)).collect()
+    }
 }
 
 impl AddAssign<LinearSum> for LinearSum {
@@ -165,6 +169,7 @@ impl Constraint {
 }
 
 pub(super) struct NormCSPVars {
+    // TODO: remove `pub(super)`
     pub(super) num_bool_var: usize,
     pub(super) int_var: Vec<super::csp::Domain>,
 }

@@ -14,7 +14,7 @@ impl Var {
     }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug)]
 pub struct Lit(GlucoseLit);
 
 impl Lit {
