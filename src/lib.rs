@@ -7,7 +7,7 @@ pub mod normalizer;
 pub mod sat;
 mod util;
 
-#[derive(Clone, Copy, Hash)]
+#[derive(Clone, Copy, Debug, Hash)]
 pub enum CmpOp {
     Eq,
     Ne,

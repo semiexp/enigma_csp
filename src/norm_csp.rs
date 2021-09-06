@@ -135,6 +135,7 @@ impl Mul<i32> for LinearSum {
 }
 
 /// Literal stating (`sum` `op` 0) where `op` is one of comparison operators (like `>=`).
+#[derive(Clone, Debug)]
 pub struct LinearLit {
     pub(super) sum: LinearSum,
     pub(super) op: CmpOp,

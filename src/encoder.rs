@@ -1,4 +1,6 @@
-use super::norm_csp::{BoolLit, BoolVar, Constraint, IntVar, LinearSum, NormCSP, NormCSPVars};
+use super::norm_csp::{
+    BoolLit, BoolVar, Constraint, IntVar, LinearLit, LinearSum, NormCSP, NormCSPVars,
+};
 use super::sat::{Lit, SATModel, Var, VarArray, SAT};
 use super::CmpOp;
 
@@ -139,43 +141,76 @@ fn encode_constraint(env: &mut EncoderEnv, constr: Constraint) {
 
         env.sat.add_clause(clause);
         return;
-    } else if constr.linear_lit.len() == 1 {
-        let mut constr = constr;
-        let mut linear_lit = constr.linear_lit.remove(0);
+    }
+    let mut constr = constr;
+    let mut linear_lits = vec![];
 
-        let bool_lit = constr
-            .bool_lit
-            .into_iter()
-            .map(|lit| env.convert_bool_lit(lit))
-            .collect::<Vec<_>>();
-
+    for mut linear_lit in constr.linear_lit {
         match linear_lit.op {
             CmpOp::Eq => {
-                encode_linear_ge(env, &linear_lit.sum, &bool_lit);
-                linear_lit.sum *= -1;
-                encode_linear_ge(env, &linear_lit.sum, &bool_lit);
+                linear_lits.push(linear_lit);
             }
-            CmpOp::Ne => todo!(),
+            CmpOp::Ne => {
+                {
+                    let mut linear_lit = linear_lit.clone();
+                    linear_lit.sum *= -1;
+                    linear_lit.sum.add_constant(-1);
+                    linear_lits.push(LinearLit::new(linear_lit.sum, CmpOp::Ge));
+                }
+                {
+                    linear_lit.sum.add_constant(-1);
+                    linear_lits.push(LinearLit::new(linear_lit.sum, CmpOp::Ge));
+                }
+            }
             CmpOp::Le => {
                 linear_lit.sum *= -1;
-                encode_linear_ge(env, &linear_lit.sum, &bool_lit);
+                linear_lits.push(LinearLit::new(linear_lit.sum, CmpOp::Ge));
             }
             CmpOp::Lt => {
                 linear_lit.sum *= -1;
                 linear_lit.sum.add_constant(-1);
-                encode_linear_ge(env, &linear_lit.sum, &bool_lit);
+                linear_lits.push(LinearLit::new(linear_lit.sum, CmpOp::Ge));
             }
             CmpOp::Ge => {
-                encode_linear_ge(env, &linear_lit.sum, &bool_lit);
+                linear_lits.push(LinearLit::new(linear_lit.sum, CmpOp::Ge));
             }
             CmpOp::Gt => {
                 linear_lit.sum.add_constant(-1);
-                encode_linear_ge(env, &linear_lit.sum, &bool_lit);
+                linear_lits.push(LinearLit::new(linear_lit.sum, CmpOp::Ge));
             }
         }
-        return;
     }
-    todo!();
+
+    fn encode(env: &mut EncoderEnv, mut linear: LinearLit, bool_lit: &Vec<Lit>) {
+        match linear.op {
+            CmpOp::Ge => {
+                encode_linear_ge(env, &linear.sum, bool_lit);
+            }
+            CmpOp::Eq => {
+                encode_linear_ge(env, &linear.sum, bool_lit);
+                linear.sum *= -1;
+                encode_linear_ge(env, &linear.sum, bool_lit);
+            }
+            _ => unimplemented!(),
+        }
+    }
+
+    let mut bool_lit = constr
+        .bool_lit
+        .into_iter()
+        .map(|lit| env.convert_bool_lit(lit))
+        .collect::<Vec<_>>();
+
+    if linear_lits.len() == 1 {
+        encode(env, linear_lits.remove(0), &bool_lit);
+    } else {
+        for linear_lit in linear_lits {
+            let aux = env.sat.new_var();
+            bool_lit.push(aux.as_lit(false));
+            encode(env, linear_lit, &vec![aux.as_lit(true)]);
+        }
+        env.sat.add_clause(bool_lit);
+    }
 }
 
 /// Helper struct for encoding linear constraints on variables represented in order encoding.

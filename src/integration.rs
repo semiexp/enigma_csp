@@ -193,6 +193,58 @@ mod tests {
     }
 
     #[test]
+    fn test_integration_simple_linear3() {
+        let mut solver = IntegratedSolver::new();
+
+        let a = solver.new_int_var(Domain::range(3, 4));
+        let b = solver.new_int_var(Domain::range(1, 2));
+        let c = solver.new_int_var(Domain::range(1, 2));
+        solver.add_expr(a.expr().ne(b.expr() + c.expr()));
+        solver.add_expr(b.expr().gt(c.expr()));
+
+        let model = solver.solve();
+        assert!(model.is_some());
+        let model = model.unwrap();
+        assert_eq!(model.get_int(a), 4);
+        assert_eq!(model.get_int(b), 2);
+        assert_eq!(model.get_int(c), 1);
+    }
+
+    #[test]
+    fn test_integration_simple_linear4() {
+        let mut solver = IntegratedSolver::new();
+
+        let a = solver.new_int_var(Domain::range(1, 2));
+        let b = solver.new_int_var(Domain::range(1, 2));
+        let c = solver.new_int_var(Domain::range(1, 2));
+        solver.add_expr(a.expr().ne(b.expr()));
+        solver.add_expr(b.expr().ne(c.expr()));
+        solver.add_expr(c.expr().ne(a.expr()));
+
+        let model = solver.solve();
+        assert!(model.is_none());
+    }
+
+    #[test]
+    fn test_integration_simple_linear5() {
+        let mut solver = IntegratedSolver::new();
+
+        let a = solver.new_int_var(Domain::range(1, 2));
+        let b = solver.new_int_var(Domain::range(1, 2));
+        let c = solver.new_int_var(Domain::range(1, 2));
+        solver.add_expr(a.expr().ne(b.expr()));
+        solver.add_expr(b.expr().ne(c.expr()));
+        solver.add_expr(c.expr().ne(a.expr()) | (a.expr() + c.expr()).eq(b.expr()));
+
+        let model = solver.solve();
+        assert!(model.is_some());
+        let model = model.unwrap();
+        assert_eq!(model.get_int(a), 1);
+        assert_eq!(model.get_int(b), 2);
+        assert_eq!(model.get_int(c), 1);
+    }
+
+    #[test]
     fn test_integration_unused_bool() {
         let mut solver = IntegratedSolver::new();
 
