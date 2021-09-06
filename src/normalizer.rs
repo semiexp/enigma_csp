@@ -380,124 +380,11 @@ fn normalize_int_expr(env: &mut NormalizerEnv, expr: &IntExpr) -> LinearSum {
 
 #[cfg(test)]
 mod tests {
-    use std::collections::{BTreeMap, BTreeSet};
+    use std::collections::BTreeSet;
 
+    use super::super::csp;
+    use super::super::norm_csp;
     use super::*;
-
-    #[derive(Debug)]
-    struct Assignment {
-        bool_val: BTreeMap<BoolVar, bool>,
-        int_val: BTreeMap<IntVar, i32>,
-    }
-
-    fn eval_bool_expr(assignment: &Assignment, expr: &BoolExpr) -> bool {
-        match expr {
-            BoolExpr::Const(b) => *b,
-            BoolExpr::Var(v) => *(assignment.bool_val.get(v).unwrap()),
-            &BoolExpr::NVar(_) => panic!(),
-            BoolExpr::And(es) => {
-                for e in es {
-                    if !eval_bool_expr(assignment, e) {
-                        return false;
-                    }
-                }
-                true
-            }
-            BoolExpr::Or(es) => {
-                for e in es {
-                    if eval_bool_expr(assignment, e) {
-                        return true;
-                    }
-                }
-                false
-            }
-            BoolExpr::Not(e) => !eval_bool_expr(assignment, e),
-            BoolExpr::Xor(e1, e2) => {
-                eval_bool_expr(assignment, e1) ^ eval_bool_expr(assignment, e2)
-            }
-            BoolExpr::Iff(e1, e2) => {
-                eval_bool_expr(assignment, e1) == eval_bool_expr(assignment, e2)
-            }
-            BoolExpr::Imp(e1, e2) => {
-                !eval_bool_expr(assignment, e1) || eval_bool_expr(assignment, e2)
-            }
-            BoolExpr::Cmp(op, e1, e2) => {
-                let v1 = eval_int_expr(assignment, e1);
-                let v2 = eval_int_expr(assignment, e2);
-                match *op {
-                    CmpOp::Eq => v1 == v2,
-                    CmpOp::Ne => v1 != v2,
-                    CmpOp::Le => v1 <= v2,
-                    CmpOp::Lt => v1 < v2,
-                    CmpOp::Ge => v1 >= v2,
-                    CmpOp::Gt => v1 > v2,
-                }
-            }
-        }
-    }
-
-    fn eval_int_expr(assignment: &Assignment, expr: &IntExpr) -> i32 {
-        match expr {
-            IntExpr::Const(c) => *c,
-            IntExpr::Var(v) => *(assignment.int_val.get(v).unwrap()),
-            &IntExpr::NVar(_) => panic!(),
-            IntExpr::Linear(es) => {
-                let mut ret = 0i32;
-                for (e, c) in es {
-                    ret = ret
-                        .checked_add(eval_int_expr(assignment, e).checked_mul(*c).unwrap())
-                        .unwrap();
-                }
-                ret
-            }
-            IntExpr::If(c, t, f) => eval_int_expr(
-                assignment,
-                if eval_bool_expr(assignment, c) { t } else { f },
-            ),
-        }
-    }
-
-    #[derive(Clone)]
-    struct NAssignment {
-        bool_val: BTreeMap<NBoolVar, bool>,
-        int_val: BTreeMap<NIntVar, i32>,
-    }
-
-    fn eval_constraint(constr: &Constraint, assignment: &NAssignment) -> bool {
-        for l in &constr.bool_lit {
-            if assignment.bool_val.get(&l.var).unwrap() ^ l.negated {
-                return true;
-            }
-        }
-        for l in &constr.linear_lit {
-            let sum = &l.sum;
-            let mut v = sum.constant;
-            for (var, coef) in &sum.term {
-                v = v
-                    .checked_add(
-                        assignment
-                            .int_val
-                            .get(var)
-                            .unwrap()
-                            .checked_mul(*coef)
-                            .unwrap(),
-                    )
-                    .unwrap();
-            }
-
-            if match l.op {
-                CmpOp::Eq => v == 0,
-                CmpOp::Ne => v != 0,
-                CmpOp::Le => v <= 0,
-                CmpOp::Lt => v < 0,
-                CmpOp::Ge => v >= 0,
-                CmpOp::Gt => v > 0,
-            } {
-                return true;
-            }
-        }
-        false
-    }
 
     struct NormalizerTester {
         original_constr: Vec<Stmt>,
@@ -602,32 +489,24 @@ mod tests {
                 &util::product_multi(&bool_domains),
                 &util::product_multi(&int_domains),
             ) {
-                let mut assignment = Assignment {
-                    bool_val: BTreeMap::new(),
-                    int_val: BTreeMap::new(),
-                };
+                let mut assignment = csp::Assignment::new();
                 for i in 0..self.bool_vars.len() {
-                    assignment.bool_val.insert(self.bool_vars[i], vb[i]);
+                    assignment.set_bool(self.bool_vars[i], vb[i]);
                 }
                 for i in 0..self.int_vars.len() {
-                    assignment.int_val.insert(self.int_vars[i].0, vi[i]);
+                    assignment.set_int(self.int_vars[i].0, vi[i]);
                 }
                 let is_sat_csp = self.is_satisfied_csp(&assignment);
                 let mut is_sat_norm = false;
                 {
-                    let mut n_assignment = NAssignment {
-                        bool_val: BTreeMap::new(),
-                        int_val: BTreeMap::new(),
-                    };
+                    let mut n_assignment = norm_csp::Assignment::new();
                     for i in 0..self.bool_vars.len() {
                         n_assignment
-                            .bool_val
-                            .insert(self.map.get_bool_var(self.bool_vars[i]).unwrap(), vb[i]);
+                            .set_bool(self.map.get_bool_var(self.bool_vars[i]).unwrap(), vb[i]);
                     }
                     for i in 0..self.int_vars.len() {
                         n_assignment
-                            .int_val
-                            .insert(self.map.get_int_var(self.int_vars[i].0).unwrap(), vi[i]);
+                            .set_int(self.map.get_int_var(self.int_vars[i].0).unwrap(), vi[i]);
                     }
                     for (ub, ui) in util::product_binary(
                         &util::product_multi(&unfixed_bool_domains),
@@ -635,10 +514,10 @@ mod tests {
                     ) {
                         let mut n_assignment = n_assignment.clone();
                         for i in 0..unfixed_bool_vars.len() {
-                            n_assignment.bool_val.insert(unfixed_bool_vars[i], ub[i]);
+                            n_assignment.set_bool(unfixed_bool_vars[i], ub[i]);
                         }
                         for i in 0..unfixed_int_vars.len() {
-                            n_assignment.int_val.insert(unfixed_int_vars[i], ui[i]);
+                            n_assignment.set_int(unfixed_int_vars[i], ui[i]);
                         }
                         is_sat_norm |= self.is_satisfied_norm(&n_assignment);
                     }
@@ -647,11 +526,11 @@ mod tests {
             }
         }
 
-        fn is_satisfied_csp(&self, assignment: &Assignment) -> bool {
+        fn is_satisfied_csp(&self, assignment: &csp::Assignment) -> bool {
             for stmt in &self.original_constr {
                 match stmt {
                     Stmt::Expr(e) => {
-                        if !eval_bool_expr(assignment, e) {
+                        if !assignment.eval_bool_expr(e) {
                             return false;
                         }
                     }
@@ -661,9 +540,9 @@ mod tests {
             true
         }
 
-        fn is_satisfied_norm(&self, assignment: &NAssignment) -> bool {
+        fn is_satisfied_norm(&self, assignment: &norm_csp::Assignment) -> bool {
             for constr in &self.norm.constraints {
-                if !eval_constraint(constr, assignment) {
+                if !assignment.eval_constraint(constr) {
                     return false;
                 }
             }

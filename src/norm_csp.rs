@@ -218,3 +218,55 @@ impl NormCSP {
         ret
     }
 }
+
+#[derive(Clone)]
+pub struct Assignment {
+    bool_val: BTreeMap<BoolVar, bool>,
+    int_val: BTreeMap<IntVar, i32>,
+}
+
+impl Assignment {
+    pub fn new() -> Assignment {
+        Assignment {
+            bool_val: BTreeMap::new(),
+            int_val: BTreeMap::new(),
+        }
+    }
+
+    pub fn set_bool(&mut self, var: BoolVar, val: bool) {
+        self.bool_val.insert(var, val);
+    }
+
+    pub fn set_int(&mut self, var: IntVar, val: i32) {
+        self.int_val.insert(var, val);
+    }
+
+    pub fn eval_constraint(&self, constr: &Constraint) -> bool {
+        for l in &constr.bool_lit {
+            if self.bool_val.get(&l.var).unwrap() ^ l.negated {
+                return true;
+            }
+        }
+        for l in &constr.linear_lit {
+            let sum = &l.sum;
+            let mut v = sum.constant;
+            for (var, coef) in &sum.term {
+                v = v
+                    .checked_add(self.int_val.get(var).unwrap().checked_mul(*coef).unwrap())
+                    .unwrap();
+            }
+
+            if match l.op {
+                CmpOp::Eq => v == 0,
+                CmpOp::Ne => v != 0,
+                CmpOp::Le => v <= 0,
+                CmpOp::Lt => v < 0,
+                CmpOp::Ge => v >= 0,
+                CmpOp::Gt => v > 0,
+            } {
+                return true;
+            }
+        }
+        false
+    }
+}

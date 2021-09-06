@@ -1,3 +1,4 @@
+use std::collections::BTreeMap;
 use std::ops::{Add, BitAnd, BitOr, BitXor, Mul, Not, Sub};
 
 use super::CmpOp;
@@ -309,6 +310,87 @@ impl CSP {
 
     pub fn add_constraint(&mut self, stmt: Stmt) {
         self.constraints.push(stmt)
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct Assignment {
+    bool_val: BTreeMap<BoolVar, bool>,
+    int_val: BTreeMap<IntVar, i32>,
+}
+
+impl Assignment {
+    pub fn new() -> Assignment {
+        Assignment {
+            bool_val: BTreeMap::new(),
+            int_val: BTreeMap::new(),
+        }
+    }
+
+    pub fn set_bool(&mut self, var: BoolVar, val: bool) {
+        self.bool_val.insert(var, val);
+    }
+
+    pub fn set_int(&mut self, var: IntVar, val: i32) {
+        self.int_val.insert(var, val);
+    }
+
+    pub fn eval_bool_expr(&self, expr: &BoolExpr) -> bool {
+        match expr {
+            BoolExpr::Const(b) => *b,
+            BoolExpr::Var(v) => *(self.bool_val.get(v).unwrap()),
+            &BoolExpr::NVar(_) => panic!(),
+            BoolExpr::And(es) => {
+                for e in es {
+                    if !self.eval_bool_expr(e) {
+                        return false;
+                    }
+                }
+                true
+            }
+            BoolExpr::Or(es) => {
+                for e in es {
+                    if self.eval_bool_expr(e) {
+                        return true;
+                    }
+                }
+                false
+            }
+            BoolExpr::Not(e) => !self.eval_bool_expr(e),
+            BoolExpr::Xor(e1, e2) => self.eval_bool_expr(e1) ^ self.eval_bool_expr(e2),
+            BoolExpr::Iff(e1, e2) => self.eval_bool_expr(e1) == self.eval_bool_expr(e2),
+            BoolExpr::Imp(e1, e2) => !self.eval_bool_expr(e1) || self.eval_bool_expr(e2),
+            BoolExpr::Cmp(op, e1, e2) => {
+                let v1 = self.eval_int_expr(e1);
+                let v2 = self.eval_int_expr(e2);
+                match *op {
+                    CmpOp::Eq => v1 == v2,
+                    CmpOp::Ne => v1 != v2,
+                    CmpOp::Le => v1 <= v2,
+                    CmpOp::Lt => v1 < v2,
+                    CmpOp::Ge => v1 >= v2,
+                    CmpOp::Gt => v1 > v2,
+                }
+            }
+        }
+    }
+
+    pub fn eval_int_expr(&self, expr: &IntExpr) -> i32 {
+        match expr {
+            IntExpr::Const(c) => *c,
+            IntExpr::Var(v) => *(self.int_val.get(v).unwrap()),
+            &IntExpr::NVar(_) => panic!(),
+            IntExpr::Linear(es) => {
+                let mut ret = 0i32;
+                for (e, c) in es {
+                    ret = ret
+                        .checked_add(self.eval_int_expr(e).checked_mul(*c).unwrap())
+                        .unwrap();
+                }
+                ret
+            }
+            IntExpr::If(c, t, f) => self.eval_int_expr(if self.eval_bool_expr(c) { t } else { f }),
+        }
     }
 }
 
