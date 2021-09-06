@@ -111,10 +111,10 @@ impl<'a, 'b, 'c> EncoderEnv<'a, 'b, 'c> {
 }
 
 pub fn encode(norm: &mut NormCSP, sat: &mut SAT, map: &mut EncodeMap) {
-    // TODO: don't encode an int variables more than once
-    for i in 0..norm.vars.int_var.len() {
+    for i in norm.num_encoded_vars..norm.vars.int_var.len() {
         map.convert_int_var(&mut norm.vars, sat, IntVar(i));
     }
+    norm.num_encoded_vars = norm.vars.int_var.len();
 
     let mut env = EncoderEnv {
         norm_vars: &mut norm.vars,

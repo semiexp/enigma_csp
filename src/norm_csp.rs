@@ -177,6 +177,7 @@ pub(super) struct NormCSPVars {
 pub struct NormCSP {
     pub(super) vars: NormCSPVars,
     pub(super) constraints: Vec<Constraint>,
+    pub(super) num_encoded_vars: usize,
 }
 
 impl NormCSP {
@@ -187,6 +188,7 @@ impl NormCSP {
                 int_var: vec![],
             },
             constraints: vec![],
+            num_encoded_vars: 0,
         }
     }
 
