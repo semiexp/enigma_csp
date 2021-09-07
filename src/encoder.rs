@@ -212,6 +212,12 @@ fn encode_constraint(env: &mut EncoderEnv, constr: Constraint) {
     }
 }
 
+enum ExtendedLit {
+    True,
+    False,
+    Lit(Lit),
+}
+
 /// Helper struct for encoding linear constraints on variables represented in order encoding.
 /// With this struct, all coefficients can be virtually treated as positive.
 struct LinearInfoForOrderEncoding<'a> {
@@ -258,6 +264,32 @@ impl<'a> LinearInfoForOrderEncoding<'a> {
                 .as_lit(true)
         }
     }
+
+    /// The literal asserting (x >= val) under the assumption that x is in the domain of the i-th variable.
+    fn at_least_val(&self, i: usize, val: i32) -> ExtendedLit {
+        let dom_size = self.domain_size(i);
+
+        if val <= self.domain(i, 0) {
+            ExtendedLit::True
+        } else if val > self.domain(i, dom_size - 1) {
+            ExtendedLit::False
+        } else {
+            // compute the largest j such that val <= domain[j]
+            let mut left = 0;
+            let mut right = dom_size - 1;
+
+            while left < right {
+                let mid = (left + right) / 2;
+                if val <= self.domain(i, mid) {
+                    right = mid;
+                } else {
+                    left = mid + 1;
+                }
+            }
+
+            ExtendedLit::Lit(self.at_least(i, left))
+        }
+    }
 }
 
 fn encode_linear_ge(env: &mut EncoderEnv, sum: &LinearSum, bool_lit: &Vec<Lit>) {
@@ -281,6 +313,22 @@ fn encode_linear_ge(env: &mut EncoderEnv, sum: &LinearSum, bool_lit: &Vec<Lit>) 
         if idx == info.len() {
             if constant < 0 {
                 sat.add_clause(clause.clone());
+            }
+            return;
+        }
+        if idx + 1 == info.len() {
+            let a = info.coef(idx);
+            // a * x >= -constant
+            // x >= ceil(-constant / a)
+            let threshold = (-constant).checked_add(a - 1).unwrap().div_euclid(a);
+            match info.at_least_val(idx, threshold) {
+                ExtendedLit::True => (),
+                ExtendedLit::False => sat.add_clause(clause.clone()),
+                ExtendedLit::Lit(lit) => {
+                    clause.push(lit);
+                    sat.add_clause(clause.clone());
+                    clause.pop();
+                }
             }
             return;
         }

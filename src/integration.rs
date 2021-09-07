@@ -471,6 +471,22 @@ mod tests {
     }
 
     #[test]
+    fn test_integration_exhaustive_linear3() {
+        let mut tester = IntegrationTester::new();
+
+        let a = tester.new_int_var(Domain::range(0, 4));
+        let b = tester.new_int_var(Domain::range(0, 4));
+        let c = tester.new_int_var(Domain::range(0, 4));
+        let d = tester.new_int_var(Domain::range(0, 4));
+        tester.add_expr((a.expr() * 2 - b.expr() + c.expr() * 3 + d.expr()).ge(IntExpr::Const(10)));
+        tester.add_expr(
+            (a.expr() + b.expr() * 4 - c.expr() * 2 - d.expr() * 3).le(IntExpr::Const(2)),
+        );
+
+        tester.check();
+    }
+
+    #[test]
     fn test_integration_exhaustive_complex1() {
         let mut tester = IntegrationTester::new();
 
