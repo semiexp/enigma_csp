@@ -1,7 +1,7 @@
 use super::norm_csp::{
     BoolLit, BoolVar, Constraint, IntVar, LinearLit, LinearSum, NormCSP, NormCSPVars,
 };
-use super::sat::{Lit, SATModel, Var, VarArray, SAT};
+use super::sat::{Lit, SATModel, VarArray, SAT};
 use super::CmpOp;
 
 /// Order encoding of an integer variable with domain of `domain`.
@@ -24,7 +24,7 @@ impl EncodeMap {
         }
     }
 
-    fn convert_bool_var(&mut self, norm_vars: &NormCSPVars, sat: &mut SAT, var: BoolVar) -> Lit {
+    fn convert_bool_var(&mut self, _norm_vars: &NormCSPVars, sat: &mut SAT, var: BoolVar) -> Lit {
         let id = var.0;
 
         while self.bool_map.len() <= id {
@@ -142,7 +142,6 @@ fn encode_constraint(env: &mut EncoderEnv, constr: Constraint) {
         env.sat.add_clause(clause);
         return;
     }
-    let mut constr = constr;
     let mut linear_lits = vec![];
 
     for mut linear_lit in constr.linear_lit {

@@ -1,4 +1,5 @@
 /// Given v1 and v2, return v1 * v2 as Vec<(A, B)>, where * represents the Cartesian product.
+#[allow(dead_code)]
 pub fn product_binary<A: Clone, B: Clone>(a: &[A], b: &[B]) -> Vec<(A, B)> {
     let mut ret = vec![];
 
@@ -12,6 +13,7 @@ pub fn product_binary<A: Clone, B: Clone>(a: &[A], b: &[B]) -> Vec<(A, B)> {
 }
 
 /// Given [v1, v2, ..., vn], return v1 * v2 * ... * vn, where * represents the Cartesian product.
+#[allow(dead_code)]
 pub fn product_multi<T: Clone>(inputs: &Vec<Vec<T>>) -> Vec<Vec<T>> {
     let mut ret = vec![];
 

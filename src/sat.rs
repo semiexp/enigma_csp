@@ -70,7 +70,7 @@ impl SAT {
 
     pub fn new_vars(&mut self, count: i32) -> VarArray {
         let mut vars = vec![];
-        for i in 0..count {
+        for _ in 0..count {
             vars.push(self.new_var());
         }
         VarArray { vars }

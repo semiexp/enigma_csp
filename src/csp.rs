@@ -77,14 +77,17 @@ impl BoolVarData {
         }
     }
 
+    #[allow(dead_code)]
     fn is_feasible(&self, b: bool) -> bool {
         (self.possibility_mask & (if b { 2 } else { 1 })) != 0
     }
 
+    #[allow(dead_code)]
     fn is_unsatisfiable(&self) -> bool {
         self.possibility_mask == 0
     }
 
+    #[allow(dead_code)]
     fn set_infeasible(&mut self, b: bool) -> bool {
         let res = self.is_feasible(b);
         self.possibility_mask &= if b { 1 } else { 2 };
@@ -154,32 +157,6 @@ impl BoolExpr {
 
     pub fn ite(self, t: IntExpr, f: IntExpr) -> IntExpr {
         IntExpr::If(Box::new(self), Box::new(t), Box::new(f))
-    }
-
-    pub(super) fn decompose_neg(self) -> Box<BoolExpr> {
-        match self {
-            BoolExpr::Not(x) => x,
-            _ => panic!(),
-        }
-    }
-
-    pub(super) fn decompose_or(self) -> Vec<Box<BoolExpr>> {
-        match self {
-            BoolExpr::Or(x) => x,
-            _ => panic!(),
-        }
-    }
-
-    pub(super) fn decompose_binary_or(self) -> (Box<BoolExpr>, Box<BoolExpr>) {
-        match self {
-            BoolExpr::Or(mut x) => {
-                assert_eq!(x.len(), 2);
-                let b = x.remove(1);
-                let a = x.remove(0);
-                (a, b)
-            }
-            _ => panic!(),
-        }
     }
 }
 
@@ -402,6 +379,6 @@ mod tests {
     fn test_hoge() {
         let mut csp = CSP::new();
         let v = csp.new_int_var(Domain { low: 5, high: 10 });
-        let e = IntExpr::Var(v) + IntExpr::Var(v);
+        let _e = IntExpr::Var(v) + IntExpr::Var(v);
     }
 }

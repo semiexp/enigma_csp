@@ -1,8 +1,7 @@
-use super::csp::{BoolExpr, BoolVar, CSPVars, Domain, IntExpr, IntVar, Stmt, CSP};
+use super::csp::{BoolExpr, BoolVar, CSPVars, IntExpr, IntVar, Stmt, CSP};
 use super::norm_csp::BoolVar as NBoolVar;
 use super::norm_csp::IntVar as NIntVar;
 use super::norm_csp::{BoolLit, Constraint, LinearLit, LinearSum, NormCSP};
-use crate::util;
 
 use super::CmpOp;
 
@@ -21,7 +20,7 @@ impl NormalizeMap {
 
     fn convert_bool_var(
         &mut self,
-        csp_vars: &CSPVars,
+        _csp_vars: &CSPVars,
         norm: &mut NormCSP,
         var: BoolVar,
     ) -> NBoolVar {
@@ -120,7 +119,7 @@ fn normalize_stmt(env: &mut NormalizerEnv, stmt: Stmt) {
                 }
             }
         }
-        Stmt::AllDifferent(exprs) => {
+        Stmt::AllDifferent(_exprs) => {
             todo!();
         }
     }
@@ -386,8 +385,10 @@ mod tests {
     use std::collections::BTreeSet;
 
     use super::super::csp;
+    use super::super::csp::Domain;
     use super::super::norm_csp;
     use super::*;
+    use crate::util;
 
     struct NormalizerTester {
         original_constr: Vec<Stmt>,
