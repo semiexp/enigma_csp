@@ -1,4 +1,5 @@
 pub mod csp;
+pub mod csugar_cli;
 pub mod encoder;
 pub mod glucose;
 pub mod integration;

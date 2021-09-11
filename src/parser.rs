@@ -1,5 +1,5 @@
 extern crate nom;
-use std::collections::BTreeMap;
+use std::collections::{btree_map, BTreeMap};
 
 use nom::{
     branch::alt,
@@ -112,6 +112,10 @@ impl VarMap {
 
     pub fn get_var(&self, name: &str) -> Option<Var> {
         self.0.get(name).copied()
+    }
+
+    pub fn iter<'a>(&'a self) -> btree_map::Iter<'a, String, Var> {
+        self.0.iter()
     }
 }
 
@@ -228,7 +232,6 @@ fn parse_int_expr(var_map: &VarMap, tree: &SyntaxTree) -> IntExpr {
         SyntaxTree::Node(child) => {
             let op_name = child[0].as_op_name();
             if op_name == "+" || op_name == "add" {
-                assert_eq!(child.len(), 2);
                 IntExpr::Linear(
                     child[1..]
                         .iter()
