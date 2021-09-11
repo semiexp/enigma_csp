@@ -3,7 +3,7 @@ use std::ops::{Add, BitAnd, BitOr, BitXor, Mul, Not, Sub};
 
 use super::CmpOp;
 
-#[derive(Clone, Copy)]
+#[derive(Clone, PartialEq, Eq, Debug)]
 pub struct Domain {
     low: i32,
     high: i32,
@@ -125,14 +125,14 @@ impl IntVar {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, PartialEq, Eq, Debug)]
 pub enum Stmt {
     Expr(BoolExpr),
     AllDifferent(Vec<IntExpr>),
     // TODO: graph constraints go here
 }
 
-#[derive(Clone, Hash)]
+#[derive(Clone, Hash, PartialEq, Eq, Debug)]
 pub enum BoolExpr {
     Const(bool),
     Var(BoolVar),
@@ -192,7 +192,7 @@ impl Not for BoolExpr {
     }
 }
 
-#[derive(Clone, Hash)]
+#[derive(Clone, Hash, PartialEq, Eq, Debug)]
 pub enum IntExpr {
     Const(i32),
     Var(IntVar),

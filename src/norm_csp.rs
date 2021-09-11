@@ -215,7 +215,7 @@ impl NormCSP {
         let mut ret = Domain::range(linear_sum.constant, linear_sum.constant);
 
         for (var, coef) in &linear_sum.term {
-            ret = ret + self.vars.int_var[var.0] * *coef;
+            ret = ret + self.vars.int_var[var.0].clone() * *coef;
         }
 
         ret
