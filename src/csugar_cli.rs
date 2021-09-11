@@ -47,7 +47,36 @@ pub fn csugar_cli() {
     }
 
     match target_vars {
-        Some(_target_vars) => todo!(),
+        Some(target_vars) => {
+            let mut bool_target = vec![];
+            let mut int_target = vec![];
+            for target in &target_vars {
+                match var_map.get_var(target).unwrap() {
+                    Var::Bool(var) => bool_target.push(var),
+                    Var::Int(var) => int_target.push(var),
+                }
+            }
+            match solver.decide_irrefutable_facts(&bool_target, &int_target) {
+                Some(result) => {
+                    println!("sat");
+                    for target in &target_vars {
+                        match var_map.get_var(target).unwrap() {
+                            Var::Bool(var) => {
+                                if let Some(b) = result.get_bool(var) {
+                                    println!("{} {}", target, b);
+                                }
+                            }
+                            Var::Int(var) => {
+                                if let Some(i) = result.get_int(var) {
+                                    println!("{} {}", target, i);
+                                }
+                            }
+                        }
+                    }
+                }
+                None => println!("unsat"),
+            }
+        }
         None => match solver.solve() {
             Some(model) => {
                 println!("s SATISFIABLE");

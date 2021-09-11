@@ -98,6 +98,64 @@ impl IntegratedSolver {
         }
         ret
     }
+
+    pub fn decide_irrefutable_facts(
+        mut self,
+        bool_vars: &[BoolVar],
+        int_vars: &[IntVar],
+    ) -> Option<Assignment> {
+        let mut assignment = Assignment::new();
+        match self.solve() {
+            Some(model) => {
+                for &var in bool_vars {
+                    assignment.set_bool(var, model.get_bool(var));
+                }
+                for &var in int_vars {
+                    assignment.set_int(var, model.get_int(var));
+                }
+            }
+            None => return None,
+        }
+        loop {
+            let mut refutation = vec![];
+            for (&v, &b) in assignment.bool_iter() {
+                refutation.push(Box::new(if b { !v.expr() } else { v.expr() }));
+            }
+            for (&v, &i) in assignment.int_iter() {
+                refutation.push(Box::new(v.expr().ne(IntExpr::Const(i))));
+            }
+            self.add_expr(BoolExpr::Or(refutation));
+
+            match self.solve() {
+                Some(model) => {
+                    let bool_erased = assignment
+                        .bool_iter()
+                        .filter_map(|(&v, &b)| {
+                            if model.get_bool(v) != b {
+                                Some(v)
+                            } else {
+                                None
+                            }
+                        })
+                        .collect::<Vec<_>>();
+                    let int_erased = assignment
+                        .int_iter()
+                        .filter_map(|(&v, &i)| if model.get_int(v) != i { Some(v) } else { None })
+                        .collect::<Vec<_>>();
+
+                    bool_erased
+                        .iter()
+                        .for_each(|&v| assert!(assignment.remove_bool(v).is_some()));
+                    int_erased
+                        .iter()
+                        .for_each(|&v| assert!(assignment.remove_int(v).is_some()));
+                }
+                None => break,
+            }
+        }
+
+        Some(assignment)
+    }
 }
 
 pub struct Model<'a> {
@@ -428,6 +486,67 @@ mod tests {
             let model = solver.solve();
             assert!(model.is_some());
         }
+    }
+
+    #[test]
+    fn test_integration_irrefutable_logic1() {
+        let mut solver = IntegratedSolver::new();
+
+        let x = solver.new_bool_var();
+        let y = solver.new_bool_var();
+        let z = solver.new_bool_var();
+        solver.add_expr(x.expr() | y.expr());
+        solver.add_expr(y.expr() | z.expr());
+        solver.add_expr(!(x.expr() & z.expr()));
+
+        let res = solver.decide_irrefutable_facts(&[x, y, z], &[]);
+        assert!(res.is_some());
+        let res = res.unwrap();
+        assert_eq!(res.get_bool(x), None);
+        assert_eq!(res.get_bool(y), Some(true));
+        assert_eq!(res.get_bool(z), None);
+    }
+
+    #[test]
+    fn test_integration_irrefutable_complex1() {
+        let mut solver = IntegratedSolver::new();
+
+        let x = solver.new_bool_var();
+        let a = solver.new_int_var(Domain::range(0, 2));
+        let b = solver.new_int_var(Domain::range(0, 2));
+        solver.add_expr(x.expr().ite(a.expr(), b.expr()).eq(a.expr()));
+        solver.add_expr(a.expr().ne(b.expr()));
+
+        let res = solver.decide_irrefutable_facts(&[x], &[a, b]);
+        assert!(res.is_some());
+        let res = res.unwrap();
+        assert_eq!(res.get_bool(x), Some(true));
+        assert_eq!(res.get_int(a), None);
+        assert_eq!(res.get_int(b), None);
+    }
+
+    #[test]
+    fn test_integration_irrefutable_complex2() {
+        let mut solver = IntegratedSolver::new();
+
+        let x = solver.new_bool_var();
+        let a = solver.new_int_var(Domain::range(0, 2));
+        let b = solver.new_int_var(Domain::range(0, 2));
+        let c = solver.new_int_var(Domain::range(0, 2));
+        solver.add_expr(
+            x.expr()
+                .ite(a.expr(), b.expr())
+                .lt(c.expr() - IntExpr::Const(1)),
+        );
+        solver.add_expr(a.expr().ne(b.expr()));
+
+        let res = solver.decide_irrefutable_facts(&[x], &[a, b, c]);
+        assert!(res.is_some());
+        let res = res.unwrap();
+        assert_eq!(res.get_bool(x), None);
+        assert_eq!(res.get_int(a), None);
+        assert_eq!(res.get_int(b), None);
+        assert_eq!(res.get_int(c), Some(2));
     }
 
     #[test]

@@ -1,4 +1,4 @@
-use std::collections::BTreeMap;
+use std::collections::{btree_map, BTreeMap};
 use std::ops::{Add, BitAnd, BitOr, BitXor, Mul, Not, Sub};
 
 use super::CmpOp;
@@ -310,6 +310,30 @@ impl Assignment {
 
     pub fn set_int(&mut self, var: IntVar, val: i32) {
         self.int_val.insert(var, val);
+    }
+
+    pub fn get_bool(&self, var: BoolVar) -> Option<bool> {
+        self.bool_val.get(&var).copied()
+    }
+
+    pub fn get_int(&self, var: IntVar) -> Option<i32> {
+        self.int_val.get(&var).copied()
+    }
+
+    pub fn remove_bool(&mut self, var: BoolVar) -> Option<bool> {
+        self.bool_val.remove(&var)
+    }
+
+    pub fn remove_int(&mut self, var: IntVar) -> Option<i32> {
+        self.int_val.remove(&var)
+    }
+
+    pub fn bool_iter(&self) -> btree_map::Iter<BoolVar, bool> {
+        self.bool_val.iter()
+    }
+
+    pub fn int_iter(&self) -> btree_map::Iter<IntVar, i32> {
+        self.int_val.iter()
     }
 
     pub fn eval_bool_expr(&self, expr: &BoolExpr) -> bool {
