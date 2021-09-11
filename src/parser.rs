@@ -124,7 +124,7 @@ pub fn parse<'a, 'b>(var_map: &'a VarMap, input: &'b str) -> ParseResult<'b> {
     let tree = parse_to_tree(input).unwrap();
     let child = match &tree {
         SyntaxTree::Node(child) => child,
-        _ => panic!("top-level must be either decl, expr or stmt"),
+        _ => return ParseResult::Stmt(Stmt::Expr(parse_bool_expr(var_map, &tree))),
     };
     assert!(child.len() >= 1);
     let op_name = child[0].as_op_name();
@@ -309,5 +309,8 @@ mod tests {
             result,
             ParseResult::Stmt(Stmt::Expr((foo.expr() ^ bar.expr()) | bar.expr()))
         );
+
+        let result = parse(&var_map, "foo");
+        assert_eq!(result, ParseResult::Stmt(Stmt::Expr(foo.expr())));
     }
 }
