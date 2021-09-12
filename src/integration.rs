@@ -550,6 +550,33 @@ mod tests {
     }
 
     #[test]
+    fn test_integration_irrefutable_many_terms() {
+        let mut solver = IntegratedSolver::new();
+
+        let mut ivars = vec![];
+        for i in 0..30 {
+            ivars.push(solver.new_int_var(Domain::range(0, 1)));
+        }
+        solver.add_expr(
+            IntExpr::Linear(ivars.iter().map(|v| (Box::new(v.expr()), 1)).collect())
+                .ge(IntExpr::Const(10)),
+        );
+
+        let x = solver.new_bool_var();
+        solver.add_expr(
+            IntExpr::Linear(ivars.iter().map(|v| (Box::new(v.expr()), 1)).collect())
+                .ge(IntExpr::Const(9))
+                .iff(x.expr()),
+        );
+
+        let res = solver.decide_irrefutable_facts(&[x], &ivars);
+        assert!(res.is_some());
+        let res = res.unwrap();
+        assert_eq!(res.get_bool(x), Some(true));
+        assert_eq!(res.get_int(ivars[0]), None);
+    }
+
+    #[test]
     fn test_integration_exhaustive_bool1() {
         let mut tester = IntegrationTester::new();
 

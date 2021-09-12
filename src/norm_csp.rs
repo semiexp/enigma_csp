@@ -177,6 +177,24 @@ pub(super) struct NormCSPVars {
     pub(super) int_var: Vec<super::csp::Domain>,
 }
 
+impl NormCSPVars {
+    pub(super) fn new_int_var(&mut self, domain: super::csp::Domain) -> IntVar {
+        let id = self.int_var.len();
+        self.int_var.push(domain);
+        IntVar(id)
+    }
+
+    pub(super) fn get_domain_linear_sum(&self, linear_sum: &LinearSum) -> Domain {
+        let mut ret = Domain::range(linear_sum.constant, linear_sum.constant);
+
+        for (var, coef) in &linear_sum.term {
+            ret = ret + self.int_var[var.0].clone() * *coef;
+        }
+
+        ret
+    }
+}
+
 pub struct NormCSP {
     pub(super) vars: NormCSPVars,
     pub(super) constraints: Vec<Constraint>,
@@ -202,9 +220,7 @@ impl NormCSP {
     }
 
     pub fn new_int_var(&mut self, domain: super::csp::Domain) -> IntVar {
-        let id = self.vars.int_var.len();
-        self.vars.int_var.push(domain);
-        IntVar(id)
+        self.vars.new_int_var(domain)
     }
 
     pub fn add_constraint(&mut self, constraint: Constraint) {
@@ -212,13 +228,7 @@ impl NormCSP {
     }
 
     pub(super) fn get_domain_linear_sum(&self, linear_sum: &LinearSum) -> Domain {
-        let mut ret = Domain::range(linear_sum.constant, linear_sum.constant);
-
-        for (var, coef) in &linear_sum.term {
-            ret = ret + self.vars.int_var[var.0].clone() * *coef;
-        }
-
-        ret
+        self.vars.get_domain_linear_sum(linear_sum)
     }
 }
 

@@ -1,3 +1,6 @@
+use std::cmp::Reverse;
+use std::collections::BinaryHeap;
+
 use super::norm_csp::{
     BoolLit, BoolVar, Constraint, IntVar, LinearLit, LinearSum, NormCSP, NormCSPVars,
 };
@@ -183,12 +186,13 @@ fn encode_constraint(env: &mut EncoderEnv, constr: Constraint) {
     fn encode(env: &mut EncoderEnv, mut linear: LinearLit, bool_lit: &Vec<Lit>) {
         match linear.op {
             CmpOp::Ge => {
-                encode_linear_ge(env, &linear.sum, bool_lit);
+                encode_linear_ge_with_simplification(env, &linear.sum, bool_lit);
             }
             CmpOp::Eq => {
-                encode_linear_ge(env, &linear.sum, bool_lit);
+                // TODO: don't create the same aux vars twice
+                encode_linear_ge_with_simplification(env, &linear.sum, bool_lit);
                 linear.sum *= -1;
-                encode_linear_ge(env, &linear.sum, bool_lit);
+                encode_linear_ge_with_simplification(env, &linear.sum, bool_lit);
             }
             _ => unimplemented!(),
         }
@@ -290,6 +294,58 @@ impl<'a> LinearInfoForOrderEncoding<'a> {
             ExtendedLit::Lit(self.at_least(i, left))
         }
     }
+}
+
+const DOM_PRODUCT_THRESHOLD: usize = 1000; // TODO: make this parameter configurable
+
+fn encode_linear_ge_with_simplification(
+    env: &mut EncoderEnv,
+    sum: &LinearSum,
+    bool_lit: &Vec<Lit>,
+) {
+    let mut heap = BinaryHeap::new();
+    for (&var, &coef) in &sum.term {
+        let dom_size = env.map.int_map[var.0].as_ref().unwrap().domain.len();
+        heap.push(Reverse((dom_size, var, coef)));
+    }
+
+    let mut pending: Vec<(usize, IntVar, i32)> = vec![];
+    let mut dom_product = 1usize;
+    while let Some(&Reverse(top)) = heap.peek() {
+        let (dom_size, _, _) = top;
+        if dom_product * dom_size >= DOM_PRODUCT_THRESHOLD && pending.len() >= 2 && heap.len() >= 2
+        {
+            // Introduce auxiliary variable which aggregates current pending terms
+            let mut aux_sum = LinearSum::new();
+            for &(_, var, coef) in &pending {
+                aux_sum.add_coef(var, coef);
+            }
+            let aux_dom = env.norm_vars.get_domain_linear_sum(&aux_sum);
+            let aux_var = env.norm_vars.new_int_var(aux_dom);
+            env.map
+                .convert_int_var(&mut env.norm_vars, &mut env.sat, aux_var);
+
+            // aux_sum >= aux_var
+            aux_sum.add_coef(aux_var, -1);
+            encode_linear_ge(env, &aux_sum, &vec![]);
+
+            pending.clear();
+            let dom_size = env.map.int_map[aux_var.0].as_ref().unwrap().domain.len();
+            pending.push((dom_size, aux_var, 1));
+            dom_product = dom_size;
+
+            continue;
+        }
+        dom_product *= dom_size;
+        pending.push(top);
+        heap.pop();
+    }
+
+    let mut sum = LinearSum::constant(sum.constant);
+    for &(_, var, coef) in &pending {
+        sum.add_coef(var, coef);
+    }
+    encode_linear_ge(env, &sum, bool_lit);
 }
 
 fn encode_linear_ge(env: &mut EncoderEnv, sum: &LinearSum, bool_lit: &Vec<Lit>) {
