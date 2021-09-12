@@ -51,9 +51,10 @@ fn parse_to_tree(input: &str) -> Result<SyntaxTree, nom::error::Error<&str>> {
             tag("||"),
             tag("^"),
             tag("=>"),
-            tag("="),
             tag("=="),
+            tag("="),
             tag("!="),
+            tag("!"),
             tag("<="),
             tag("<"),
             tag(">="),
@@ -164,7 +165,7 @@ fn parse_bool_expr(var_map: &VarMap, tree: &SyntaxTree) -> BoolExpr {
         &SyntaxTree::Int(_) => panic!("int constant is given while bool expr is expected"),
         SyntaxTree::Node(child) => {
             let op_name = child[0].as_op_name();
-            if op_name == "not" {
+            if op_name == "not" || op_name == "!" {
                 assert_eq!(child.len(), 2);
                 !parse_bool_expr(var_map, &child[1])
             } else if op_name == "and" || op_name == "&&" {
