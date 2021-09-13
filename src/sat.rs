@@ -84,6 +84,21 @@ impl SAT {
         self.solver.add_clause(&c);
     }
 
+    pub fn add_order_encoding_linear(
+        &mut self,
+        lits: Vec<Vec<Lit>>,
+        domain: Vec<Vec<i32>>,
+        coefs: Vec<i32>,
+        constant: i32,
+    ) -> bool {
+        let lits = lits
+            .iter()
+            .map(|x| x.iter().map(|l| l.0).collect::<Vec<_>>())
+            .collect::<Vec<_>>();
+        self.solver
+            .add_order_encoding_linear(&lits, &domain, &coefs, constant)
+    }
+
     pub fn solve<'a>(&'a mut self) -> Option<SATModel<'a>> {
         self.solver.solve().map(|model| SATModel { model })
     }

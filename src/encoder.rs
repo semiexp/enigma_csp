@@ -327,7 +327,12 @@ fn encode_linear_ge_with_simplification(
 
             // aux_sum >= aux_var
             aux_sum.add_coef(aux_var, -1);
-            encode_linear_ge(env, &aux_sum, &vec![]);
+            if pending.len() <= 3 {
+                // TODO: make this parameter configurable
+                encode_linear_ge_direct(env, &aux_sum, &vec![]);
+            } else {
+                encode_linear_ge(env, &aux_sum, &vec![]);
+            }
 
             pending.clear();
             let dom_size = env.map.int_map[aux_var.0].as_ref().unwrap().domain.len();
@@ -346,6 +351,41 @@ fn encode_linear_ge_with_simplification(
         sum.add_coef(var, coef);
     }
     encode_linear_ge(env, &sum, bool_lit);
+}
+
+fn encode_linear_ge_direct(env: &mut EncoderEnv, sum: &LinearSum, bool_lit: &Vec<Lit>) {
+    assert!(bool_lit.is_empty()); // TODO
+
+    let mut coef = vec![];
+    let mut encoding = vec![];
+    for (v, c) in sum.terms() {
+        assert_ne!(c, 0);
+        coef.push(c);
+        encoding.push(env.map.int_map[v.0].as_ref().unwrap());
+    }
+    let info = LinearInfoForOrderEncoding::new(coef, encoding);
+
+    let mut lits = vec![];
+    let mut domain = vec![];
+    let mut coefs = vec![];
+    let constant = sum.constant;
+
+    for i in 0..info.len() {
+        let mut lits_r = vec![];
+        let mut domain_r = vec![];
+        for j in 0..info.domain_size(i) {
+            if j > 0 {
+                lits_r.push(info.at_least(i, j));
+            }
+            domain_r.push(info.domain(i, j));
+        }
+        lits.push(lits_r);
+        domain.push(domain_r);
+        coefs.push(info.coef(i));
+    }
+
+    env.sat
+        .add_order_encoding_linear(lits, domain, coefs, constant);
 }
 
 fn encode_linear_ge(env: &mut EncoderEnv, sum: &LinearSum, bool_lit: &Vec<Lit>) {

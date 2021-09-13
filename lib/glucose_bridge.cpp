@@ -1,6 +1,7 @@
 #include "glucose_bridge.h"
 
 #include "core/Solver.h"
+#include "constraints/OrderEncodingLinear.h"
 
 extern "C" {
 
@@ -35,6 +36,23 @@ int32_t Glucose_NumVar(const Glucose::Solver* solver) {
 
 int32_t Glucose_GetModelValueVar(const Glucose::Solver* solver, int32_t var) {
     return solver->modelValue(Glucose::Var(var)) == l_True ? 1 : 0;
+}
+
+int32_t Glucose_AddOrderEncodingLinear(Glucose::Solver* solver, int32_t n_terms, const int32_t* domain_size, const int32_t* lits, const int32_t* domain, const int32_t* coefs, int32_t constant) {
+    std::vector<Glucose::LinearTerm> terms;
+    int lits_offset = 0, domain_offset = 0;
+    for (int i = 0; i < n_terms; ++i) {
+        std::vector<Glucose::Lit> term_lits;
+        for (int j = 0; j < domain_size[i] - 1; ++j) {
+            term_lits.push_back(Glucose::Lit{lits[lits_offset++]});
+        }
+        std::vector<int> term_domain;
+        for (int j = 0; j < domain_size[i]; ++j) {
+            term_domain.push_back(domain[domain_offset++]);
+        }
+        terms.push_back(Glucose::LinearTerm{ term_lits, term_domain, coefs[i] });
+    }
+    return solver->addConstraint(std::make_unique<Glucose::OrderEncodingLinear>(std::move(terms), constant)) ? 1 : 0;
 }
 
 }

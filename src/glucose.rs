@@ -13,6 +13,15 @@ extern "C" {
     fn Glucose_Solve(solver: *mut Opaque) -> i32;
     fn Glucose_NumVar(solver: *mut Opaque) -> i32;
     fn Glucose_GetModelValueVar(solver: *mut Opaque, var: i32) -> i32;
+    fn Glucose_AddOrderEncodingLinear(
+        solver: *mut Opaque,
+        n_terms: i32,
+        domain_size: *const i32,
+        lits: *const Lit,
+        domain: *const i32,
+        coefs: *const i32,
+        constant: i32,
+    ) -> i32;
 }
 
 #[derive(Clone, Copy)]
@@ -70,6 +79,38 @@ impl Solver {
     pub fn add_clause(&mut self, clause: &[Lit]) -> bool {
         assert!(clause.len() <= i32::max_value() as usize);
         let res = unsafe { Glucose_AddClause(self.ptr, clause.as_ptr(), clause.len() as i32) };
+        res != 0
+    }
+
+    pub fn add_order_encoding_linear(
+        &mut self,
+        lits: &[Vec<Lit>],
+        domain: &[Vec<i32>],
+        coefs: &[i32],
+        constant: i32,
+    ) -> bool {
+        assert!(lits.len() <= i32::max_value() as usize);
+        assert_eq!(lits.len(), domain.len());
+        assert_eq!(lits.len(), coefs.len());
+        let n_terms = lits.len() as i32;
+        let domain_size = domain.iter().map(|x| x.len() as i32).collect::<Vec<_>>();
+        for i in 0..lits.len() {
+            assert!(domain[i].len() <= i32::max_value() as usize);
+            assert_eq!(lits[i].len() + 1, domain[i].len());
+        }
+        let lits_flat = lits.iter().flatten().copied().collect::<Vec<_>>();
+        let domain_flat = domain.iter().flatten().copied().collect::<Vec<_>>();
+        let res = unsafe {
+            Glucose_AddOrderEncodingLinear(
+                self.ptr,
+                n_terms,
+                domain_size.as_ptr(),
+                lits_flat.as_ptr(),
+                domain_flat.as_ptr(),
+                coefs.as_ptr(),
+                constant,
+            )
+        };
         res != 0
     }
 
