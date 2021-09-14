@@ -554,7 +554,7 @@ mod tests {
         let mut solver = IntegratedSolver::new();
 
         let mut ivars = vec![];
-        for i in 0..30 {
+        for _ in 0..30 {
             ivars.push(solver.new_int_var(Domain::range(0, 1)));
         }
         solver.add_expr(
