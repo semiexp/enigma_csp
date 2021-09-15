@@ -2,19 +2,20 @@ use super::csp::{BoolExpr, BoolVar, CSPVars, IntExpr, IntVar, Stmt, CSP};
 use super::norm_csp::BoolVar as NBoolVar;
 use super::norm_csp::IntVar as NIntVar;
 use super::norm_csp::{BoolLit, Constraint, LinearLit, LinearSum, NormCSP};
+use crate::util::ConvertMap;
 
 use super::CmpOp;
 
 pub struct NormalizeMap {
-    bool_map: Vec<Option<NBoolVar>>,
-    int_map: Vec<Option<NIntVar>>,
+    bool_map: ConvertMap<BoolVar, NBoolVar>,
+    int_map: ConvertMap<IntVar, NIntVar>,
 }
 
 impl NormalizeMap {
     pub fn new() -> NormalizeMap {
         NormalizeMap {
-            bool_map: vec![],
-            int_map: vec![],
+            bool_map: ConvertMap::new(),
+            int_map: ConvertMap::new(),
         }
     }
 
@@ -24,53 +25,33 @@ impl NormalizeMap {
         norm: &mut NormCSP,
         var: BoolVar,
     ) -> NBoolVar {
-        let id = var.0;
-
-        while self.bool_map.len() <= id {
-            self.bool_map.push(None);
-        }
-
-        match self.bool_map[id] {
+        match self.bool_map[var] {
             Some(x) => x,
             None => {
                 let ret = norm.new_bool_var();
-                self.bool_map[id] = Some(ret);
+                self.bool_map[var] = Some(ret);
                 ret
             }
         }
     }
 
     fn convert_int_var(&mut self, csp_vars: &CSPVars, norm: &mut NormCSP, var: IntVar) -> NIntVar {
-        let id = var.0;
-
-        while self.int_map.len() <= id {
-            self.int_map.push(None);
-        }
-
-        match self.int_map[id] {
+        match self.int_map[var] {
             Some(x) => x,
             None => {
-                let ret = norm.new_int_var(csp_vars.int_var[id].domain.clone());
-                self.int_map[id] = Some(ret);
+                let ret = norm.new_int_var(csp_vars.int_var(var).domain.clone());
+                self.int_map[var] = Some(ret);
                 ret
             }
         }
     }
 
     pub fn get_bool_var(&self, var: BoolVar) -> Option<NBoolVar> {
-        if var.0 < self.bool_map.len() {
-            self.bool_map[var.0]
-        } else {
-            None
-        }
+        self.bool_map[var]
     }
 
     pub fn get_int_var(&self, var: IntVar) -> Option<NIntVar> {
-        if var.0 < self.int_map.len() {
-            self.int_map[var.0]
-        } else {
-            None
-        }
+        self.int_map[var]
     }
 }
 
@@ -436,8 +417,8 @@ mod tests {
             normalize(&mut self.csp, &mut self.norm, &mut self.map);
 
             let mut unfixed_bool_vars = BTreeSet::<NBoolVar>::new();
-            for i in 0..self.norm.vars.num_bool_var {
-                unfixed_bool_vars.insert(NBoolVar(i));
+            for v in self.norm.bool_vars_iter() {
+                unfixed_bool_vars.insert(v);
             }
 
             for v in &self.bool_vars {
@@ -454,8 +435,8 @@ mod tests {
             let unfixed_bool_vars = unfixed_bool_vars.into_iter().collect::<Vec<_>>();
 
             let mut unfixed_int_vars = BTreeSet::<NIntVar>::new();
-            for i in 0..self.norm.vars.int_var.len() {
-                unfixed_int_vars.insert(NIntVar(i));
+            for v in self.norm.int_vars_iter() {
+                unfixed_int_vars.insert(v);
             }
 
             for (v, _) in &self.int_vars {
@@ -486,7 +467,7 @@ mod tests {
             }
             let mut unfixed_int_domains = vec![];
             for nv in &unfixed_int_vars {
-                unfixed_int_domains.push(self.norm.vars.int_var[nv.0].enumerate());
+                unfixed_int_domains.push(self.norm.vars.int_var(*nv).enumerate());
             }
 
             for (vb, vi) in util::product_binary(

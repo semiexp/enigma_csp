@@ -1,3 +1,51 @@
+use std::marker::PhantomData;
+use std::ops::{Index, IndexMut};
+
+pub trait ConvertMapIndex {
+    fn to_index(&self) -> usize;
+}
+
+pub struct ConvertMap<K: ConvertMapIndex, V> {
+    data: Vec<Option<V>>,
+    key_type: PhantomData<K>,
+}
+
+impl<K: ConvertMapIndex, V> ConvertMap<K, V> {
+    pub fn new() -> ConvertMap<K, V> {
+        ConvertMap {
+            data: vec![],
+            key_type: PhantomData,
+        }
+    }
+
+    pub fn len(&self) -> usize {
+        self.data.len()
+    }
+}
+
+impl<K: ConvertMapIndex, V> Index<K> for ConvertMap<K, V> {
+    type Output = Option<V>;
+
+    fn index(&self, index: K) -> &Self::Output {
+        let index = index.to_index();
+        if index < self.len() {
+            &self.data[index]
+        } else {
+            &None
+        }
+    }
+}
+
+impl<K: ConvertMapIndex, V> IndexMut<K> for ConvertMap<K, V> {
+    fn index_mut(&mut self, index: K) -> &mut Self::Output {
+        let index = index.to_index();
+        while self.len() <= index {
+            self.data.push(None);
+        }
+        &mut self.data[index]
+    }
+}
+
 /// Given v1 and v2, return v1 * v2 as Vec<(A, B)>, where * represents the Cartesian product.
 #[allow(dead_code)]
 pub fn product_binary<A: Clone, B: Clone>(a: &[A], b: &[B]) -> Vec<(A, B)> {

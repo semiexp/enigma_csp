@@ -58,12 +58,12 @@ impl IntegratedSolver {
     /// Since this function may modify the problem instance, this consumes `self` to avoid further operations.
     pub fn enumerate_valid_assignments(mut self) -> Vec<Assignment> {
         let mut bool_vars = vec![];
-        for i in 0..self.csp.vars.bool_var.len() {
-            bool_vars.push(BoolVar(i));
+        for v in self.csp.vars.bool_vars_iter() {
+            bool_vars.push(v);
         }
         let mut int_vars = vec![];
-        for i in 0..self.csp.vars.int_var.len() {
-            int_vars.push(IntVar(i));
+        for v in self.csp.vars.int_vars_iter() {
+            int_vars.push(v);
         }
 
         let mut ret = vec![];
@@ -178,7 +178,7 @@ impl<'a> Model<'a> {
         self.normalize_map
             .get_int_var(var)
             .and_then(|norm_var| self.encode_map.get_int_value(&self.model, norm_var))
-            .unwrap_or(self.csp.vars.int_var[var.0].domain.lower_bound()) // unused variable optimization
+            .unwrap_or(self.csp.vars.int_var(var).domain.lower_bound()) // unused variable optimization
     }
 }
 

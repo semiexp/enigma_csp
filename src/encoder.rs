@@ -6,6 +6,7 @@ use super::norm_csp::{
 };
 use super::sat::{Lit, SATModel, VarArray, SAT};
 use super::CmpOp;
+use crate::util::ConvertMap;
 
 /// Order encoding of an integer variable with domain of `domain`.
 /// `vars[i]` is the logical variable representing (the value of this int variable) >= `domain[i+1]`.
@@ -15,30 +16,24 @@ pub struct OrderEncoding {
 }
 
 pub struct EncodeMap {
-    bool_map: Vec<Option<Lit>>, // mapped to Lit rather than Var so that further optimization can be done
-    int_map: Vec<Option<OrderEncoding>>,
+    bool_map: ConvertMap<BoolVar, Lit>, // mapped to Lit rather than Var so that further optimization can be done
+    int_map: ConvertMap<IntVar, OrderEncoding>,
 }
 
 impl EncodeMap {
     pub fn new() -> EncodeMap {
         EncodeMap {
-            bool_map: vec![],
-            int_map: vec![],
+            bool_map: ConvertMap::new(),
+            int_map: ConvertMap::new(),
         }
     }
 
     fn convert_bool_var(&mut self, _norm_vars: &NormCSPVars, sat: &mut SAT, var: BoolVar) -> Lit {
-        let id = var.0;
-
-        while self.bool_map.len() <= id {
-            self.bool_map.push(None);
-        }
-
-        match self.bool_map[id] {
+        match self.bool_map[var] {
             Some(x) => x,
             None => {
                 let ret = sat.new_var().as_lit(false);
-                self.bool_map[id] = Some(ret);
+                self.bool_map[var] = Some(ret);
                 ret
             }
         }
@@ -55,14 +50,9 @@ impl EncodeMap {
 
     fn convert_int_var(&mut self, norm_vars: &NormCSPVars, sat: &mut SAT, var: IntVar) {
         // Currently, only order encoding is supported
-        let id = var.0;
 
-        while self.int_map.len() <= id {
-            self.int_map.push(None);
-        }
-
-        if self.int_map[id].is_none() {
-            let domain = norm_vars.int_var[id].enumerate();
+        if self.int_map[var].is_none() {
+            let domain = norm_vars.int_var(var).enumerate();
             assert_ne!(domain.len(), 0);
             let vars = sat.new_vars((domain.len() - 1) as i32);
             for i in 1..vars.len() {
@@ -70,23 +60,19 @@ impl EncodeMap {
                 sat.add_clause(vec![vars.at(i).as_lit(true), vars.at(i - 1).as_lit(false)]);
             }
 
-            self.int_map[id] = Some(OrderEncoding { domain, vars });
+            self.int_map[var] = Some(OrderEncoding { domain, vars });
         }
     }
 
     pub fn get_bool_var(&self, var: BoolVar) -> Option<Lit> {
-        if var.0 < self.bool_map.len() {
-            self.bool_map[var.0]
-        } else {
-            None
-        }
+        self.bool_map[var]
     }
 
     pub fn get_int_value(&self, model: &SATModel, var: IntVar) -> Option<i32> {
-        if var.0 >= self.int_map.len() || self.int_map[var.0].is_none() {
+        if self.int_map[var].is_none() {
             return None;
         }
-        let encoding = self.int_map[var.0].as_ref().unwrap();
+        let encoding = self.int_map[var].as_ref().unwrap();
 
         // Find the number of true value in `encoding.vars`
         let mut left = 0;
@@ -116,8 +102,8 @@ impl<'a, 'b, 'c> EncoderEnv<'a, 'b, 'c> {
 }
 
 pub fn encode(norm: &mut NormCSP, sat: &mut SAT, map: &mut EncodeMap) {
-    for i in norm.num_encoded_vars..norm.vars.int_var.len() {
-        map.convert_int_var(&mut norm.vars, sat, IntVar(i));
+    for var in norm.unencoded_int_vars() {
+        map.convert_int_var(&mut norm.vars, sat, var);
     }
     norm.num_encoded_vars = norm.vars.int_var.len();
 
@@ -305,7 +291,7 @@ fn encode_linear_ge_with_simplification(
 ) {
     let mut heap = BinaryHeap::new();
     for (&var, &coef) in &sum.term {
-        let dom_size = env.map.int_map[var.0].as_ref().unwrap().domain.len();
+        let dom_size = env.map.int_map[var].as_ref().unwrap().domain.len();
         heap.push(Reverse((dom_size, var, coef)));
     }
 
@@ -335,7 +321,7 @@ fn encode_linear_ge_with_simplification(
             }
 
             pending.clear();
-            let dom_size = env.map.int_map[aux_var.0].as_ref().unwrap().domain.len();
+            let dom_size = env.map.int_map[aux_var].as_ref().unwrap().domain.len();
             pending.push((dom_size, aux_var, 1));
             dom_product = dom_size;
 
@@ -361,7 +347,7 @@ fn encode_linear_ge_direct(env: &mut EncoderEnv, sum: &LinearSum, bool_lit: &Vec
     for (v, c) in sum.terms() {
         assert_ne!(c, 0);
         coef.push(c);
-        encoding.push(env.map.int_map[v.0].as_ref().unwrap());
+        encoding.push(env.map.int_map[v].as_ref().unwrap());
     }
     let info = LinearInfoForOrderEncoding::new(coef, encoding);
 
@@ -395,7 +381,7 @@ fn encode_linear_ge(env: &mut EncoderEnv, sum: &LinearSum, bool_lit: &Vec<Lit>) 
     for (v, c) in sum.terms() {
         assert_ne!(c, 0);
         coef.push(c);
-        encoding.push(env.map.int_map[v.0].as_ref().unwrap());
+        encoding.push(env.map.int_map[v].as_ref().unwrap());
     }
     let info = LinearInfoForOrderEncoding::new(coef, encoding);
 

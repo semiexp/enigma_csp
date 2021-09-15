@@ -5,12 +5,25 @@ use std::ops::{Add, AddAssign, Mul, MulAssign, Sub, SubAssign};
 
 use super::csp::Domain;
 use super::CmpOp;
+use crate::util::ConvertMapIndex;
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug, Hash)]
-pub struct BoolVar(pub(super) usize);
+pub struct BoolVar(usize);
+
+impl ConvertMapIndex for BoolVar {
+    fn to_index(&self) -> usize {
+        self.0
+    }
+}
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug, Hash)]
-pub struct IntVar(pub(super) usize);
+pub struct IntVar(usize);
+
+impl ConvertMapIndex for IntVar {
+    fn to_index(&self) -> usize {
+        self.0
+    }
+}
 
 #[derive(Debug)]
 pub struct BoolLit {
@@ -173,11 +186,23 @@ impl Constraint {
 
 pub(super) struct NormCSPVars {
     // TODO: remove `pub(super)`
-    pub(super) num_bool_var: usize,
+    num_bool_var: usize,
     pub(super) int_var: Vec<super::csp::Domain>,
 }
 
 impl NormCSPVars {
+    pub(super) fn bool_vars_iter(&self) -> impl Iterator<Item = BoolVar> {
+        (0..self.num_bool_var).map(|i| BoolVar(i))
+    }
+
+    pub(super) fn int_vars_iter(&self) -> impl Iterator<Item = IntVar> {
+        (0..self.int_var.len()).map(|i| IntVar(i))
+    }
+
+    pub(super) fn int_var(&self, var: IntVar) -> &super::csp::Domain {
+        &self.int_var[var.0]
+    }
+
     pub(super) fn new_int_var(&mut self, domain: super::csp::Domain) -> IntVar {
         let id = self.int_var.len();
         self.int_var.push(domain);
@@ -188,7 +213,7 @@ impl NormCSPVars {
         let mut ret = Domain::range(linear_sum.constant, linear_sum.constant);
 
         for (var, coef) in &linear_sum.term {
-            ret = ret + self.int_var[var.0].clone() * *coef;
+            ret = ret + self.int_var(*var).clone() * *coef;
         }
 
         ret
@@ -225,6 +250,18 @@ impl NormCSP {
 
     pub fn add_constraint(&mut self, constraint: Constraint) {
         self.constraints.push(constraint);
+    }
+
+    pub fn bool_vars_iter(&self) -> impl Iterator<Item = BoolVar> {
+        self.vars.bool_vars_iter()
+    }
+
+    pub fn int_vars_iter(&self) -> impl Iterator<Item = IntVar> {
+        self.vars.int_vars_iter()
+    }
+
+    pub fn unencoded_int_vars(&self) -> impl Iterator<Item = IntVar> {
+        (self.num_encoded_vars..self.vars.int_var.len()).map(|x| IntVar(x))
     }
 
     pub(super) fn get_domain_linear_sum(&self, linear_sum: &LinearSum) -> Domain {

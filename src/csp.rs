@@ -1,3 +1,4 @@
+use crate::util::ConvertMapIndex;
 use std::collections::{btree_map, BTreeMap};
 use std::ops::{Add, BitAnd, BitOr, BitXor, Mul, Not, Sub};
 
@@ -108,7 +109,7 @@ impl IntVarData {
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug, Hash)]
-pub struct BoolVar(pub(super) usize);
+pub struct BoolVar(usize);
 
 impl BoolVar {
     pub fn expr(self) -> BoolExpr {
@@ -116,12 +117,24 @@ impl BoolVar {
     }
 }
 
+impl ConvertMapIndex for BoolVar {
+    fn to_index(&self) -> usize {
+        self.0
+    }
+}
+
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug, Hash)]
-pub struct IntVar(pub(super) usize);
+pub struct IntVar(usize);
 
 impl IntVar {
     pub fn expr(self) -> IntExpr {
         IntExpr::Var(self)
+    }
+}
+
+impl ConvertMapIndex for IntVar {
+    fn to_index(&self) -> usize {
+        self.0
     }
 }
 
@@ -255,6 +268,20 @@ pub(super) struct CSPVars {
     // TODO: remove `pub(super)`
     pub(super) bool_var: Vec<BoolVarData>,
     pub(super) int_var: Vec<IntVarData>,
+}
+
+impl CSPVars {
+    pub(super) fn bool_vars_iter(&self) -> impl Iterator<Item = BoolVar> {
+        (0..self.bool_var.len()).map(|x| BoolVar(x))
+    }
+
+    pub(super) fn int_vars_iter(&self) -> impl Iterator<Item = IntVar> {
+        (0..self.int_var.len()).map(|x| IntVar(x))
+    }
+
+    pub(super) fn int_var(&self, var: IntVar) -> &IntVarData {
+        &self.int_var[var.0]
+    }
 }
 
 pub struct CSP {
