@@ -220,9 +220,14 @@ impl NormCSPVars {
     }
 }
 
+pub enum ExtraConstraint {
+    ActiveVerticesConnected(Vec<BoolLit>, Vec<(usize, usize)>),
+}
+
 pub struct NormCSP {
     pub(super) vars: NormCSPVars,
     pub(super) constraints: Vec<Constraint>,
+    pub(super) extra_constraints: Vec<ExtraConstraint>,
     pub(super) num_encoded_vars: usize,
 }
 
@@ -234,6 +239,7 @@ impl NormCSP {
                 int_var: vec![],
             },
             constraints: vec![],
+            extra_constraints: vec![],
             num_encoded_vars: 0,
         }
     }
@@ -250,6 +256,10 @@ impl NormCSP {
 
     pub fn add_constraint(&mut self, constraint: Constraint) {
         self.constraints.push(constraint);
+    }
+
+    pub fn add_extra_constraint(&mut self, constraint: ExtraConstraint) {
+        self.extra_constraints.push(constraint);
     }
 
     pub fn bool_vars_iter(&self) -> impl Iterator<Item = BoolVar> {

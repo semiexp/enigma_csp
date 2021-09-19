@@ -189,7 +189,7 @@ impl ConvertMapIndex for IntVar {
 pub enum Stmt {
     Expr(BoolExpr),
     AllDifferent(Vec<IntExpr>),
-    // TODO: graph constraints go here
+    ActiveVerticesConnected(Vec<BoolExpr>, Vec<(usize, usize)>),
 }
 
 #[derive(Clone, Hash, PartialEq, Eq, Debug)]
@@ -621,20 +621,28 @@ impl CSP {
         }
     }
 
+    pub fn apply_constant_folding(&mut self) {
+        let vars = &mut self.vars;
+        for stmt in &mut self.constraints {
+            match stmt {
+                Stmt::Expr(e) => vars.constant_folding_bool(e),
+                Stmt::AllDifferent(exprs) => {
+                    exprs.iter_mut().for_each(|e| vars.constant_folding_int(e));
+                }
+                Stmt::ActiveVerticesConnected(vertices, _edges) => {
+                    vertices
+                        .iter_mut()
+                        .for_each(|e| vars.constant_folding_bool(e));
+                }
+            }
+        }
+    }
+
     pub fn optimize(&mut self, use_propagate: bool) {
         if use_propagate {
             loop {
+                self.apply_constant_folding();
                 let vars = &mut self.vars;
-                for stmt in &mut self.constraints {
-                    match stmt {
-                        Stmt::Expr(e) => {
-                            vars.constant_folding_bool(e);
-                        }
-                        Stmt::AllDifferent(exprs) => {
-                            exprs.iter_mut().for_each(|e| vars.constant_folding_int(e));
-                        }
-                    }
-                }
                 let mut update_status = UpdateStatus::NotUpdated;
                 for stmt in &self.constraints {
                     match stmt {
@@ -654,14 +662,7 @@ impl CSP {
                 }
             }
         } else {
-            for stmt in &mut self.constraints {
-                match stmt {
-                    Stmt::Expr(e) => {
-                        self.vars.constant_folding_bool(e);
-                    }
-                    _ => (),
-                }
-            }
+            self.apply_constant_folding();
         }
     }
 }

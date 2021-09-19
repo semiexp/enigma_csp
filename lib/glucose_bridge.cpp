@@ -1,6 +1,7 @@
 #include "glucose_bridge.h"
 
 #include "core/Solver.h"
+#include "constraints/Graph.h"
 #include "constraints/OrderEncodingLinear.h"
 
 extern "C" {
@@ -53,6 +54,18 @@ int32_t Glucose_AddOrderEncodingLinear(Glucose::Solver* solver, int32_t n_terms,
         terms.push_back(Glucose::LinearTerm{ term_lits, term_domain, coefs[i] });
     }
     return solver->addConstraint(std::make_unique<Glucose::OrderEncodingLinear>(std::move(terms), constant)) ? 1 : 0;
+}
+
+int32_t Glucose_AddActiveVerticesConnected(Glucose::Solver* solver, int32_t n_vertices, const int32_t* lits, int32_t n_edges, const int32_t* edges) {
+    std::vector<Glucose::Lit> g_lits;
+    for (int i = 0; i < n_vertices; ++i) {
+        g_lits.push_back(Glucose::Lit{lits[i]});
+    }
+    std::vector<std::pair<int, int>> g_edges;
+    for (int i = 0; i < n_edges; ++i) {
+        g_edges.push_back({edges[i * 2], edges[i * 2 + 1]});
+    }
+    return solver->addConstraint(std::make_unique<Glucose::ActiveVerticesConnected>(std::move(g_lits), std::move(g_edges))) ? 1 : 0;
 }
 
 }

@@ -41,6 +41,12 @@ impl<'a> SyntaxTree<'a> {
             _ => panic!("int expected"),
         }
     }
+
+    fn as_usize(&self) -> usize {
+        let n = self.as_int();
+        assert!(n >= 0);
+        n as usize
+    }
 }
 
 fn parse_to_tree(input: &str) -> Result<SyntaxTree, nom::error::Error<&str>> {
@@ -61,6 +67,7 @@ fn parse_to_tree(input: &str) -> Result<SyntaxTree, nom::error::Error<&str>> {
             tag(">"),
             tag("+"),
             tag("-"),
+            tag("graph-active-vertices-connected"),
         ));
         alt((
             delimited(
@@ -68,12 +75,12 @@ fn parse_to_tree(input: &str) -> Result<SyntaxTree, nom::error::Error<&str>> {
                 map(separated_list0(tag(" "), rec_parser), SyntaxTree::Node),
                 tag(")"),
             ),
+            map(op, SyntaxTree::Ident),
             map(ident_or_op, SyntaxTree::Ident),
             map(digit1, |s: &str| SyntaxTree::Int(s.parse::<i32>().unwrap())), // TODO
             map(preceded(tag("-"), digit1), |s: &str| {
                 SyntaxTree::Int(-s.parse::<i32>().unwrap())
             }), // TODO
-            map(op, SyntaxTree::Ident),
         ))(input)
     }
 
@@ -142,6 +149,25 @@ pub fn parse<'a, 'b>(var_map: &'a VarMap, input: &'b str) -> ParseResult<'b> {
         ParseResult::IntVarDecl(var_name, Domain::range(low, high))
     } else if op_name == "alldifferent" {
         todo!();
+    } else if op_name == "graph-active-vertices-connected" {
+        let num_vertices = child[1].as_usize();
+        let num_edges = child[2].as_usize();
+        let num_vertices = num_vertices as usize;
+        let num_edges = num_edges as usize;
+        assert_eq!(child.len(), 3 + num_vertices + num_edges * 2);
+
+        let vertices = (0..num_vertices)
+            .map(|i| parse_bool_expr(var_map, &child[i + 3]))
+            .collect::<Vec<_>>();
+        let edges = (0..num_edges)
+            .map(|i| {
+                (
+                    child[i * 2 + 3 + num_vertices].as_usize(),
+                    child[i * 2 + 4 + num_vertices].as_usize(),
+                )
+            })
+            .collect::<Vec<_>>();
+        ParseResult::Stmt(Stmt::ActiveVerticesConnected(vertices, edges))
     } else {
         ParseResult::Stmt(Stmt::Expr(parse_bool_expr(var_map, &tree)))
     }

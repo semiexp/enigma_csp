@@ -1,7 +1,7 @@
 use super::csp::{BoolExpr, BoolVar, CSPVars, IntExpr, IntVar, Stmt, CSP};
 use super::norm_csp::BoolVar as NBoolVar;
 use super::norm_csp::IntVar as NIntVar;
-use super::norm_csp::{BoolLit, Constraint, LinearLit, LinearSum, NormCSP};
+use super::norm_csp::{BoolLit, Constraint, ExtraConstraint, LinearLit, LinearSum, NormCSP};
 use crate::util::ConvertMap;
 
 use super::CmpOp;
@@ -89,19 +89,43 @@ pub fn normalize(csp: &mut CSP, norm: &mut NormCSP, map: &mut NormalizeMap) {
 
 fn normalize_stmt(env: &mut NormalizerEnv, stmt: Stmt) {
     match stmt {
-        Stmt::Expr(mut expr) => {
-            let mut exprs = vec![];
-            tseitin_transformation_bool(env, &mut exprs, &mut expr, false);
-            exprs.push(expr);
-            for expr in exprs {
-                let constraints = normalize_bool_expr(env, &expr, false);
-                for c in constraints {
-                    env.norm.add_constraint(c);
-                }
-            }
-        }
+        Stmt::Expr(expr) => normalize_and_register_expr(env, expr),
         Stmt::AllDifferent(_exprs) => {
             todo!();
+        }
+        Stmt::ActiveVerticesConnected(vertices, edges) => {
+            let mut vertices_converted = vec![];
+            for e in vertices {
+                // TODO: support Not(Var(_)), Const
+                let simplified = match &e {
+                    BoolExpr::Var(v) => Some(BoolLit::new(env.convert_bool_var(*v), false)),
+                    _ => None,
+                };
+                if let Some(l) = simplified {
+                    vertices_converted.push(l);
+                } else {
+                    let aux = env.norm.new_bool_var();
+                    normalize_and_register_expr(env, BoolExpr::NVar(aux).iff(e));
+                    vertices_converted.push(BoolLit::new(aux, false));
+                }
+            }
+            env.norm
+                .add_extra_constraint(ExtraConstraint::ActiveVerticesConnected(
+                    vertices_converted,
+                    edges,
+                ));
+        }
+    }
+}
+
+fn normalize_and_register_expr(env: &mut NormalizerEnv, mut expr: BoolExpr) {
+    let mut exprs = vec![];
+    tseitin_transformation_bool(env, &mut exprs, &mut expr, false);
+    exprs.push(expr);
+    for expr in exprs {
+        let constraints = normalize_bool_expr(env, &expr, false);
+        for c in constraints {
+            env.norm.add_constraint(c);
         }
     }
 }
@@ -520,6 +544,7 @@ mod tests {
                         }
                     }
                     Stmt::AllDifferent(_) => todo!(),
+                    Stmt::ActiveVerticesConnected(_, _) => todo!(),
                 }
             }
             true

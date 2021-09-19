@@ -7,6 +7,7 @@ fn main() {
             "lib/glucose/core/Solver.cc",
             "lib/glucose/utils/Options.cc",
             "lib/glucose/utils/System.cc",
+            "lib/glucose/constraints/Graph.cc",
             "lib/glucose/constraints/OrderEncodingLinear.cc",
         ])
         //        .cpp_link_stdlib("c++")

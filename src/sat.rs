@@ -99,6 +99,15 @@ impl SAT {
             .add_order_encoding_linear(&lits, &domain, &coefs, constant)
     }
 
+    pub fn add_active_vertices_connected(
+        &mut self,
+        lits: Vec<Lit>,
+        edges: Vec<(usize, usize)>,
+    ) -> bool {
+        let lits = lits.iter().map(|x| x.0).collect::<Vec<_>>();
+        self.solver.add_active_vertices_connected(&lits, &edges)
+    }
+
     pub fn solve<'a>(&'a mut self) -> Option<SATModel<'a>> {
         self.solver.solve().map(|model| SATModel { model })
     }

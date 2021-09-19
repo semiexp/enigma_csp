@@ -2,7 +2,8 @@ use std::cmp::Reverse;
 use std::collections::BinaryHeap;
 
 use super::norm_csp::{
-    BoolLit, BoolVar, Constraint, IntVar, LinearLit, LinearSum, NormCSP, NormCSPVars,
+    BoolLit, BoolVar, Constraint, ExtraConstraint, IntVar, LinearLit, LinearSum, NormCSP,
+    NormCSPVars,
 };
 use super::sat::{Lit, SATModel, VarArray, SAT};
 use super::CmpOp;
@@ -113,11 +114,22 @@ pub fn encode(norm: &mut NormCSP, sat: &mut SAT, map: &mut EncodeMap) {
         map,
     };
 
-    let mut constrs = vec![];
-    std::mem::swap(&mut constrs, &mut norm.constraints);
-
+    let constrs = std::mem::replace(&mut norm.constraints, vec![]);
     for constr in constrs {
         encode_constraint(&mut env, constr);
+    }
+
+    let extra_constrs = std::mem::replace(&mut norm.extra_constraints, vec![]);
+    for constr in extra_constrs {
+        match constr {
+            ExtraConstraint::ActiveVerticesConnected(vertices, edges) => {
+                let lits = vertices
+                    .into_iter()
+                    .map(|l| env.convert_bool_lit(l))
+                    .collect::<Vec<_>>();
+                env.sat.add_active_vertices_connected(lits, edges);
+            }
+        }
     }
 }
 

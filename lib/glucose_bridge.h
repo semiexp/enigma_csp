@@ -16,5 +16,6 @@ int32_t Glucose_Solve(Glucose::Solver* solver);
 int32_t Glucose_NumVar(const Glucose::Solver* solver);
 int32_t Glucose_GetModelValueVar(const Glucose::Solver* solver, int32_t var);
 int32_t Glucose_AddOrderEncodingLinear(Glucose::Solver* solver, int32_t n_terms, const int32_t* domain_size, const int32_t* lits, const int32_t* domain, const int32_t* coefs, int32_t constant);
+int32_t Glucose_AddActiveVerticesConnected(Glucose::Solver* solver, int32_t n_vertices, const int32_t* lits, int32_t n_edges, const int32_t* edges);
 
 }

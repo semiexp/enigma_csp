@@ -300,6 +300,7 @@ mod tests {
                         }
                     }
                     Stmt::AllDifferent(_) => todo!(),
+                    Stmt::ActiveVerticesConnected(_, _) => todo!(),
                 }
             }
             true

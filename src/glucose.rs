@@ -22,6 +22,13 @@ extern "C" {
         coefs: *const i32,
         constant: i32,
     ) -> i32;
+    fn Glucose_AddActiveVerticesConnected(
+        solver: *mut Opaque,
+        n_vertices: i32,
+        lits: *const Lit,
+        n_edges: i32,
+        edges: *const i32,
+    ) -> i32;
 }
 
 #[derive(Clone, Copy)]
@@ -109,6 +116,34 @@ impl Solver {
                 domain_flat.as_ptr(),
                 coefs.as_ptr(),
                 constant,
+            )
+        };
+        res != 0
+    }
+
+    pub fn add_active_vertices_connected(
+        &mut self,
+        lits: &[Lit],
+        edges: &[(usize, usize)],
+    ) -> bool {
+        assert!(lits.len() <= i32::max_value() as usize);
+        assert!(edges.len() <= i32::max_value() as usize);
+
+        let mut edges_flat = vec![];
+        for &(u, v) in edges {
+            assert!(u < lits.len());
+            assert!(v < lits.len());
+            edges_flat.push(u as i32);
+            edges_flat.push(v as i32);
+        }
+
+        let res = unsafe {
+            Glucose_AddActiveVerticesConnected(
+                self.ptr,
+                lits.len() as i32,
+                lits.as_ptr(),
+                edges.len() as i32,
+                edges_flat.as_ptr(),
             )
         };
         res != 0
