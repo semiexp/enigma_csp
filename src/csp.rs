@@ -1,6 +1,6 @@
 use crate::util::ConvertMapIndex;
 use std::collections::{btree_map, BTreeMap};
-use std::ops::{Add, BitAnd, BitOr, BitXor, Mul, Not, Sub};
+use std::ops::{Add, BitAnd, BitOr, BitOrAssign, BitXor, Mul, Not, Sub};
 
 use super::CmpOp;
 
@@ -25,6 +25,18 @@ impl Domain {
 
     pub fn upper_bound(&self) -> i32 {
         self.high
+    }
+
+    pub fn is_constant(&self) -> Option<i32> {
+        if self.low == self.high {
+            Some(self.low)
+        } else {
+            None
+        }
+    }
+
+    pub fn is_infeasible(&self) -> bool {
+        self.low > self.high
     }
 }
 
@@ -67,6 +79,33 @@ impl BitOr<Domain> for Domain {
     }
 }
 
+#[derive(Clone, Copy)]
+enum UpdateStatus {
+    NotUpdated,
+    Updated,
+    Unsatisfiable,
+}
+
+impl BitOr<UpdateStatus> for UpdateStatus {
+    type Output = UpdateStatus;
+
+    fn bitor(self, rhs: UpdateStatus) -> Self::Output {
+        match (self, rhs) {
+            (UpdateStatus::Unsatisfiable, _) | (_, UpdateStatus::Unsatisfiable) => {
+                UpdateStatus::Unsatisfiable
+            }
+            (UpdateStatus::Updated, _) | (_, UpdateStatus::Updated) => UpdateStatus::Updated,
+            _ => UpdateStatus::NotUpdated,
+        }
+    }
+}
+
+impl BitOrAssign<UpdateStatus> for UpdateStatus {
+    fn bitor_assign(&mut self, rhs: UpdateStatus) {
+        *self = *self | rhs;
+    }
+}
+
 pub(super) struct BoolVarData {
     possibility_mask: u8,
 }
@@ -89,10 +128,18 @@ impl BoolVarData {
     }
 
     #[allow(dead_code)]
-    fn set_infeasible(&mut self, b: bool) -> bool {
+    fn set_infeasible(&mut self, b: bool) -> UpdateStatus {
         let res = self.is_feasible(b);
         self.possibility_mask &= if b { 1 } else { 2 };
-        res
+        if res {
+            if self.is_unsatisfiable() {
+                UpdateStatus::Unsatisfiable
+            } else {
+                UpdateStatus::Updated
+            }
+        } else {
+            UpdateStatus::NotUpdated
+        }
     }
 }
 
@@ -170,6 +217,13 @@ impl BoolExpr {
 
     pub fn ite(self, t: IntExpr, f: IntExpr) -> IntExpr {
         IntExpr::If(Box::new(self), Box::new(t), Box::new(f))
+    }
+
+    fn is_const(&self) -> Option<bool> {
+        match self {
+            &BoolExpr::Const(b) => Some(b),
+            _ => None,
+        }
     }
 }
 
@@ -282,11 +336,235 @@ impl CSPVars {
     pub(super) fn int_var(&self, var: IntVar) -> &IntVarData {
         &self.int_var[var.0]
     }
+
+    fn constant_folding_bool(&self, expr: &mut BoolExpr) {
+        match expr {
+            BoolExpr::Const(_) => (),
+            BoolExpr::Var(v) => {
+                let value = &self.bool_var[v.0];
+                if !value.is_feasible(true) && value.is_feasible(false) {
+                    *expr = BoolExpr::Const(false)
+                } else if value.is_feasible(true) && !value.is_feasible(false) {
+                    *expr = BoolExpr::Const(true)
+                } else if value.is_unsatisfiable() {
+                    panic!(); // this should be handled when the inconsistency first occurred.
+                }
+            }
+            BoolExpr::NVar(_) => unreachable!(),
+            BoolExpr::And(exprs) => {
+                exprs.iter_mut().for_each(|e| self.constant_folding_bool(e));
+                if exprs.iter().any(|e| e.is_const() == Some(false)) {
+                    *expr = BoolExpr::Const(false);
+                } else {
+                    exprs.retain(|e| e.is_const().is_none());
+                    if exprs.len() == 0 {
+                        *expr = BoolExpr::Const(true);
+                    } else if exprs.len() == 1 {
+                        *expr = *exprs.remove(0);
+                    }
+                }
+            }
+            BoolExpr::Or(exprs) => {
+                exprs.iter_mut().for_each(|e| self.constant_folding_bool(e));
+                if exprs.iter().any(|e| e.is_const() == Some(true)) {
+                    *expr = BoolExpr::Const(true);
+                } else {
+                    exprs.retain(|e| e.is_const().is_none());
+                    if exprs.len() == 0 {
+                        *expr = BoolExpr::Const(false);
+                    } else if exprs.len() == 1 {
+                        *expr = *exprs.remove(0);
+                    }
+                }
+            }
+            BoolExpr::Not(e) => {
+                self.constant_folding_bool(e);
+                match e.is_const() {
+                    Some(b) => *expr = BoolExpr::Const(!b),
+                    _ => (),
+                }
+            }
+            BoolExpr::Xor(e1, e2) => {
+                self.constant_folding_bool(e1);
+                self.constant_folding_bool(e2);
+
+                match (e1.is_const(), e2.is_const()) {
+                    (Some(b1), Some(b2)) => *expr = BoolExpr::Const(b1 ^ b2),
+                    (Some(true), None) => {
+                        let e2 = std::mem::replace(e2.as_mut(), BoolExpr::Const(false));
+                        *expr = BoolExpr::Not(Box::new(e2));
+                    }
+                    (Some(false), None) => {
+                        let e2 = std::mem::replace(e2.as_mut(), BoolExpr::Const(false));
+                        *expr = e2;
+                    }
+                    (None, Some(true)) => {
+                        let e1 = std::mem::replace(e1.as_mut(), BoolExpr::Const(false));
+                        *expr = BoolExpr::Not(Box::new(e1));
+                    }
+                    (None, Some(false)) => {
+                        let e1 = std::mem::replace(e1.as_mut(), BoolExpr::Const(false));
+                        *expr = e1;
+                    }
+                    (None, None) => (),
+                }
+            }
+            BoolExpr::Iff(e1, e2) => {
+                self.constant_folding_bool(e1);
+                self.constant_folding_bool(e2);
+
+                match (e1.is_const(), e2.is_const()) {
+                    (Some(b1), Some(b2)) => *expr = BoolExpr::Const(b1 == b2),
+                    (Some(false), None) => {
+                        let e2 = std::mem::replace(e2.as_mut(), BoolExpr::Const(false));
+                        *expr = BoolExpr::Not(Box::new(e2));
+                    }
+                    (Some(true), None) => {
+                        let e2 = std::mem::replace(e2.as_mut(), BoolExpr::Const(false));
+                        *expr = e2;
+                    }
+                    (None, Some(false)) => {
+                        let e1 = std::mem::replace(e1.as_mut(), BoolExpr::Const(false));
+                        *expr = BoolExpr::Not(Box::new(e1));
+                    }
+                    (None, Some(true)) => {
+                        let e1 = std::mem::replace(e1.as_mut(), BoolExpr::Const(false));
+                        *expr = e1;
+                    }
+                    (None, None) => (),
+                }
+            }
+            BoolExpr::Imp(e1, e2) => {
+                self.constant_folding_bool(e1);
+                self.constant_folding_bool(e2);
+
+                match (e1.is_const(), e2.is_const()) {
+                    (Some(b1), Some(b2)) => *expr = BoolExpr::Const(!b1 || b2),
+                    (Some(false), None) | (None, Some(true)) => {
+                        *expr = BoolExpr::Const(true);
+                    }
+                    (Some(true), None) => {
+                        let e2 = std::mem::replace(e2.as_mut(), BoolExpr::Const(false));
+                        *expr = e2;
+                    }
+                    (None, Some(false)) => {
+                        let e1 = std::mem::replace(e1.as_mut(), BoolExpr::Const(false));
+                        *expr = BoolExpr::Not(Box::new(e1));
+                    }
+                    (None, None) => (),
+                }
+            }
+            BoolExpr::Cmp(_, t, f) => {
+                self.constant_folding_int(t);
+                self.constant_folding_int(f);
+            }
+        }
+    }
+
+    fn constant_folding_int(&self, expr: &mut IntExpr) {
+        match expr {
+            IntExpr::Const(_) => (),
+            IntExpr::Var(v) => {
+                let value = self.int_var(*v);
+                if let Some(c) = value.domain.is_constant() {
+                    *expr = IntExpr::Const(c);
+                }
+            }
+            IntExpr::NVar(_) => unreachable!(),
+            IntExpr::Linear(terms) => {
+                terms
+                    .iter_mut()
+                    .for_each(|(e, _)| self.constant_folding_int(e));
+                if terms.len() == 0 {
+                    *expr = IntExpr::Const(0);
+                } else if terms.len() == 1 && terms[0].1 == 1 {
+                    *expr = *terms.remove(0).0;
+                }
+            }
+            IntExpr::If(c, t, f) => {
+                self.constant_folding_bool(c);
+                self.constant_folding_int(t);
+                self.constant_folding_int(f);
+
+                match c.is_const() {
+                    Some(true) => {
+                        let t = std::mem::replace(t.as_mut(), IntExpr::Const(0));
+                        *expr = t;
+                    }
+                    Some(false) => {
+                        let f = std::mem::replace(f.as_mut(), IntExpr::Const(0));
+                        *expr = f;
+                    }
+                    None => (),
+                }
+            }
+        }
+    }
+
+    fn constant_prop_bool(&mut self, expr: &BoolExpr, expected: bool) -> UpdateStatus {
+        match expr {
+            &BoolExpr::Const(c) => {
+                if c == expected {
+                    UpdateStatus::NotUpdated
+                } else {
+                    UpdateStatus::Unsatisfiable
+                }
+            }
+            &BoolExpr::Var(v) => self.bool_var[v.0].set_infeasible(!expected),
+            BoolExpr::NVar(_) => unreachable!(),
+            BoolExpr::And(exprs) => {
+                if expected {
+                    let mut ret = UpdateStatus::NotUpdated;
+                    for e in exprs {
+                        ret |= self.constant_prop_bool(e, true);
+                    }
+                    ret
+                } else {
+                    UpdateStatus::NotUpdated
+                }
+            }
+            BoolExpr::Or(exprs) => {
+                if !expected {
+                    let mut ret = UpdateStatus::NotUpdated;
+                    for e in exprs {
+                        ret |= self.constant_prop_bool(e, false);
+                    }
+                    ret
+                } else {
+                    UpdateStatus::NotUpdated
+                }
+            }
+            BoolExpr::Not(e) => self.constant_prop_bool(e, !expected),
+            BoolExpr::Imp(e1, e2) => {
+                if !expected {
+                    self.constant_prop_bool(e1, true) | self.constant_prop_bool(e2, false)
+                } else {
+                    UpdateStatus::NotUpdated
+                }
+            }
+            BoolExpr::Xor(_, _) | BoolExpr::Iff(_, _) | BoolExpr::Cmp(_, _, _) => {
+                UpdateStatus::NotUpdated
+            }
+        }
+    }
+}
+
+pub enum BoolVarStatus {
+    Infeasible,
+    Fixed(bool),
+    Unfixed,
+}
+
+pub enum IntVarStatus {
+    Infeasible,
+    Fixed(i32),
+    Unfixed(i32), // an example of feasible value
 }
 
 pub struct CSP {
     pub(super) vars: CSPVars,
     pub(super) constraints: Vec<Stmt>,
+    inconsistent: bool,
 }
 
 impl CSP {
@@ -297,6 +575,7 @@ impl CSP {
                 int_var: vec![],
             },
             constraints: vec![],
+            inconsistent: false,
         }
     }
 
@@ -313,7 +592,77 @@ impl CSP {
     }
 
     pub fn add_constraint(&mut self, stmt: Stmt) {
-        self.constraints.push(stmt)
+        self.constraints.push(stmt);
+    }
+
+    pub fn is_inconsistent(&self) -> bool {
+        self.inconsistent
+    }
+
+    pub fn get_bool_var_status(&self, var: BoolVar) -> BoolVarStatus {
+        let data = &self.vars.bool_var[var.0];
+        match (data.is_feasible(false), data.is_feasible(true)) {
+            (false, false) => BoolVarStatus::Infeasible,
+            (false, true) => BoolVarStatus::Fixed(true),
+            (true, false) => BoolVarStatus::Fixed(false),
+            (true, true) => BoolVarStatus::Unfixed,
+        }
+    }
+
+    pub fn get_int_var_status(&self, var: IntVar) -> IntVarStatus {
+        let data = self.vars.int_var(var);
+        let domain = &data.domain;
+        if domain.is_infeasible() {
+            IntVarStatus::Infeasible
+        } else if let Some(v) = domain.is_constant() {
+            IntVarStatus::Fixed(v)
+        } else {
+            IntVarStatus::Unfixed(domain.lower_bound())
+        }
+    }
+
+    pub fn optimize(&mut self, use_propagate: bool) {
+        if use_propagate {
+            loop {
+                let vars = &mut self.vars;
+                for stmt in &mut self.constraints {
+                    match stmt {
+                        Stmt::Expr(e) => {
+                            vars.constant_folding_bool(e);
+                        }
+                        Stmt::AllDifferent(exprs) => {
+                            exprs.iter_mut().for_each(|e| vars.constant_folding_int(e));
+                        }
+                    }
+                }
+                let mut update_status = UpdateStatus::NotUpdated;
+                for stmt in &self.constraints {
+                    match stmt {
+                        Stmt::Expr(e) => {
+                            update_status |= vars.constant_prop_bool(e, true);
+                        }
+                        _ => (),
+                    }
+                }
+                match update_status {
+                    UpdateStatus::NotUpdated => break,
+                    UpdateStatus::Updated => (),
+                    UpdateStatus::Unsatisfiable => {
+                        self.inconsistent = true;
+                        return;
+                    }
+                }
+            }
+        } else {
+            for stmt in &mut self.constraints {
+                match stmt {
+                    Stmt::Expr(e) => {
+                        self.vars.constant_folding_bool(e);
+                    }
+                    _ => (),
+                }
+            }
+        }
     }
 }
 
@@ -427,9 +776,37 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_hoge() {
+    fn test_constant_folding1() {
         let mut csp = CSP::new();
-        let v = csp.new_int_var(Domain { low: 5, high: 10 });
-        let _e = IntExpr::Var(v) + IntExpr::Var(v);
+
+        let x = csp.new_bool_var();
+        let y = csp.new_bool_var();
+        let z = csp.new_bool_var();
+
+        let mut expr = (x.expr() ^ y.expr()) | (y.expr().imp(z.expr()));
+        csp.vars.bool_var[y.0].set_infeasible(false); // y := true
+
+        csp.vars.constant_folding_bool(&mut expr);
+        assert_eq!(expr, !x.expr() | z.expr());
+    }
+
+    #[test]
+    fn test_constant_prop1() {
+        let mut csp = CSP::new();
+
+        let w = csp.new_bool_var();
+        let x = csp.new_bool_var();
+        let y = csp.new_bool_var();
+        let z = csp.new_bool_var();
+
+        csp.vars.constant_prop_bool(&(w.expr() & !x.expr()), true);
+        assert!(!csp.vars.bool_var[w.0].is_feasible(false));
+        assert!(!csp.vars.bool_var[x.0].is_feasible(true));
+
+        let mut expr =
+            (w.expr().iff(x.expr())) | ((x.expr() ^ y.expr()) | (w.expr().imp(z.expr())));
+
+        csp.vars.constant_folding_bool(&mut expr);
+        assert_eq!(expr, y.expr() | z.expr());
     }
 }

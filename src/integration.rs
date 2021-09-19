@@ -1,4 +1,6 @@
-use super::csp::{Assignment, BoolExpr, BoolVar, Domain, IntExpr, IntVar, Stmt, CSP};
+use super::csp::{
+    Assignment, BoolExpr, BoolVar, BoolVarStatus, Domain, IntExpr, IntVar, IntVarStatus, Stmt, CSP,
+};
 use super::encoder::{encode, EncodeMap};
 use super::norm_csp::NormCSP;
 use super::normalizer::{normalize, NormalizeMap};
@@ -10,6 +12,7 @@ pub struct IntegratedSolver {
     norm: NormCSP,
     encode_map: EncodeMap,
     sat: SAT,
+    already_used: bool,
 }
 
 impl IntegratedSolver {
@@ -20,6 +23,7 @@ impl IntegratedSolver {
             norm: NormCSP::new(),
             encode_map: EncodeMap::new(),
             sat: SAT::new(),
+            already_used: false,
         }
     }
 
@@ -40,6 +44,13 @@ impl IntegratedSolver {
     }
 
     pub fn solve<'a>(&'a mut self) -> Option<Model<'a>> {
+        self.csp.optimize(!self.already_used);
+        self.already_used = true;
+
+        if self.csp.is_inconsistent() {
+            return None;
+        }
+
         normalize(&mut self.csp, &mut self.norm, &mut self.normalize_map);
         encode(&mut self.norm, &mut self.sat, &mut self.encode_map);
 
@@ -167,18 +178,40 @@ pub struct Model<'a> {
 
 impl<'a> Model<'a> {
     pub fn get_bool(&self, var: BoolVar) -> bool {
-        self.normalize_map
-            .get_bool_var(var)
-            .and_then(|norm_var| self.encode_map.get_bool_var(norm_var))
-            .map(|sat_lit| self.model.assignment(sat_lit.var()) ^ sat_lit.is_negated())
-            .unwrap_or(false) // unused variable optimization
+        match self.normalize_map.get_bool_var(var) {
+            Some(norm_var) => {
+                self.encode_map
+                    .get_bool_var(norm_var)
+                    .map(|sat_lit| self.model.assignment(sat_lit.var()) ^ sat_lit.is_negated())
+                    .unwrap_or(false) // unused variable optimization
+            }
+            None => {
+                let var_data = self.csp.get_bool_var_status(var);
+                match var_data {
+                    BoolVarStatus::Infeasible => panic!(),
+                    BoolVarStatus::Fixed(v) => v,
+                    BoolVarStatus::Unfixed => false, // unused variable optimization
+                }
+            }
+        }
     }
 
     pub fn get_int(&self, var: IntVar) -> i32 {
-        self.normalize_map
-            .get_int_var(var)
-            .and_then(|norm_var| self.encode_map.get_int_value(&self.model, norm_var))
-            .unwrap_or(self.csp.vars.int_var(var).domain.lower_bound()) // unused variable optimization
+        match self.normalize_map.get_int_var(var) {
+            Some(norm_var) => {
+                self.encode_map
+                    .get_int_value(&self.model, norm_var)
+                    .unwrap_or(self.csp.vars.int_var(var).domain.lower_bound()) // unused variable optimization
+            }
+            None => {
+                let var_data = self.csp.get_int_var_status(var);
+                match var_data {
+                    IntVarStatus::Infeasible => panic!(),
+                    IntVarStatus::Fixed(v) => v,
+                    IntVarStatus::Unfixed(v) => v,
+                }
+            }
+        }
     }
 }
 
@@ -489,6 +522,33 @@ mod tests {
     }
 
     #[test]
+    fn test_integration_csp_optimization1() {
+        let mut solver = IntegratedSolver::new();
+
+        let x = solver.new_bool_var();
+        let y = solver.new_bool_var();
+        solver.add_expr(x.expr() & !y.expr());
+
+        let res = solver.solve();
+        assert!(res.is_some());
+        let res = res.unwrap();
+        assert_eq!(res.get_bool(x), true);
+        assert_eq!(res.get_bool(y), false);
+    }
+
+    #[test]
+    fn test_integration_csp_optimization2() {
+        let mut solver = IntegratedSolver::new();
+
+        let x = solver.new_bool_var();
+        solver.add_expr(x.expr() | x.expr());
+        solver.add_expr(!x.expr());
+
+        let res = solver.solve();
+        assert!(res.is_none());
+    }
+
+    #[test]
     fn test_integration_irrefutable_logic1() {
         let mut solver = IntegratedSolver::new();
 
@@ -648,6 +708,27 @@ mod tests {
                 .eq(a.expr() - b.expr()),
         );
         tester.add_expr(a.expr().ge(y.expr().ite(b.expr(), c.expr())) ^ z.expr());
+
+        tester.check();
+    }
+
+    #[test]
+    fn test_integration_exhaustive_complex2() {
+        let mut tester = IntegrationTester::new();
+
+        let x = tester.new_bool_var();
+        let y = tester.new_bool_var();
+        let z = tester.new_bool_var();
+        let a = tester.new_int_var(Domain::range(0, 3));
+        let b = tester.new_int_var(Domain::range(0, 3));
+        let c = tester.new_int_var(Domain::range(0, 3));
+        tester.add_expr(
+            x.expr()
+                .ite(a.expr(), b.expr() + c.expr())
+                .eq(a.expr() - b.expr()),
+        );
+        tester.add_expr(a.expr().ge(y.expr().ite(b.expr(), c.expr())) ^ z.expr());
+        tester.add_expr(x.expr());
 
         tester.check();
     }
