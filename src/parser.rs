@@ -67,7 +67,6 @@ fn parse_to_tree(input: &str) -> Result<SyntaxTree, nom::error::Error<&str>> {
             tag(">"),
             tag("+"),
             tag("-"),
-            tag("graph-active-vertices-connected"),
         ));
         alt((
             delimited(
@@ -75,12 +74,13 @@ fn parse_to_tree(input: &str) -> Result<SyntaxTree, nom::error::Error<&str>> {
                 map(separated_list0(tag(" "), rec_parser), SyntaxTree::Node),
                 tag(")"),
             ),
-            map(op, SyntaxTree::Ident),
+            map(tag("graph-active-vertices-connected"), SyntaxTree::Ident),
             map(ident_or_op, SyntaxTree::Ident),
             map(digit1, |s: &str| SyntaxTree::Int(s.parse::<i32>().unwrap())), // TODO
             map(preceded(tag("-"), digit1), |s: &str| {
                 SyntaxTree::Int(-s.parse::<i32>().unwrap())
             }), // TODO
+            map(op, SyntaxTree::Ident),
         ))(input)
     }
 
