@@ -44,20 +44,31 @@ impl IntegratedSolver {
     }
 
     pub fn solve<'a>(&'a mut self) -> Option<Model<'a>> {
-        self.csp.optimize(!self.already_used);
+        let is_first = !self.already_used;
         self.already_used = true;
+
+        self.csp.optimize(is_first);
 
         if self.csp.is_inconsistent() {
             return None;
         }
 
         normalize(&mut self.csp, &mut self.norm, &mut self.normalize_map);
+
+        if is_first {
+            self.norm.refine_domain();
+        }
+        if self.norm.is_inconsistent() {
+            return None;
+        }
+
         encode(&mut self.norm, &mut self.sat, &mut self.encode_map);
 
         match self.sat.solve() {
             Some(model) => Some(Model {
                 csp: &self.csp,
                 normalize_map: &self.normalize_map,
+                norm_csp: &self.norm,
                 encode_map: &self.encode_map,
                 model,
             }),
@@ -172,6 +183,7 @@ impl IntegratedSolver {
 pub struct Model<'a> {
     csp: &'a CSP,
     normalize_map: &'a NormalizeMap,
+    norm_csp: &'a NormCSP,
     encode_map: &'a EncodeMap,
     model: SATModel<'a>,
 }
@@ -201,7 +213,8 @@ impl<'a> Model<'a> {
             Some(norm_var) => {
                 self.encode_map
                     .get_int_value(&self.model, norm_var)
-                    .unwrap_or(self.csp.vars.int_var(var).domain.lower_bound()) // unused variable optimization
+                    .unwrap_or(self.norm_csp.vars.int_var(norm_var).lower_bound())
+                // unused variable optimization
             }
             None => {
                 let var_data = self.csp.get_int_var_status(var);

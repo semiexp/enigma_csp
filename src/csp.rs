@@ -1,6 +1,6 @@
-use crate::util::ConvertMapIndex;
+use crate::util::{ConvertMapIndex, UpdateStatus};
 use std::collections::{btree_map, BTreeMap};
-use std::ops::{Add, BitAnd, BitOr, BitOrAssign, BitXor, Mul, Not, Sub};
+use std::ops::{Add, BitAnd, BitOr, BitXor, Mul, Not, Sub};
 
 use super::CmpOp;
 
@@ -37,6 +37,32 @@ impl Domain {
 
     pub fn is_infeasible(&self) -> bool {
         self.low > self.high
+    }
+
+    pub fn refine_upper_bound(&mut self, v: i32) -> UpdateStatus {
+        if self.high <= v {
+            UpdateStatus::NotUpdated
+        } else {
+            self.high = v;
+            if self.is_infeasible() {
+                UpdateStatus::Unsatisfiable
+            } else {
+                UpdateStatus::Updated
+            }
+        }
+    }
+
+    pub fn refine_lower_bound(&mut self, v: i32) -> UpdateStatus {
+        if self.low >= v {
+            UpdateStatus::NotUpdated
+        } else {
+            self.low = v;
+            if self.is_infeasible() {
+                UpdateStatus::Unsatisfiable
+            } else {
+                UpdateStatus::Updated
+            }
+        }
     }
 }
 
@@ -76,33 +102,6 @@ impl BitOr<Domain> for Domain {
 
     fn bitor(self, rhs: Domain) -> Domain {
         Domain::range(self.low.min(rhs.low), self.high.max(rhs.high))
-    }
-}
-
-#[derive(Clone, Copy)]
-enum UpdateStatus {
-    NotUpdated,
-    Updated,
-    Unsatisfiable,
-}
-
-impl BitOr<UpdateStatus> for UpdateStatus {
-    type Output = UpdateStatus;
-
-    fn bitor(self, rhs: UpdateStatus) -> Self::Output {
-        match (self, rhs) {
-            (UpdateStatus::Unsatisfiable, _) | (_, UpdateStatus::Unsatisfiable) => {
-                UpdateStatus::Unsatisfiable
-            }
-            (UpdateStatus::Updated, _) | (_, UpdateStatus::Updated) => UpdateStatus::Updated,
-            _ => UpdateStatus::NotUpdated,
-        }
-    }
-}
-
-impl BitOrAssign<UpdateStatus> for UpdateStatus {
-    fn bitor_assign(&mut self, rhs: UpdateStatus) {
-        *self = *self | rhs;
     }
 }
 

@@ -7,7 +7,7 @@ use super::norm_csp::{
 };
 use super::sat::{Lit, SATModel, VarArray, SAT};
 use super::CmpOp;
-use crate::util::ConvertMap;
+use crate::util::{div_ceil, ConvertMap};
 
 /// Order encoding of an integer variable with domain of `domain`.
 /// `vars[i]` is the logical variable representing (the value of this int variable) >= `domain[i+1]`.
@@ -414,7 +414,7 @@ fn encode_linear_ge(env: &mut EncoderEnv, sum: &LinearSum, bool_lit: &Vec<Lit>) 
             let a = info.coef(idx);
             // a * x >= -constant
             // x >= ceil(-constant / a)
-            let threshold = (-constant).checked_add(a - 1).unwrap().div_euclid(a);
+            let threshold = div_ceil(-constant, a);
             match info.at_least_val(idx, threshold) {
                 ExtendedLit::True => (),
                 ExtendedLit::False => sat.add_clause(clause.clone()),

@@ -1,11 +1,11 @@
 // Normalized CSP
 
-use std::collections::BTreeMap;
-use std::ops::{Add, AddAssign, Mul, MulAssign, Sub, SubAssign};
+use std::collections::{btree_map, BTreeMap};
+use std::ops::{Add, AddAssign, BitAnd, BitOr, Mul, MulAssign, Sub, SubAssign};
 
 use super::csp::Domain;
 use super::CmpOp;
-use crate::util::ConvertMapIndex;
+use crate::util::{div_ceil, div_floor, ConvertMapIndex, UpdateStatus};
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug, Hash)]
 pub struct BoolVar(usize);
@@ -34,6 +34,105 @@ pub struct BoolLit {
 impl BoolLit {
     pub fn new(var: BoolVar, negated: bool) -> BoolLit {
         BoolLit { var, negated }
+    }
+}
+
+#[derive(Clone, Copy, Debug)]
+pub struct Range {
+    low: i32,
+    high: i32,
+}
+
+impl Range {
+    pub fn new(low: i32, high: i32) -> Range {
+        Range { low, high }
+    }
+
+    pub fn empty() -> Range {
+        Range {
+            low: i32::max_value(),
+            high: i32::min_value(),
+        }
+    }
+
+    pub fn any() -> Range {
+        Range {
+            low: i32::min_value(),
+            high: i32::max_value(),
+        }
+    }
+
+    pub fn at_least(c: i32) -> Range {
+        Range {
+            low: c,
+            high: i32::max_value(),
+        }
+    }
+
+    pub fn at_most(c: i32) -> Range {
+        Range {
+            low: i32::min_value(),
+            high: c,
+        }
+    }
+
+    pub fn constant(c: i32) -> Range {
+        Range { low: c, high: c }
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.low > self.high
+    }
+}
+
+impl Add<Range> for Range {
+    type Output = Range;
+
+    fn add(self, rhs: Range) -> Self::Output {
+        if self.is_empty() || rhs.is_empty() {
+            Range::empty()
+        } else {
+            Range::new(
+                self.low.checked_add(rhs.low).unwrap(),
+                self.high.checked_add(rhs.high).unwrap(),
+            )
+        }
+    }
+}
+
+impl Mul<i32> for Range {
+    type Output = Range;
+
+    fn mul(self, rhs: i32) -> Self::Output {
+        if self.is_empty() {
+            Range::empty()
+        } else if rhs >= 0 {
+            Range::new(
+                self.low.checked_mul(rhs).unwrap(),
+                self.high.checked_mul(rhs).unwrap(),
+            )
+        } else {
+            Range::new(
+                self.high.checked_mul(rhs).unwrap(),
+                self.low.checked_mul(rhs).unwrap(),
+            )
+        }
+    }
+}
+
+impl BitAnd<Range> for Range {
+    type Output = Range;
+
+    fn bitand(self, rhs: Range) -> Self::Output {
+        Range::new(self.low.max(rhs.low), self.high.min(rhs.high))
+    }
+}
+
+impl BitOr<Range> for Range {
+    type Output = Range;
+
+    fn bitor(self, rhs: Range) -> Self::Output {
+        Range::new(self.low.min(rhs.low), self.high.max(rhs.high))
     }
 }
 
@@ -85,6 +184,10 @@ impl LinearSum {
 
     pub fn terms(&self) -> Vec<(IntVar, i32)> {
         self.term.iter().map(|(v, c)| (*v, *c)).collect()
+    }
+
+    pub fn iter(&self) -> btree_map::Iter<IntVar, i32> {
+        self.term.iter()
     }
 }
 
@@ -218,6 +321,90 @@ impl NormCSPVars {
 
         ret
     }
+
+    fn refine_var(&self, op: CmpOp, sum: &LinearSum, target: IntVar) -> Range {
+        if op == CmpOp::Ne {
+            return Range::any();
+        }
+        if op == CmpOp::Eq {
+            return self.refine_var(CmpOp::Ge, sum, target)
+                & self.refine_var(CmpOp::Le, sum, target);
+        }
+
+        let mut target_coef = None;
+        let mut range_other = Range::constant(sum.constant);
+        for (&v, &c) in &sum.term {
+            if v == target {
+                target_coef = Some(c);
+            } else {
+                let dom = self.int_var(v);
+                range_other = range_other + Range::new(dom.lower_bound(), dom.upper_bound()) * c;
+            }
+        }
+
+        let mut target_coef = target_coef.unwrap();
+        assert_ne!(target_coef, 0);
+
+        // Normalize `op` to `CmpOp::Ge` to reduce case analyses
+        match op {
+            CmpOp::Ge => (),
+            CmpOp::Gt => range_other = range_other + Range::constant(-1),
+            CmpOp::Le => {
+                range_other = range_other * -1;
+                target_coef = target_coef.checked_mul(-1).unwrap();
+            }
+            CmpOp::Lt => {
+                range_other = range_other * -1 + Range::constant(-1);
+                target_coef = target_coef.checked_mul(-1).unwrap();
+            }
+            CmpOp::Eq | CmpOp::Ne => unreachable!(),
+        }
+
+        if target_coef > 0 {
+            let lb = div_ceil(-range_other.high, target_coef);
+            Range::at_least(lb)
+        } else {
+            let ub = div_floor(range_other.high, -target_coef);
+            Range::at_most(ub)
+        }
+    }
+
+    fn refine_domain(&mut self, constraint: &Constraint) -> UpdateStatus {
+        if !constraint.bool_lit.is_empty() {
+            return UpdateStatus::NotUpdated;
+        }
+
+        let mut occurrence = BTreeMap::<IntVar, usize>::new();
+        for linear_lit in &constraint.linear_lit {
+            for (v, _) in linear_lit.sum.iter() {
+                let n = occurrence.get(v).copied().unwrap_or(0);
+                occurrence.insert(*v, n + 1);
+            }
+        }
+
+        let mut status = UpdateStatus::NotUpdated;
+        let common_vars = occurrence
+            .iter()
+            .filter_map(|(&v, &occ)| {
+                if occ == constraint.linear_lit.len() {
+                    Some(v)
+                } else {
+                    None
+                }
+            })
+            .collect::<Vec<_>>();
+        for v in common_vars {
+            let mut range = Range::empty();
+            for linear_lit in &constraint.linear_lit {
+                range = range | self.refine_var(linear_lit.op, &linear_lit.sum, v);
+            }
+
+            let domain = &mut self.int_var[v.0];
+            status |= domain.refine_lower_bound(range.low);
+            status |= domain.refine_upper_bound(range.high);
+        }
+        status
+    }
 }
 
 pub enum ExtraConstraint {
@@ -229,6 +416,7 @@ pub struct NormCSP {
     pub(super) constraints: Vec<Constraint>,
     pub(super) extra_constraints: Vec<ExtraConstraint>,
     pub(super) num_encoded_vars: usize,
+    inconsistent: bool,
 }
 
 impl NormCSP {
@@ -241,6 +429,7 @@ impl NormCSP {
             constraints: vec![],
             extra_constraints: vec![],
             num_encoded_vars: 0,
+            inconsistent: false,
         }
     }
 
@@ -276,6 +465,29 @@ impl NormCSP {
 
     pub(super) fn get_domain_linear_sum(&self, linear_sum: &LinearSum) -> Domain {
         self.vars.get_domain_linear_sum(linear_sum)
+    }
+
+    pub fn is_inconsistent(&self) -> bool {
+        self.inconsistent
+    }
+
+    pub fn refine_domain(&mut self) {
+        loop {
+            let mut update_status = UpdateStatus::NotUpdated;
+
+            for constraint in &self.constraints {
+                update_status |= self.vars.refine_domain(constraint);
+            }
+
+            match update_status {
+                UpdateStatus::NotUpdated => break,
+                UpdateStatus::Updated => (),
+                UpdateStatus::Unsatisfiable => {
+                    self.inconsistent = true;
+                    return;
+                }
+            }
+        }
     }
 }
 
@@ -328,5 +540,67 @@ impl Assignment {
             }
         }
         false
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn construct_linear_sum(terms: &[(IntVar, i32)], constant: i32) -> LinearSum {
+        let mut ret = LinearSum::constant(constant);
+        for &(v, c) in terms {
+            ret.add_coef(v, c);
+        }
+        ret
+    }
+
+    #[test]
+    fn test_norm_csp_refinement1() {
+        let mut norm_csp = NormCSP::new();
+
+        let a = norm_csp.new_int_var(Domain::range(0, 100));
+        let b = norm_csp.new_int_var(Domain::range(0, 90));
+        let c = norm_csp.new_int_var(Domain::range(0, 80));
+
+        let mut constraint = Constraint::new();
+        constraint.add_linear(LinearLit::new(
+            construct_linear_sum(&[(a, 2), (b, 3), (c, 4)], -70),
+            CmpOp::Le,
+        ));
+
+        assert_eq!(
+            norm_csp.vars.refine_domain(&constraint),
+            UpdateStatus::Updated
+        );
+        assert_eq!(norm_csp.vars.int_var(a).lower_bound(), 0);
+        assert_eq!(norm_csp.vars.int_var(a).upper_bound(), 35);
+        assert_eq!(norm_csp.vars.int_var(b).lower_bound(), 0);
+        assert_eq!(norm_csp.vars.int_var(b).upper_bound(), 23);
+        assert_eq!(norm_csp.vars.int_var(c).lower_bound(), 0);
+        assert_eq!(norm_csp.vars.int_var(c).upper_bound(), 17);
+    }
+
+    #[test]
+    fn test_norm_csp_refinement2() {
+        let mut norm_csp = NormCSP::new();
+
+        let a = norm_csp.new_int_var(Domain::range(0, 100));
+        let b = norm_csp.new_int_var(Domain::range(-10, 90));
+
+        let mut constraint = Constraint::new();
+        constraint.add_linear(LinearLit::new(
+            construct_linear_sum(&[(a, 2), (b, -3)], -71),
+            CmpOp::Ge,
+        ));
+
+        assert_eq!(
+            norm_csp.vars.refine_domain(&constraint),
+            UpdateStatus::Updated
+        );
+        assert_eq!(norm_csp.vars.int_var(a).lower_bound(), 21);
+        assert_eq!(norm_csp.vars.int_var(a).upper_bound(), 100);
+        assert_eq!(norm_csp.vars.int_var(b).lower_bound(), -10);
+        assert_eq!(norm_csp.vars.int_var(b).upper_bound(), 43);
     }
 }

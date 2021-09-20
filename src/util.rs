@@ -1,5 +1,42 @@
 use std::marker::PhantomData;
-use std::ops::{Index, IndexMut};
+use std::ops::{BitOr, BitOrAssign, Index, IndexMut};
+
+/// Returns `floor(a / b)` assuming b > 0.
+pub fn div_floor(a: i32, b: i32) -> i32 {
+    a.checked_div_euclid(b).unwrap()
+}
+
+/// Returns `ceil(a / b)` assuming b > 0.
+pub fn div_ceil(a: i32, b: i32) -> i32 {
+    a.checked_add(b - 1).unwrap().checked_div_euclid(b).unwrap()
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum UpdateStatus {
+    NotUpdated,
+    Updated,
+    Unsatisfiable,
+}
+
+impl BitOr<UpdateStatus> for UpdateStatus {
+    type Output = UpdateStatus;
+
+    fn bitor(self, rhs: UpdateStatus) -> Self::Output {
+        match (self, rhs) {
+            (UpdateStatus::Unsatisfiable, _) | (_, UpdateStatus::Unsatisfiable) => {
+                UpdateStatus::Unsatisfiable
+            }
+            (UpdateStatus::Updated, _) | (_, UpdateStatus::Updated) => UpdateStatus::Updated,
+            _ => UpdateStatus::NotUpdated,
+        }
+    }
+}
+
+impl BitOrAssign<UpdateStatus> for UpdateStatus {
+    fn bitor_assign(&mut self, rhs: UpdateStatus) {
+        *self = *self | rhs;
+    }
+}
 
 pub trait ConvertMapIndex {
     fn to_index(&self) -> usize;
@@ -84,6 +121,24 @@ pub fn product_multi<T: Clone>(inputs: &Vec<Vec<T>>) -> Vec<Vec<T>> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_div_floor() {
+        assert_eq!(div_floor(12, 4), 3);
+        assert_eq!(div_floor(10, 3), 3);
+        assert_eq!(div_floor(0, 7), 0);
+        assert_eq!(div_floor(-42, 4), -11);
+        assert_eq!(div_floor(-42, 3), -14);
+    }
+
+    #[test]
+    fn test_div_ceil() {
+        assert_eq!(div_ceil(12, 4), 3);
+        assert_eq!(div_ceil(10, 3), 4);
+        assert_eq!(div_ceil(0, 7), 0);
+        assert_eq!(div_ceil(-42, 4), -10);
+        assert_eq!(div_ceil(-42, 3), -14);
+    }
 
     #[test]
     fn test_product_binary1() {
