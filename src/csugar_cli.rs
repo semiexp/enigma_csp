@@ -1,12 +1,16 @@
 /// csugar-like CLI
 use std::io;
 
+use super::config::Config;
 use super::integration::IntegratedSolver;
 use super::parser::{parse, ParseResult, Var, VarMap};
 
 pub fn csugar_cli() {
+    let config = Config::parse_from_args();
+
     let mut var_map = VarMap::new();
     let mut solver = IntegratedSolver::new();
+    solver.set_config(config);
 
     let mut buffer = String::new();
     let stdin = io::stdin();

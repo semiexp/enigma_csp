@@ -1,6 +1,7 @@
 use std::cmp::Reverse;
 use std::collections::BinaryHeap;
 
+use super::config::Config;
 use super::norm_csp::{
     BoolLit, BoolVar, Constraint, ExtraConstraint, IntVar, LinearLit, LinearSum, NormCSP,
     NormCSPVars,
@@ -90,19 +91,20 @@ impl EncodeMap {
     }
 }
 
-struct EncoderEnv<'a, 'b, 'c> {
+struct EncoderEnv<'a, 'b, 'c, 'd> {
     norm_vars: &'a mut NormCSPVars,
     sat: &'b mut SAT,
     map: &'c mut EncodeMap,
+    config: &'d Config,
 }
 
-impl<'a, 'b, 'c> EncoderEnv<'a, 'b, 'c> {
+impl<'a, 'b, 'c, 'd> EncoderEnv<'a, 'b, 'c, 'd> {
     fn convert_bool_lit(&mut self, lit: BoolLit) -> Lit {
         self.map.convert_bool_lit(self.norm_vars, self.sat, lit)
     }
 }
 
-pub fn encode(norm: &mut NormCSP, sat: &mut SAT, map: &mut EncodeMap) {
+pub fn encode(norm: &mut NormCSP, sat: &mut SAT, map: &mut EncodeMap, config: &Config) {
     for var in norm.unencoded_int_vars() {
         map.convert_int_var(&mut norm.vars, sat, var);
     }
@@ -112,6 +114,7 @@ pub fn encode(norm: &mut NormCSP, sat: &mut SAT, map: &mut EncodeMap) {
         norm_vars: &mut norm.vars,
         sat,
         map,
+        config,
     };
 
     let constrs = std::mem::replace(&mut norm.constraints, vec![]);
@@ -294,8 +297,6 @@ impl<'a> LinearInfoForOrderEncoding<'a> {
     }
 }
 
-const DOM_PRODUCT_THRESHOLD: usize = 1000; // TODO: make this parameter configurable
-
 fn encode_linear_ge_with_simplification(
     env: &mut EncoderEnv,
     sum: &LinearSum,
@@ -311,7 +312,9 @@ fn encode_linear_ge_with_simplification(
     let mut dom_product = 1usize;
     while let Some(&Reverse(top)) = heap.peek() {
         let (dom_size, _, _) = top;
-        if dom_product * dom_size >= DOM_PRODUCT_THRESHOLD && pending.len() >= 2 && heap.len() >= 2
+        if dom_product * dom_size >= env.config.domain_product_threshold
+            && pending.len() >= 2
+            && heap.len() >= 2
         {
             // Introduce auxiliary variable which aggregates current pending terms
             let mut aux_sum = LinearSum::new();
@@ -325,7 +328,7 @@ fn encode_linear_ge_with_simplification(
 
             // aux_sum >= aux_var
             aux_sum.add_coef(aux_var, -1);
-            if pending.len() <= 3 {
+            if pending.len() + 1 <= env.config.native_linear_encoding_terms {
                 // TODO: make this parameter configurable
                 encode_linear_ge_direct(env, &aux_sum, &vec![]);
             } else {

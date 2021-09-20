@@ -1,3 +1,4 @@
+use super::config::Config;
 use super::csp::{
     Assignment, BoolExpr, BoolVar, BoolVarStatus, Domain, IntExpr, IntVar, IntVarStatus, Stmt, CSP,
 };
@@ -13,6 +14,7 @@ pub struct IntegratedSolver {
     encode_map: EncodeMap,
     sat: SAT,
     already_used: bool,
+    config: Config,
 }
 
 impl IntegratedSolver {
@@ -24,7 +26,12 @@ impl IntegratedSolver {
             encode_map: EncodeMap::new(),
             sat: SAT::new(),
             already_used: false,
+            config: Config::default(),
         }
+    }
+
+    pub fn set_config(&mut self, config: Config) {
+        self.config = config;
     }
 
     pub fn new_bool_var(&mut self) -> BoolVar {
@@ -47,7 +54,10 @@ impl IntegratedSolver {
         let is_first = !self.already_used;
         self.already_used = true;
 
-        self.csp.optimize(is_first);
+        if self.config.use_constant_folding {
+            self.csp
+                .optimize(is_first && self.config.use_constant_propagation);
+        }
 
         if self.csp.is_inconsistent() {
             return None;
@@ -55,14 +65,19 @@ impl IntegratedSolver {
 
         normalize(&mut self.csp, &mut self.norm, &mut self.normalize_map);
 
-        if is_first {
+        if is_first && self.config.use_norm_domain_refinement {
             self.norm.refine_domain();
         }
         if self.norm.is_inconsistent() {
             return None;
         }
 
-        encode(&mut self.norm, &mut self.sat, &mut self.encode_map);
+        encode(
+            &mut self.norm,
+            &mut self.sat,
+            &mut self.encode_map,
+            &self.config,
+        );
 
         match self.sat.solve() {
             Some(model) => Some(Model {
