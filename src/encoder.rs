@@ -257,6 +257,14 @@ impl<'a> LinearInfoForOrderEncoding<'a> {
         }
     }
 
+    fn domain_min(&self, i: usize) -> i32 {
+        self.domain(i, 0)
+    }
+
+    fn domain_max(&self, i: usize) -> i32 {
+        self.domain(i, self.domain_size(i) - 1)
+    }
+
     /// The literal asserting that (the value of the i-th variable) is at least `domain(i, j)`.
     fn at_least(&self, i: usize, j: usize) -> Lit {
         assert!(0 < j && j < self.encoding[i].domain.len());
@@ -429,6 +437,24 @@ fn encode_linear_ge(env: &mut EncoderEnv, sum: &LinearSum, bool_lit: &Vec<Lit>) 
             }
             return;
         }
+        let mut min_possible = constant;
+        let mut max_possible = constant;
+        for i in idx..info.len() {
+            min_possible = min_possible
+                .checked_add(info.domain_min(i).checked_mul(info.coef(i)).unwrap())
+                .unwrap();
+            max_possible = max_possible
+                .checked_add(info.domain_max(i).checked_mul(info.coef(i)).unwrap())
+                .unwrap();
+        }
+        if min_possible >= 0 {
+            return;
+        }
+        if max_possible < 0 {
+            sat.add_clause(clause.clone());
+            return;
+        }
+
         let domain_size = info.domain_size(idx);
         for j in 0..domain_size {
             let new_constant = constant
