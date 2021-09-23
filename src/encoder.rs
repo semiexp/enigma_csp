@@ -329,7 +329,28 @@ fn encode_linear_ge_with_simplification(
             for &(_, var, coef) in &pending {
                 aux_sum.add_coef(var, coef);
             }
-            let aux_dom = env.norm_vars.get_domain_linear_sum(&aux_sum);
+            let mut aux_dom = env.norm_vars.get_domain_linear_sum(&aux_sum);
+
+            let mut rem_sum = LinearSum::new();
+            for &Reverse((_, var, coef)) in &heap {
+                rem_sum.add_coef(var, coef);
+            }
+            let rem_dom = env.norm_vars.get_domain_linear_sum(&rem_sum);
+            aux_dom.refine_upper_bound(
+                sum.constant
+                    .checked_add(rem_dom.lower_bound())
+                    .unwrap()
+                    .checked_neg()
+                    .unwrap(),
+            );
+            aux_dom.refine_lower_bound(
+                sum.constant
+                    .checked_add(rem_dom.upper_bound())
+                    .unwrap()
+                    .checked_neg()
+                    .unwrap(),
+            );
+
             let aux_var = env.norm_vars.new_int_var(aux_dom);
             env.map
                 .convert_int_var(&mut env.norm_vars, &mut env.sat, aux_var);
@@ -345,9 +366,8 @@ fn encode_linear_ge_with_simplification(
 
             pending.clear();
             let dom_size = env.map.int_map[aux_var].as_ref().unwrap().domain.len();
-            pending.push((dom_size, aux_var, 1));
-            dom_product = dom_size;
-
+            heap.push(Reverse((dom_size, aux_var, 1)));
+            dom_product = 1;
             continue;
         }
         dom_product *= dom_size;
