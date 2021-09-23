@@ -1,11 +1,12 @@
 /// csugar-like CLI
-use std::io;
+use std::fmt::Write;
+use std::io::BufRead;
 
 use super::config::Config;
 use super::integration::IntegratedSolver;
 use super::parser::{parse, ParseResult, Var, VarMap};
 
-pub fn csugar_cli() {
+pub fn csugar_cli<R: BufRead>(input: &mut R) -> String {
     let config = Config::parse_from_args();
 
     let mut var_map = VarMap::new();
@@ -13,13 +14,14 @@ pub fn csugar_cli() {
     solver.set_config(config);
 
     let mut buffer = String::new();
-    let stdin = io::stdin();
 
     let mut target_vars: Option<Vec<String>> = None;
 
+    let mut ret = String::new();
+
     loop {
         buffer.clear();
-        let num_bytes = stdin.read_line(&mut buffer).unwrap(); // TODO
+        let num_bytes = input.read_line(&mut buffer).unwrap(); // TODO
         if num_bytes == 0 {
             // EOF
             break;
@@ -62,37 +64,43 @@ pub fn csugar_cli() {
             }
             match solver.decide_irrefutable_facts(&bool_target, &int_target) {
                 Some(result) => {
-                    println!("sat");
+                    writeln!(&mut ret, "sat").unwrap();
                     for target in &target_vars {
                         match var_map.get_var(target).unwrap() {
                             Var::Bool(var) => {
                                 if let Some(b) = result.get_bool(var) {
-                                    println!("{} {}", target, b);
+                                    writeln!(&mut ret, "{} {}", target, b).unwrap();
                                 }
                             }
                             Var::Int(var) => {
                                 if let Some(i) = result.get_int(var) {
-                                    println!("{} {}", target, i);
+                                    writeln!(&mut ret, "{} {}", target, i).unwrap();
                                 }
                             }
                         }
                     }
                 }
-                None => println!("unsat"),
+                None => writeln!(&mut ret, "unsat").unwrap(),
             }
         }
         None => match solver.solve() {
             Some(model) => {
-                println!("s SATISFIABLE");
+                writeln!(&mut ret, "s SATISFIABLE").unwrap();
                 for (name, &var) in var_map.iter() {
                     match var {
-                        Var::Bool(var) => println!("a {}\t{}", name, model.get_bool(var)),
-                        Var::Int(var) => println!("a {}\t{}", name, model.get_int(var)),
+                        Var::Bool(var) => {
+                            writeln!(&mut ret, "a {}\t{}", name, model.get_bool(var)).unwrap()
+                        }
+                        Var::Int(var) => {
+                            writeln!(&mut ret, "a {}\t{}", name, model.get_int(var)).unwrap()
+                        }
                     }
                 }
-                println!("a");
+                writeln!(&mut ret, "a").unwrap();
             }
-            None => println!("s UNSATISFIABLE"),
+            None => writeln!(&mut ret, "s UNSATISFIABLE").unwrap(),
         },
     }
+
+    ret
 }
