@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use super::csp::{BoolExpr, BoolVar, CSPVars, IntExpr, IntVar, Stmt, CSP};
 use super::norm_csp::BoolVar as NBoolVar;
 use super::norm_csp::IntVar as NIntVar;
@@ -9,6 +11,7 @@ use super::CmpOp;
 pub struct NormalizeMap {
     bool_map: ConvertMap<BoolVar, NBoolVar>,
     int_map: ConvertMap<IntVar, NIntVar>,
+    int_expr_equivalence: HashMap<IntExpr, NIntVar>,
 }
 
 impl NormalizeMap {
@@ -16,6 +19,7 @@ impl NormalizeMap {
         NormalizeMap {
             bool_map: ConvertMap::new(),
             int_map: ConvertMap::new(),
+            int_expr_equivalence: HashMap::new(),
         }
     }
 
@@ -357,6 +361,10 @@ fn normalize_int_expr(env: &mut NormalizerEnv, expr: &IntExpr) -> LinearSum {
             ret
         }
         IntExpr::If(c, t, f) => {
+            if let Some(&v) = env.map.int_expr_equivalence.get(expr) {
+                return LinearSum::singleton(v);
+            }
+
             let t = normalize_int_expr(env, t);
             let f = normalize_int_expr(env, f);
             let dom = env.norm.get_domain_linear_sum(&t) | env.norm.get_domain_linear_sum(&f);
@@ -379,6 +387,12 @@ fn normalize_int_expr(env: &mut NormalizerEnv, expr: &IntExpr) -> LinearSum {
             for c in normalize_disjunction(env, vec![constr1, constr2]) {
                 env.norm.add_constraint(c);
             }
+
+            assert!(env
+                .map
+                .int_expr_equivalence
+                .insert(expr.clone(), v)
+                .is_none());
 
             LinearSum::singleton(v)
         }
