@@ -165,29 +165,29 @@ fn encode_constraint(env: &mut EncoderEnv, constr: Constraint) {
             CmpOp::Ne => {
                 {
                     let mut linear_lit = linear_lit.clone();
-                    linear_lit.sum *= CheckedInt::new(-1);
-                    linear_lit.sum.add_constant(CheckedInt::new(-1));
+                    linear_lit.sum *= -1;
+                    linear_lit.sum += -1;
                     linear_lits.push(LinearLit::new(linear_lit.sum, CmpOp::Ge));
                 }
                 {
-                    linear_lit.sum.add_constant(CheckedInt::new(-1));
+                    linear_lit.sum += -1;
                     linear_lits.push(LinearLit::new(linear_lit.sum, CmpOp::Ge));
                 }
             }
             CmpOp::Le => {
-                linear_lit.sum *= CheckedInt::new(-1);
+                linear_lit.sum *= -1;
                 linear_lits.push(LinearLit::new(linear_lit.sum, CmpOp::Ge));
             }
             CmpOp::Lt => {
-                linear_lit.sum *= CheckedInt::new(-1);
-                linear_lit.sum.add_constant(CheckedInt::new(-1));
+                linear_lit.sum *= -1;
+                linear_lit.sum += -1;
                 linear_lits.push(LinearLit::new(linear_lit.sum, CmpOp::Ge));
             }
             CmpOp::Ge => {
                 linear_lits.push(LinearLit::new(linear_lit.sum, CmpOp::Ge));
             }
             CmpOp::Gt => {
-                linear_lit.sum.add_constant(CheckedInt::new(-1));
+                linear_lit.sum += -1;
                 linear_lits.push(LinearLit::new(linear_lit.sum, CmpOp::Ge));
             }
         }
@@ -201,7 +201,7 @@ fn encode_constraint(env: &mut EncoderEnv, constr: Constraint) {
             CmpOp::Eq => {
                 // TODO: don't create the same aux vars twice
                 encode_linear_ge_with_simplification(env, &linear.sum, bool_lit);
-                linear.sum *= CheckedInt::new(-1);
+                linear.sum *= -1;
                 encode_linear_ge_with_simplification(env, &linear.sum, bool_lit);
             }
             _ => unimplemented!(),
@@ -262,7 +262,7 @@ impl<'a> LinearInfoForOrderEncoding<'a> {
 
     /// j-th smallest domain value for the i-th variable (after normalizing negative coefficients)
     fn domain(&self, i: usize, j: usize) -> CheckedInt {
-        if self.coef[i] > CheckedInt::new(0) {
+        if self.coef[i] > 0 {
             self.encoding[i].domain[j]
         } else {
             -self.encoding[i].domain[self.encoding[i].domain.len() - 1 - j]
@@ -280,7 +280,7 @@ impl<'a> LinearInfoForOrderEncoding<'a> {
     /// The literal asserting that (the value of the i-th variable) is at least `domain(i, j)`.
     fn at_least(&self, i: usize, j: usize) -> Lit {
         assert!(0 < j && j < self.encoding[i].domain.len());
-        if self.coef[i] > CheckedInt::new(0) {
+        if self.coef[i] > 0 {
             self.encoding[i].vars.at((j - 1) as i32).as_lit(false)
         } else {
             self.encoding[i]
@@ -388,7 +388,7 @@ fn encode_linear_ge_direct(env: &mut EncoderEnv, sum: &LinearSum, bool_lit: &Vec
     let mut coef = vec![];
     let mut encoding = vec![];
     for (v, c) in sum.terms() {
-        assert_ne!(c, CheckedInt::new(0));
+        assert_ne!(c, 0);
         coef.push(c);
         encoding.push(env.map.int_map[v].as_ref().unwrap());
     }
@@ -422,7 +422,7 @@ fn encode_linear_ge(env: &mut EncoderEnv, sum: &LinearSum, bool_lit: &Vec<Lit>) 
     let mut coef = vec![];
     let mut encoding = vec![];
     for (v, c) in sum.terms() {
-        assert_ne!(c, CheckedInt::new(0));
+        assert_ne!(c, 0);
         coef.push(c);
         encoding.push(env.map.int_map[v].as_ref().unwrap());
     }
@@ -436,7 +436,7 @@ fn encode_linear_ge(env: &mut EncoderEnv, sum: &LinearSum, bool_lit: &Vec<Lit>) 
         constant: CheckedInt,
     ) {
         if idx == info.len() {
-            if constant < CheckedInt::new(0) {
+            if constant < 0 {
                 sat.add_clause(clause.clone());
             }
             return;
@@ -463,10 +463,10 @@ fn encode_linear_ge(env: &mut EncoderEnv, sum: &LinearSum, bool_lit: &Vec<Lit>) 
             min_possible += info.domain_min(i) * info.coef(i);
             max_possible += info.domain_max(i) * info.coef(i);
         }
-        if min_possible >= CheckedInt::new(0) {
+        if min_possible >= 0 {
             return;
         }
-        if max_possible < CheckedInt::new(0) {
+        if max_possible < 0 {
             sat.add_clause(clause.clone());
             return;
         }

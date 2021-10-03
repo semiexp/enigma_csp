@@ -154,7 +154,7 @@ mod tests {
 
     #[test]
     fn test_product_multi3() {
-        assert_eq!(product_multi::<i32>(&vec![]), vec![vec![]]);
+        assert_eq!(product_multi::<i32>(&vec![]), vec![Vec::<i32>::new()]);
     }
 
     #[test]

@@ -104,7 +104,7 @@ impl Mul<CheckedInt> for Range {
     fn mul(self, rhs: CheckedInt) -> Self::Output {
         if self.is_empty() {
             Range::empty()
-        } else if rhs >= CheckedInt::new(0) {
+        } else if rhs >= 0 {
             Range::new(self.low * rhs, self.high * rhs)
         } else {
             Range::new(self.high * rhs, self.low * rhs)
@@ -160,14 +160,14 @@ impl LinearSum {
     }
 
     pub(super) fn add_coef(&mut self, var: IntVar, coef: CheckedInt) {
-        if coef == CheckedInt::new(0) {
+        if coef == 0 {
             return;
         }
         let new_coef = match self.term.get(&var) {
             Some(&e) => e + coef,
             _ => coef,
         };
-        if new_coef == CheckedInt::new(0) {
+        if new_coef == 0 {
             self.term.remove(&var);
         } else {
             self.term.insert(var, new_coef);
@@ -202,6 +202,12 @@ impl Add<LinearSum> for LinearSum {
     }
 }
 
+impl AddAssign<i32> for LinearSum {
+    fn add_assign(&mut self, rhs: i32) {
+        self.add_constant(CheckedInt::new(rhs));
+    }
+}
+
 impl SubAssign<LinearSum> for LinearSum {
     fn sub_assign(&mut self, rhs: LinearSum) {
         for (&key, &value) in rhs.term.iter() {
@@ -223,7 +229,7 @@ impl Sub<LinearSum> for LinearSum {
 
 impl MulAssign<CheckedInt> for LinearSum {
     fn mul_assign(&mut self, rhs: CheckedInt) {
-        if rhs == CheckedInt::new(0) {
+        if rhs == 0 {
             *self = LinearSum::new();
         }
         self.constant *= rhs;
@@ -240,6 +246,20 @@ impl Mul<CheckedInt> for LinearSum {
         let mut ret = self;
         ret *= rhs;
         ret
+    }
+}
+
+impl MulAssign<i32> for LinearSum {
+    fn mul_assign(&mut self, rhs: i32) {
+        *self *= CheckedInt::new(rhs);
+    }
+}
+
+impl Mul<i32> for LinearSum {
+    type Output = LinearSum;
+
+    fn mul(self, rhs: i32) -> LinearSum {
+        self * CheckedInt::new(rhs)
     }
 }
 
@@ -336,7 +356,7 @@ impl NormCSPVars {
         }
 
         let mut target_coef = target_coef.unwrap();
-        assert_ne!(target_coef, CheckedInt::new(0));
+        assert_ne!(target_coef, 0);
 
         // Normalize `op` to `CmpOp::Ge` to reduce case analyses
         match op {
@@ -354,7 +374,7 @@ impl NormCSPVars {
             CmpOp::Eq | CmpOp::Ne => unreachable!(),
         }
 
-        if target_coef > CheckedInt::new(0) {
+        if target_coef > 0 {
             let lb = (-range_other.high).div_ceil(target_coef);
             Range::at_least(lb)
         } else {
@@ -521,12 +541,12 @@ impl Assignment {
             }
 
             if match l.op {
-                CmpOp::Eq => v == CheckedInt::new(0),
-                CmpOp::Ne => v != CheckedInt::new(0),
-                CmpOp::Le => v <= CheckedInt::new(0),
-                CmpOp::Lt => v < CheckedInt::new(0),
-                CmpOp::Ge => v >= CheckedInt::new(0),
-                CmpOp::Gt => v > CheckedInt::new(0),
+                CmpOp::Eq => v == 0,
+                CmpOp::Ne => v != 0,
+                CmpOp::Le => v <= 0,
+                CmpOp::Lt => v < 0,
+                CmpOp::Ge => v >= 0,
+                CmpOp::Gt => v > 0,
             } {
                 return true;
             }
@@ -565,30 +585,12 @@ mod tests {
             norm_csp.vars.refine_domain(&constraint),
             UpdateStatus::Updated
         );
-        assert_eq!(
-            norm_csp.vars.int_var(a).lower_bound_checked(),
-            CheckedInt::new(0)
-        );
-        assert_eq!(
-            norm_csp.vars.int_var(a).upper_bound_checked(),
-            CheckedInt::new(35)
-        );
-        assert_eq!(
-            norm_csp.vars.int_var(b).lower_bound_checked(),
-            CheckedInt::new(0)
-        );
-        assert_eq!(
-            norm_csp.vars.int_var(b).upper_bound_checked(),
-            CheckedInt::new(23)
-        );
-        assert_eq!(
-            norm_csp.vars.int_var(c).lower_bound_checked(),
-            CheckedInt::new(0)
-        );
-        assert_eq!(
-            norm_csp.vars.int_var(c).upper_bound_checked(),
-            CheckedInt::new(17)
-        );
+        assert_eq!(norm_csp.vars.int_var(a).lower_bound_checked(), 0);
+        assert_eq!(norm_csp.vars.int_var(a).upper_bound_checked(), 35);
+        assert_eq!(norm_csp.vars.int_var(b).lower_bound_checked(), 0);
+        assert_eq!(norm_csp.vars.int_var(b).upper_bound_checked(), 23);
+        assert_eq!(norm_csp.vars.int_var(c).lower_bound_checked(), 0);
+        assert_eq!(norm_csp.vars.int_var(c).upper_bound_checked(), 17);
     }
 
     #[test]

@@ -88,9 +88,9 @@ impl Mul<CheckedInt> for Domain {
     type Output = Domain;
 
     fn mul(self, rhs: CheckedInt) -> Domain {
-        if rhs == CheckedInt::new(0) {
+        if rhs == 0 {
             Domain::range(0, 0)
-        } else if rhs > CheckedInt::new(0) {
+        } else if rhs > 0 {
             Domain::range_from_checked(self.low * rhs, self.high * rhs)
         } else {
             Domain::range_from_checked(self.high * rhs, self.low * rhs)
