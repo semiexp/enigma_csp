@@ -767,4 +767,49 @@ mod tests {
 
         tester.check();
     }
+
+    #[test]
+    fn test_integration_exhaustive_enumerative1() {
+        let mut tester = IntegrationTester::new();
+
+        let x = tester.new_bool_var();
+        let y = tester.new_bool_var();
+        let z = tester.new_bool_var();
+        let a = tester.new_int_var(Domain::range(0, 2));
+        let b = tester.new_int_var(Domain::range(0, 3));
+        let c = tester.new_int_var(Domain::range(0, 3));
+        tester.add_expr(
+            x.expr().ite(IntExpr::Const(3), b.expr() + c.expr()).eq(a
+                .expr()
+                .ne(IntExpr::Const(2))
+                .ite(IntExpr::Const(1), IntExpr::Const(3))
+                - b.expr()),
+        );
+        tester.add_expr(
+            a.expr()
+                .ne(IntExpr::Const(0))
+                .ite(IntExpr::Const(2), IntExpr::Const(1))
+                .ge(y.expr().ite(b.expr(), c.expr()))
+                ^ z.expr(),
+        );
+        tester.add_expr(x.expr() ^ a.expr().eq(IntExpr::Const(1)));
+
+        tester.check();
+    }
+
+    #[test]
+    fn test_integration_exhaustive_enumerative2() {
+        let mut tester = IntegrationTester::new();
+
+        let x = tester.new_bool_var();
+        let y = tester.new_bool_var();
+        let z = tester.new_bool_var();
+        let a = tester.new_int_var(Domain::range(0, 2));
+        let b = tester.new_int_var(Domain::range(0, 3));
+        let c = tester.new_int_var(Domain::range(0, 3));
+        tester.add_expr(x.expr().iff(a.expr().eq(IntExpr::Const(0))));
+        tester.add_expr(y.expr().iff(b.expr().ne(IntExpr::Const(1))));
+        tester.add_expr(z.expr().iff(c.expr().eq(IntExpr::Const(2))));
+        tester.check();
+    }
 }

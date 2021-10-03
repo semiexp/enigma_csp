@@ -1,5 +1,5 @@
 use std::cmp::Reverse;
-use std::collections::BinaryHeap;
+use std::collections::{BTreeSet, BinaryHeap};
 
 use super::config::Config;
 use super::norm_csp::{
@@ -18,9 +18,42 @@ struct OrderEncoding {
     vars: VarArray,
 }
 
+struct DirectEncoding {
+    domain: Vec<CheckedInt>,
+    vars: VarArray,
+}
+
+enum Encoding {
+    OrderEncoding(OrderEncoding),
+    DirectEncoding(DirectEncoding),
+}
+
+impl Encoding {
+    fn as_order_encoding(&self) -> &OrderEncoding {
+        match self {
+            Encoding::OrderEncoding(e) => e,
+            _ => panic!(),
+        }
+    }
+
+    fn as_direct_encoding(&self) -> &DirectEncoding {
+        match self {
+            Encoding::DirectEncoding(e) => e,
+            _ => panic!(),
+        }
+    }
+
+    fn is_direct_encoding(&self) -> bool {
+        match self {
+            Encoding::DirectEncoding(_) => true,
+            _ => false,
+        }
+    }
+}
+
 pub struct EncodeMap {
     bool_map: ConvertMap<BoolVar, Lit>, // mapped to Lit rather than Var so that further optimization can be done
-    int_map: ConvertMap<IntVar, OrderEncoding>,
+    int_map: ConvertMap<IntVar, Encoding>,
 }
 
 impl EncodeMap {
@@ -51,9 +84,12 @@ impl EncodeMap {
         }
     }
 
-    fn convert_int_var(&mut self, norm_vars: &NormCSPVars, sat: &mut SAT, var: IntVar) {
-        // Currently, only order encoding is supported
-
+    fn convert_int_var_order_encoding(
+        &mut self,
+        norm_vars: &NormCSPVars,
+        sat: &mut SAT,
+        var: IntVar,
+    ) {
         if self.int_map[var].is_none() {
             let domain = norm_vars.int_var(var).enumerate();
             assert_ne!(domain.len(), 0);
@@ -63,7 +99,28 @@ impl EncodeMap {
                 sat.add_clause(vec![vars.at(i).as_lit(true), vars.at(i - 1).as_lit(false)]);
             }
 
-            self.int_map[var] = Some(OrderEncoding { domain, vars });
+            self.int_map[var] = Some(Encoding::OrderEncoding(OrderEncoding { domain, vars }));
+        }
+    }
+
+    fn convert_int_var_direct_encoding(
+        &mut self,
+        norm_vars: &NormCSPVars,
+        sat: &mut SAT,
+        var: IntVar,
+    ) {
+        if self.int_map[var].is_none() {
+            let domain = norm_vars.int_var(var).enumerate();
+            assert_ne!(domain.len(), 0);
+            let vars = sat.new_vars(domain.len());
+            sat.add_clause((0..vars.len()).map(|i| vars.at(i).as_lit(false)).collect());
+            for i in 1..vars.len() {
+                for j in 0..i {
+                    sat.add_clause(vec![vars.at(i).as_lit(true), vars.at(j).as_lit(true)]);
+                }
+            }
+
+            self.int_map[var] = Some(Encoding::DirectEncoding(DirectEncoding { domain, vars }));
         }
     }
 
@@ -81,18 +138,39 @@ impl EncodeMap {
         }
         let encoding = self.int_map[var].as_ref().unwrap();
 
-        // Find the number of true value in `encoding.vars`
-        let mut left = 0;
-        let mut right = encoding.vars.len();
-        while left < right {
-            let mid = (left + right + 1) / 2;
-            if model.assignment(encoding.vars.at(mid - 1)) {
-                left = mid;
-            } else {
-                right = mid - 1;
+        match encoding {
+            Encoding::OrderEncoding(encoding) => {
+                // Find the number of true value in `encoding.vars`
+                let mut left = 0;
+                let mut right = encoding.vars.len();
+                while left < right {
+                    let mid = (left + right + 1) / 2;
+                    if model.assignment(encoding.vars.at(mid - 1)) {
+                        left = mid;
+                    } else {
+                        right = mid - 1;
+                    }
+                }
+                Some(encoding.domain[left as usize])
+            }
+            Encoding::DirectEncoding(encoding) => {
+                let mut ret = None;
+                for i in 0..encoding.vars.len() {
+                    if model.assignment(encoding.vars.at(i)) {
+                        assert!(
+                            ret.is_none(),
+                            "multiple indicator bits are set for a direct-encoded variable"
+                        );
+                        ret = Some(encoding.domain[i as usize]);
+                    }
+                }
+                assert!(
+                    ret.is_some(),
+                    "no indicator bits are set for a direct-encoded variable"
+                );
+                ret
             }
         }
-        Some(encoding.domain[left as usize])
     }
 
     pub fn get_int_value(&self, model: &SATModel, var: IntVar) -> Option<i32> {
@@ -114,10 +192,30 @@ impl<'a, 'b, 'c, 'd> EncoderEnv<'a, 'b, 'c, 'd> {
 }
 
 pub fn encode(norm: &mut NormCSP, sat: &mut SAT, map: &mut EncodeMap, config: &Config) {
-    for var in norm.unencoded_int_vars() {
-        map.convert_int_var(&mut norm.vars, sat, var);
+    let mut direct_encoding_vars = BTreeSet::<IntVar>::new();
+    if config.use_direct_encoding {
+        for var in norm.unencoded_int_vars() {
+            direct_encoding_vars.insert(var);
+        }
+        for constr in &norm.constraints {
+            for lit in &constr.linear_lit {
+                let is_simple =
+                    (lit.op == CmpOp::Eq || lit.op == CmpOp::Ne) && lit.sum.terms().len() <= 1;
+                if !is_simple {
+                    for (v, _) in lit.sum.iter() {
+                        direct_encoding_vars.remove(v);
+                    }
+                }
+            }
+        }
     }
-    norm.num_encoded_vars = norm.vars.int_var.len();
+    for var in norm.unencoded_int_vars() {
+        if direct_encoding_vars.contains(&var) {
+            map.convert_int_var_direct_encoding(&mut norm.vars, sat, var);
+        } else {
+            map.convert_int_var_order_encoding(&mut norm.vars, sat, var);
+        }
+    }
 
     let mut env = EncoderEnv {
         norm_vars: &mut norm.vars,
@@ -143,6 +241,7 @@ pub fn encode(norm: &mut NormCSP, sat: &mut SAT, map: &mut EncodeMap, config: &C
             }
         }
     }
+    norm.num_encoded_vars = norm.vars.int_var.len();
 }
 
 fn encode_constraint(env: &mut EncoderEnv, constr: Constraint) {
@@ -156,8 +255,27 @@ fn encode_constraint(env: &mut EncoderEnv, constr: Constraint) {
         return;
     }
     let mut linear_lits = vec![];
+    let mut bool_lits_for_direct_encoding = vec![];
 
     for mut linear_lit in constr.linear_lit {
+        // use direct encoding if applicable
+        let use_simple_direct_encoding;
+        {
+            let terms = linear_lit.sum.terms();
+            use_simple_direct_encoding = terms.len() == 1
+                && env.map.int_map[terms[0].0]
+                    .as_ref()
+                    .unwrap()
+                    .is_direct_encoding();
+        }
+        if use_simple_direct_encoding {
+            let encoded = encode_simple_linear_direct_encoding(env, &linear_lit);
+            if let Some(encoded) = encoded {
+                bool_lits_for_direct_encoding.extend(encoded);
+            }
+            continue;
+        }
+
         match linear_lit.op {
             CmpOp::Eq => {
                 linear_lits.push(linear_lit);
@@ -196,13 +314,13 @@ fn encode_constraint(env: &mut EncoderEnv, constr: Constraint) {
     fn encode(env: &mut EncoderEnv, mut linear: LinearLit, bool_lit: &Vec<Lit>) {
         match linear.op {
             CmpOp::Ge => {
-                encode_linear_ge_with_simplification(env, &linear.sum, bool_lit);
+                encode_linear_ge_order_encoding_with_simplification(env, &linear.sum, bool_lit);
             }
             CmpOp::Eq => {
                 // TODO: don't create the same aux vars twice
-                encode_linear_ge_with_simplification(env, &linear.sum, bool_lit);
+                encode_linear_ge_order_encoding_with_simplification(env, &linear.sum, bool_lit);
                 linear.sum *= -1;
-                encode_linear_ge_with_simplification(env, &linear.sum, bool_lit);
+                encode_linear_ge_order_encoding_with_simplification(env, &linear.sum, bool_lit);
             }
             _ => unimplemented!(),
         }
@@ -213,6 +331,7 @@ fn encode_constraint(env: &mut EncoderEnv, constr: Constraint) {
         .into_iter()
         .map(|lit| env.convert_bool_lit(lit))
         .collect::<Vec<_>>();
+    bool_lit.extend(bool_lits_for_direct_encoding);
 
     if linear_lits.len() == 1 {
         encode(env, linear_lits.remove(0), &bool_lit);
@@ -317,14 +436,19 @@ impl<'a> LinearInfoForOrderEncoding<'a> {
     }
 }
 
-fn encode_linear_ge_with_simplification(
+fn encode_linear_ge_order_encoding_with_simplification(
     env: &mut EncoderEnv,
     sum: &LinearSum,
     bool_lit: &Vec<Lit>,
 ) {
     let mut heap = BinaryHeap::new();
     for (&var, &coef) in &sum.term {
-        let dom_size = env.map.int_map[var].as_ref().unwrap().domain.len();
+        let dom_size = env.map.int_map[var]
+            .as_ref()
+            .unwrap()
+            .as_order_encoding()
+            .domain
+            .len();
         heap.push(Reverse((dom_size, var, coef)));
     }
 
@@ -353,19 +477,24 @@ fn encode_linear_ge_with_simplification(
 
             let aux_var = env.norm_vars.new_int_var(aux_dom);
             env.map
-                .convert_int_var(&mut env.norm_vars, &mut env.sat, aux_var);
+                .convert_int_var_order_encoding(&mut env.norm_vars, &mut env.sat, aux_var);
 
             // aux_sum >= aux_var
             aux_sum.add_coef(aux_var, CheckedInt::new(-1));
             if pending.len() + 1 <= env.config.native_linear_encoding_terms {
                 // TODO: make this parameter configurable
-                encode_linear_ge_direct(env, &aux_sum, &vec![]);
+                encode_linear_ge_order_encoding_native(env, &aux_sum, &vec![]);
             } else {
-                encode_linear_ge(env, &aux_sum, &vec![]);
+                encode_linear_ge_order_encoding(env, &aux_sum, &vec![]);
             }
 
             pending.clear();
-            let dom_size = env.map.int_map[aux_var].as_ref().unwrap().domain.len();
+            let dom_size = env.map.int_map[aux_var]
+                .as_ref()
+                .unwrap()
+                .as_order_encoding()
+                .domain
+                .len();
             heap.push(Reverse((dom_size, aux_var, CheckedInt::new(1))));
             dom_product = 1;
             continue;
@@ -379,10 +508,14 @@ fn encode_linear_ge_with_simplification(
     for &(_, var, coef) in &pending {
         sum.add_coef(var, coef);
     }
-    encode_linear_ge(env, &sum, bool_lit);
+    encode_linear_ge_order_encoding(env, &sum, bool_lit);
 }
 
-fn encode_linear_ge_direct(env: &mut EncoderEnv, sum: &LinearSum, bool_lit: &Vec<Lit>) {
+fn encode_linear_ge_order_encoding_native(
+    env: &mut EncoderEnv,
+    sum: &LinearSum,
+    bool_lit: &Vec<Lit>,
+) {
     assert!(bool_lit.is_empty()); // TODO
 
     let mut coef = vec![];
@@ -390,7 +523,7 @@ fn encode_linear_ge_direct(env: &mut EncoderEnv, sum: &LinearSum, bool_lit: &Vec
     for (v, c) in sum.terms() {
         assert_ne!(c, 0);
         coef.push(c);
-        encoding.push(env.map.int_map[v].as_ref().unwrap());
+        encoding.push(env.map.int_map[v].as_ref().unwrap().as_order_encoding());
     }
     let info = LinearInfoForOrderEncoding::new(coef, encoding);
 
@@ -417,14 +550,14 @@ fn encode_linear_ge_direct(env: &mut EncoderEnv, sum: &LinearSum, bool_lit: &Vec
         .add_order_encoding_linear(lits, domain, coefs, constant);
 }
 
-fn encode_linear_ge(env: &mut EncoderEnv, sum: &LinearSum, bool_lit: &Vec<Lit>) {
+fn encode_linear_ge_order_encoding(env: &mut EncoderEnv, sum: &LinearSum, bool_lit: &Vec<Lit>) {
     // TODO: better ordering of variables
     let mut coef = vec![];
     let mut encoding = vec![];
     for (v, c) in sum.terms() {
         assert_ne!(c, 0);
         coef.push(c);
-        encoding.push(env.map.int_map[v].as_ref().unwrap());
+        encoding.push(env.map.int_map[v].as_ref().unwrap().as_order_encoding());
     }
     let info = LinearInfoForOrderEncoding::new(coef, encoding);
 
@@ -486,4 +619,36 @@ fn encode_linear_ge(env: &mut EncoderEnv, sum: &LinearSum, bool_lit: &Vec<Lit>) 
 
     let mut clause = bool_lit.clone();
     encode_sub(&info, &mut env.sat, &mut clause, 0, sum.constant);
+}
+
+// Return Some(clause) where `clause` encodes `lit` (the truth value of `clause` is equal to that of `lit`),
+// or None when `lit` always holds.
+fn encode_simple_linear_direct_encoding(env: &mut EncoderEnv, lit: &LinearLit) -> Option<Vec<Lit>> {
+    let op = lit.op;
+    let terms = lit.sum.terms();
+    assert_eq!(terms.len(), 1);
+    let (var, coef) = terms[0];
+
+    let encoding = env.map.int_map[var].as_ref().unwrap().as_direct_encoding();
+    let mut oks = vec![];
+    for i in 0..encoding.domain.len() {
+        let lhs = encoding.domain[i] * coef + lit.sum.constant;
+        let isok = match op {
+            CmpOp::Eq => lhs == 0,
+            CmpOp::Ne => lhs != 0,
+            CmpOp::Le => lhs <= 0,
+            CmpOp::Lt => lhs < 0,
+            CmpOp::Ge => lhs >= 0,
+            CmpOp::Gt => lhs > 0,
+        };
+        if isok {
+            oks.push(encoding.vars.at(i).as_lit(false));
+        }
+    }
+
+    if oks.len() == encoding.domain.len() {
+        None
+    } else {
+        Some(oks)
+    }
 }

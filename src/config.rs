@@ -8,6 +8,7 @@ pub struct Config {
     pub use_norm_domain_refinement: bool,
     pub domain_product_threshold: usize,
     pub native_linear_encoding_terms: usize,
+    pub use_direct_encoding: bool,
 }
 
 impl Config {
@@ -18,6 +19,7 @@ impl Config {
             use_norm_domain_refinement: true,
             domain_product_threshold: 1000,
             native_linear_encoding_terms: 4,
+            use_direct_encoding: true,
         }
     }
 
@@ -41,6 +43,11 @@ impl Config {
                 &mut config.use_norm_domain_refinement,
                 "norm-domain-refinement",
                 "domain refinement in normalized CSP",
+            ),
+            (
+                &mut config.use_direct_encoding,
+                "direct-encoding",
+                "use direct encoding if applicable",
             ),
         ];
         for (opt, name, desc) in &mut bool_flags {
