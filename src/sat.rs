@@ -35,21 +35,6 @@ impl Not for Lit {
     }
 }
 
-pub struct VarArray {
-    vars: Vec<Var>,
-}
-
-impl VarArray {
-    pub fn len(&self) -> usize {
-        self.vars.len()
-    }
-
-    pub fn at(&self, idx: usize) -> Var {
-        assert!(idx < self.len());
-        self.vars[idx]
-    }
-}
-
 /// Adapter to SAT solver.
 /// To support other SAT solver without changing previous stages, we introduce an adapter instead of
 /// using `glucose::Solver` directly from the encoder.
@@ -68,12 +53,17 @@ impl SAT {
         Var(self.solver.new_var())
     }
 
-    pub fn new_vars(&mut self, count: usize) -> VarArray {
+    pub fn new_vars(&mut self, count: usize) -> Vec<Var> {
         let mut vars = vec![];
         for _ in 0..count {
             vars.push(self.new_var());
         }
-        VarArray { vars }
+        vars
+    }
+
+    pub fn new_vars_as_lits(&mut self, count: usize) -> Vec<Lit> {
+        let vars = self.new_vars(count);
+        vars.iter().map(|v| v.as_lit(false)).collect()
     }
 
     pub fn add_clause(&mut self, clause: Vec<Lit>) {
@@ -120,5 +110,9 @@ pub struct SATModel<'a> {
 impl<'a> SATModel<'a> {
     pub fn assignment(&self, var: Var) -> bool {
         self.model.assignment(var.0)
+    }
+
+    pub fn assignment_lit(&self, lit: Lit) -> bool {
+        self.model.assignment(lit.var().0) ^ lit.is_negated()
     }
 }

@@ -6,7 +6,7 @@ use super::norm_csp::{
     BoolLit, BoolVar, Constraint, ExtraConstraint, IntVar, LinearLit, LinearSum, NormCSP,
     NormCSPVars,
 };
-use super::sat::{Lit, SATModel, VarArray, SAT};
+use super::sat::{Lit, SATModel, SAT};
 use super::CmpOp;
 use crate::arithmetic::CheckedInt;
 use crate::util::ConvertMap;
@@ -15,12 +15,12 @@ use crate::util::ConvertMap;
 /// `vars[i]` is the logical variable representing (the value of this int variable) >= `domain[i+1]`.
 struct OrderEncoding {
     domain: Vec<CheckedInt>,
-    vars: VarArray,
+    lits: Vec<Lit>,
 }
 
 struct DirectEncoding {
     domain: Vec<CheckedInt>,
-    vars: VarArray,
+    lits: Vec<Lit>,
 }
 
 enum Encoding {
@@ -93,13 +93,13 @@ impl EncodeMap {
         if self.int_map[var].is_none() {
             let domain = norm_vars.int_var(var).enumerate();
             assert_ne!(domain.len(), 0);
-            let vars = sat.new_vars(domain.len() - 1);
-            for i in 1..vars.len() {
+            let lits = sat.new_vars_as_lits(domain.len() - 1);
+            for i in 1..lits.len() {
                 // vars[i] implies vars[i - 1]
-                sat.add_clause(vec![vars.at(i).as_lit(true), vars.at(i - 1).as_lit(false)]);
+                sat.add_clause(vec![!lits[i], lits[i - 1]]);
             }
 
-            self.int_map[var] = Some(Encoding::OrderEncoding(OrderEncoding { domain, vars }));
+            self.int_map[var] = Some(Encoding::OrderEncoding(OrderEncoding { domain, lits }));
         }
     }
 
@@ -112,15 +112,15 @@ impl EncodeMap {
         if self.int_map[var].is_none() {
             let domain = norm_vars.int_var(var).enumerate();
             assert_ne!(domain.len(), 0);
-            let vars = sat.new_vars(domain.len());
-            sat.add_clause((0..vars.len()).map(|i| vars.at(i).as_lit(false)).collect());
-            for i in 1..vars.len() {
+            let lits = sat.new_vars_as_lits(domain.len());
+            sat.add_clause(lits.clone());
+            for i in 1..lits.len() {
                 for j in 0..i {
-                    sat.add_clause(vec![vars.at(i).as_lit(true), vars.at(j).as_lit(true)]);
+                    sat.add_clause(vec![!lits[i], !lits[j]]);
                 }
             }
 
-            self.int_map[var] = Some(Encoding::DirectEncoding(DirectEncoding { domain, vars }));
+            self.int_map[var] = Some(Encoding::DirectEncoding(DirectEncoding { domain, lits }));
         }
     }
 
@@ -142,10 +142,10 @@ impl EncodeMap {
             Encoding::OrderEncoding(encoding) => {
                 // Find the number of true value in `encoding.vars`
                 let mut left = 0;
-                let mut right = encoding.vars.len();
+                let mut right = encoding.lits.len();
                 while left < right {
                     let mid = (left + right + 1) / 2;
-                    if model.assignment(encoding.vars.at(mid - 1)) {
+                    if model.assignment_lit(encoding.lits[mid - 1]) {
                         left = mid;
                     } else {
                         right = mid - 1;
@@ -155,8 +155,8 @@ impl EncodeMap {
             }
             Encoding::DirectEncoding(encoding) => {
                 let mut ret = None;
-                for i in 0..encoding.vars.len() {
-                    if model.assignment(encoding.vars.at(i)) {
+                for i in 0..encoding.lits.len() {
+                    if model.assignment_lit(encoding.lits[i]) {
                         assert!(
                             ret.is_none(),
                             "multiple indicator bits are set for a direct-encoded variable"
@@ -400,12 +400,9 @@ impl<'a> LinearInfoForOrderEncoding<'a> {
     fn at_least(&self, i: usize, j: usize) -> Lit {
         assert!(0 < j && j < self.encoding[i].domain.len());
         if self.coef[i] > 0 {
-            self.encoding[i].vars.at(j - 1).as_lit(false)
+            self.encoding[i].lits[j - 1]
         } else {
-            self.encoding[i]
-                .vars
-                .at(self.encoding[i].domain.len() - 1 - j)
-                .as_lit(true)
+            !self.encoding[i].lits[self.encoding[i].domain.len() - 1 - j]
         }
     }
 
@@ -642,7 +639,7 @@ fn encode_simple_linear_direct_encoding(env: &mut EncoderEnv, lit: &LinearLit) -
             CmpOp::Gt => lhs > 0,
         };
         if isok {
-            oks.push(encoding.vars.at(i).as_lit(false));
+            oks.push(encoding.lits[i]);
         }
     }
 
