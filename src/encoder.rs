@@ -13,7 +13,7 @@ use crate::util::ConvertMap;
 
 /// Order encoding of an integer variable with domain of `domain`.
 /// `vars[i]` is the logical variable representing (the value of this int variable) >= `domain[i+1]`.
-pub struct OrderEncoding {
+struct OrderEncoding {
     domain: Vec<CheckedInt>,
     vars: VarArray,
 }
@@ -57,7 +57,7 @@ impl EncodeMap {
         if self.int_map[var].is_none() {
             let domain = norm_vars.int_var(var).enumerate();
             assert_ne!(domain.len(), 0);
-            let vars = sat.new_vars((domain.len() - 1) as i32);
+            let vars = sat.new_vars(domain.len() - 1);
             for i in 1..vars.len() {
                 // vars[i] implies vars[i - 1]
                 sat.add_clause(vec![vars.at(i).as_lit(true), vars.at(i - 1).as_lit(false)]);
@@ -281,11 +281,11 @@ impl<'a> LinearInfoForOrderEncoding<'a> {
     fn at_least(&self, i: usize, j: usize) -> Lit {
         assert!(0 < j && j < self.encoding[i].domain.len());
         if self.coef[i] > 0 {
-            self.encoding[i].vars.at((j - 1) as i32).as_lit(false)
+            self.encoding[i].vars.at(j - 1).as_lit(false)
         } else {
             self.encoding[i]
                 .vars
-                .at((self.encoding[i].domain.len() - 1 - j) as i32)
+                .at(self.encoding[i].domain.len() - 1 - j)
                 .as_lit(true)
         }
     }

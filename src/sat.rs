@@ -40,13 +40,13 @@ pub struct VarArray {
 }
 
 impl VarArray {
-    pub fn len(&self) -> i32 {
-        self.vars.len() as i32
+    pub fn len(&self) -> usize {
+        self.vars.len()
     }
 
-    pub fn at(&self, idx: i32) -> Var {
-        assert!(0 <= idx && idx < self.len());
-        self.vars[idx as usize]
+    pub fn at(&self, idx: usize) -> Var {
+        assert!(idx < self.len());
+        self.vars[idx]
     }
 }
 
@@ -68,7 +68,7 @@ impl SAT {
         Var(self.solver.new_var())
     }
 
-    pub fn new_vars(&mut self, count: i32) -> VarArray {
+    pub fn new_vars(&mut self, count: usize) -> VarArray {
         let mut vars = vec![];
         for _ in 0..count {
             vars.push(self.new_var());
