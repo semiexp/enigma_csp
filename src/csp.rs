@@ -37,7 +37,7 @@ impl Domain {
         self.high
     }
 
-    pub(crate) fn is_constant(&self) -> Option<CheckedInt> {
+    pub(crate) fn as_constant(&self) -> Option<CheckedInt> {
         if self.low == self.high {
             Some(self.low)
         } else {
@@ -466,7 +466,7 @@ impl CSPVars {
             IntExpr::Const(_) => (),
             IntExpr::Var(v) => {
                 let value = self.int_var(*v);
-                if let Some(c) = value.domain.is_constant() {
+                if let Some(c) = value.domain.as_constant() {
                     *expr = IntExpr::Const(c.get());
                 }
             }
@@ -614,7 +614,7 @@ impl CSP {
         let domain = &data.domain;
         if domain.is_infeasible() {
             IntVarStatus::Infeasible
-        } else if let Some(v) = domain.is_constant() {
+        } else if let Some(v) = domain.as_constant() {
             IntVarStatus::Fixed(v)
         } else {
             IntVarStatus::Unfixed(domain.lower_bound_checked())
