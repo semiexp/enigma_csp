@@ -1,3 +1,4 @@
+pub mod arithmetic;
 pub mod config;
 pub mod csp;
 pub mod csugar_cli;

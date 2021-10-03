@@ -1,3 +1,5 @@
+use crate::arithmetic::CheckedInt;
+
 use super::config::Config;
 use super::csp::{
     Assignment, BoolExpr, BoolVar, BoolVarStatus, Domain, IntExpr, IntVar, IntVarStatus, Stmt, CSP,
@@ -224,11 +226,15 @@ impl<'a> Model<'a> {
     }
 
     pub fn get_int(&self, var: IntVar) -> i32 {
+        self.get_int_checked(var).get()
+    }
+
+    fn get_int_checked(&self, var: IntVar) -> CheckedInt {
         match self.normalize_map.get_int_var(var) {
             Some(norm_var) => {
                 self.encode_map
-                    .get_int_value(&self.model, norm_var)
-                    .unwrap_or(self.norm_csp.vars.int_var(norm_var).lower_bound())
+                    .get_int_value_checked(&self.model, norm_var)
+                    .unwrap_or(self.norm_csp.vars.int_var(norm_var).lower_bound_checked())
                 // unused variable optimization
             }
             None => {
@@ -307,7 +313,7 @@ mod tests {
                     assignment.set_bool(self.bool_vars[i], vb[i]);
                 }
                 for i in 0..self.int_vars.len() {
-                    assignment.set_int(self.int_vars[i].0, vi[i]);
+                    assignment.set_int(self.int_vars[i].0, vi[i].get());
                 }
                 let is_sat_csp = self.is_satisfied_csp(&assignment);
                 if is_sat_csp {

@@ -4,6 +4,7 @@ use super::csp::{BoolExpr, BoolVar, CSPVars, IntExpr, IntVar, Stmt, CSP};
 use super::norm_csp::BoolVar as NBoolVar;
 use super::norm_csp::IntVar as NIntVar;
 use super::norm_csp::{BoolLit, Constraint, ExtraConstraint, LinearLit, LinearSum, NormCSP};
+use crate::arithmetic::CheckedInt;
 use crate::util::ConvertMap;
 
 use super::CmpOp;
@@ -347,7 +348,7 @@ fn normalize_disjunction(
 
 fn normalize_int_expr(env: &mut NormalizerEnv, expr: &IntExpr) -> LinearSum {
     match expr {
-        &IntExpr::Const(c) => LinearSum::constant(c),
+        &IntExpr::Const(c) => LinearSum::constant(CheckedInt::new(c)),
         &IntExpr::Var(v) => {
             let nv = env.convert_int_var(v);
             LinearSum::singleton(nv)
@@ -356,7 +357,7 @@ fn normalize_int_expr(env: &mut NormalizerEnv, expr: &IntExpr) -> LinearSum {
         IntExpr::Linear(es) => {
             let mut ret = LinearSum::new();
             for (e, coef) in es {
-                ret += normalize_int_expr(env, e) * *coef;
+                ret += normalize_int_expr(env, e) * CheckedInt::new(*coef);
             }
             ret
         }
@@ -517,7 +518,7 @@ mod tests {
                     assignment.set_bool(self.bool_vars[i], vb[i]);
                 }
                 for i in 0..self.int_vars.len() {
-                    assignment.set_int(self.int_vars[i].0, vi[i]);
+                    assignment.set_int(self.int_vars[i].0, vi[i].get());
                 }
                 let is_sat_csp = self.is_satisfied_csp(&assignment);
                 let mut is_sat_norm = false;
@@ -528,8 +529,10 @@ mod tests {
                             .set_bool(self.map.get_bool_var(self.bool_vars[i]).unwrap(), vb[i]);
                     }
                     for i in 0..self.int_vars.len() {
-                        n_assignment
-                            .set_int(self.map.get_int_var(self.int_vars[i].0).unwrap(), vi[i]);
+                        n_assignment.set_int(
+                            self.map.get_int_var(self.int_vars[i].0).unwrap(),
+                            vi[i].get(),
+                        );
                     }
                     for (ub, ui) in util::product_binary(
                         &util::product_multi(&unfixed_bool_domains),
@@ -540,7 +543,7 @@ mod tests {
                             n_assignment.set_bool(unfixed_bool_vars[i], ub[i]);
                         }
                         for i in 0..unfixed_int_vars.len() {
-                            n_assignment.set_int(unfixed_int_vars[i], ui[i]);
+                            n_assignment.set_int(unfixed_int_vars[i], ui[i].get());
                         }
                         is_sat_norm |= self.is_satisfied_norm(&n_assignment);
                     }

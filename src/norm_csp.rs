@@ -5,7 +5,8 @@ use std::ops::{Add, AddAssign, BitAnd, BitOr, Mul, MulAssign, Sub, SubAssign};
 
 use super::csp::Domain;
 use super::CmpOp;
-use crate::util::{div_ceil, div_floor, ConvertMapIndex, UpdateStatus};
+use crate::arithmetic::CheckedInt;
+use crate::util::{ConvertMapIndex, UpdateStatus};
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug, Hash)]
 pub struct BoolVar(usize);
@@ -38,45 +39,45 @@ impl BoolLit {
 }
 
 #[derive(Clone, Copy, Debug)]
-pub struct Range {
-    low: i32,
-    high: i32,
+struct Range {
+    low: CheckedInt,
+    high: CheckedInt,
 }
 
 impl Range {
-    pub fn new(low: i32, high: i32) -> Range {
+    fn new(low: CheckedInt, high: CheckedInt) -> Range {
         Range { low, high }
     }
 
     pub fn empty() -> Range {
         Range {
-            low: i32::max_value(),
-            high: i32::min_value(),
+            low: CheckedInt::max_value(),
+            high: CheckedInt::min_value(),
         }
     }
 
     pub fn any() -> Range {
         Range {
-            low: i32::min_value(),
-            high: i32::max_value(),
+            low: CheckedInt::min_value(),
+            high: CheckedInt::max_value(),
         }
     }
 
-    pub fn at_least(c: i32) -> Range {
+    fn at_least(c: CheckedInt) -> Range {
         Range {
             low: c,
-            high: i32::max_value(),
+            high: CheckedInt::max_value(),
         }
     }
 
-    pub fn at_most(c: i32) -> Range {
+    fn at_most(c: CheckedInt) -> Range {
         Range {
-            low: i32::min_value(),
+            low: CheckedInt::min_value(),
             high: c,
         }
     }
 
-    pub fn constant(c: i32) -> Range {
+    fn constant(c: CheckedInt) -> Range {
         Range { low: c, high: c }
     }
 
@@ -92,30 +93,21 @@ impl Add<Range> for Range {
         if self.is_empty() || rhs.is_empty() {
             Range::empty()
         } else {
-            Range::new(
-                self.low.checked_add(rhs.low).unwrap(),
-                self.high.checked_add(rhs.high).unwrap(),
-            )
+            Range::new(self.low + rhs.low, self.high + rhs.high)
         }
     }
 }
 
-impl Mul<i32> for Range {
+impl Mul<CheckedInt> for Range {
     type Output = Range;
 
-    fn mul(self, rhs: i32) -> Self::Output {
+    fn mul(self, rhs: CheckedInt) -> Self::Output {
         if self.is_empty() {
             Range::empty()
-        } else if rhs >= 0 {
-            Range::new(
-                self.low.checked_mul(rhs).unwrap(),
-                self.high.checked_mul(rhs).unwrap(),
-            )
+        } else if rhs >= CheckedInt::new(0) {
+            Range::new(self.low * rhs, self.high * rhs)
         } else {
-            Range::new(
-                self.high.checked_mul(rhs).unwrap(),
-                self.low.checked_mul(rhs).unwrap(),
-            )
+            Range::new(self.high * rhs, self.low * rhs)
         }
     }
 }
@@ -138,19 +130,19 @@ impl BitOr<Range> for Range {
 
 #[derive(Clone, Debug)]
 pub struct LinearSum {
-    pub(super) term: BTreeMap<IntVar, i32>,
-    pub(super) constant: i32,
+    pub(super) term: BTreeMap<IntVar, CheckedInt>,
+    pub(super) constant: CheckedInt,
 }
 
 impl LinearSum {
     pub fn new() -> LinearSum {
         LinearSum {
             term: BTreeMap::new(),
-            constant: 0,
+            constant: CheckedInt::new(0),
         }
     }
 
-    pub fn constant(v: i32) -> LinearSum {
+    pub(super) fn constant(v: CheckedInt) -> LinearSum {
         LinearSum {
             term: BTreeMap::new(),
             constant: v,
@@ -159,34 +151,34 @@ impl LinearSum {
 
     pub fn singleton(var: IntVar) -> LinearSum {
         let mut ret = LinearSum::new();
-        ret.add_coef(var, 1);
+        ret.add_coef(var, CheckedInt::new(1));
         ret
     }
 
-    pub fn add_constant(&mut self, v: i32) {
-        self.constant = self.constant.checked_add(v).unwrap();
+    pub(super) fn add_constant(&mut self, v: CheckedInt) {
+        self.constant += v;
     }
 
-    pub fn add_coef(&mut self, var: IntVar, coef: i32) {
-        if coef == 0 {
+    pub(super) fn add_coef(&mut self, var: IntVar, coef: CheckedInt) {
+        if coef == CheckedInt::new(0) {
             return;
         }
         let new_coef = match self.term.get(&var) {
-            Some(&e) => e.checked_add(coef).unwrap(),
+            Some(&e) => e + coef,
             _ => coef,
         };
-        if new_coef == 0 {
+        if new_coef == CheckedInt::new(0) {
             self.term.remove(&var);
         } else {
             self.term.insert(var, new_coef);
         }
     }
 
-    pub fn terms(&self) -> Vec<(IntVar, i32)> {
+    pub(super) fn terms(&self) -> Vec<(IntVar, CheckedInt)> {
         self.term.iter().map(|(v, c)| (*v, *c)).collect()
     }
 
-    pub fn iter(&self) -> btree_map::Iter<IntVar, i32> {
+    pub(super) fn iter(&self) -> btree_map::Iter<IntVar, CheckedInt> {
         self.term.iter()
     }
 }
@@ -229,22 +221,22 @@ impl Sub<LinearSum> for LinearSum {
     }
 }
 
-impl MulAssign<i32> for LinearSum {
-    fn mul_assign(&mut self, rhs: i32) {
-        if rhs == 0 {
+impl MulAssign<CheckedInt> for LinearSum {
+    fn mul_assign(&mut self, rhs: CheckedInt) {
+        if rhs == CheckedInt::new(0) {
             *self = LinearSum::new();
         }
-        self.constant = self.constant.checked_mul(rhs).unwrap();
+        self.constant *= rhs;
         for (_, value) in self.term.iter_mut() {
-            *value = value.checked_mul(rhs).unwrap();
+            *value *= rhs;
         }
     }
 }
 
-impl Mul<i32> for LinearSum {
+impl Mul<CheckedInt> for LinearSum {
     type Output = LinearSum;
 
-    fn mul(self, rhs: i32) -> LinearSum {
+    fn mul(self, rhs: CheckedInt) -> LinearSum {
         let mut ret = self;
         ret *= rhs;
         ret
@@ -313,7 +305,7 @@ impl NormCSPVars {
     }
 
     pub(super) fn get_domain_linear_sum(&self, linear_sum: &LinearSum) -> Domain {
-        let mut ret = Domain::range(linear_sum.constant, linear_sum.constant);
+        let mut ret = Domain::range_from_checked(linear_sum.constant, linear_sum.constant);
 
         for (var, coef) in &linear_sum.term {
             ret = ret + self.int_var(*var).clone() * *coef;
@@ -338,33 +330,35 @@ impl NormCSPVars {
                 target_coef = Some(c);
             } else {
                 let dom = self.int_var(v);
-                range_other = range_other + Range::new(dom.lower_bound(), dom.upper_bound()) * c;
+                range_other = range_other
+                    + Range::new(dom.lower_bound_checked(), dom.upper_bound_checked()) * c;
             }
         }
 
         let mut target_coef = target_coef.unwrap();
-        assert_ne!(target_coef, 0);
+        assert_ne!(target_coef, CheckedInt::new(0));
 
         // Normalize `op` to `CmpOp::Ge` to reduce case analyses
         match op {
             CmpOp::Ge => (),
-            CmpOp::Gt => range_other = range_other + Range::constant(-1),
+            CmpOp::Gt => range_other = range_other + Range::constant(CheckedInt::new(-1)),
             CmpOp::Le => {
-                range_other = range_other * -1;
-                target_coef = target_coef.checked_mul(-1).unwrap();
+                range_other = range_other * CheckedInt::new(-1);
+                target_coef = -target_coef;
             }
             CmpOp::Lt => {
-                range_other = range_other * -1 + Range::constant(-1);
-                target_coef = target_coef.checked_mul(-1).unwrap();
+                range_other =
+                    range_other * CheckedInt::new(-1) + Range::constant(CheckedInt::new(-1));
+                target_coef = -target_coef;
             }
             CmpOp::Eq | CmpOp::Ne => unreachable!(),
         }
 
-        if target_coef > 0 {
-            let lb = div_ceil(-range_other.high, target_coef);
+        if target_coef > CheckedInt::new(0) {
+            let lb = (-range_other.high).div_ceil(target_coef);
             Range::at_least(lb)
         } else {
-            let ub = div_floor(range_other.high, -target_coef);
+            let ub = range_other.high.div_floor(-target_coef);
             Range::at_most(ub)
         }
     }
@@ -494,7 +488,7 @@ impl NormCSP {
 #[derive(Clone)]
 pub struct Assignment {
     bool_val: BTreeMap<BoolVar, bool>,
-    int_val: BTreeMap<IntVar, i32>,
+    int_val: BTreeMap<IntVar, CheckedInt>,
 }
 
 impl Assignment {
@@ -510,7 +504,7 @@ impl Assignment {
     }
 
     pub fn set_int(&mut self, var: IntVar, val: i32) {
-        self.int_val.insert(var, val);
+        self.int_val.insert(var, CheckedInt::new(val));
     }
 
     pub fn eval_constraint(&self, constr: &Constraint) -> bool {
@@ -523,18 +517,16 @@ impl Assignment {
             let sum = &l.sum;
             let mut v = sum.constant;
             for (var, coef) in &sum.term {
-                v = v
-                    .checked_add(self.int_val.get(var).unwrap().checked_mul(*coef).unwrap())
-                    .unwrap();
+                v = v + self.int_val.get(var).copied().unwrap() * *coef;
             }
 
             if match l.op {
-                CmpOp::Eq => v == 0,
-                CmpOp::Ne => v != 0,
-                CmpOp::Le => v <= 0,
-                CmpOp::Lt => v < 0,
-                CmpOp::Ge => v >= 0,
-                CmpOp::Gt => v > 0,
+                CmpOp::Eq => v == CheckedInt::new(0),
+                CmpOp::Ne => v != CheckedInt::new(0),
+                CmpOp::Le => v <= CheckedInt::new(0),
+                CmpOp::Lt => v < CheckedInt::new(0),
+                CmpOp::Ge => v >= CheckedInt::new(0),
+                CmpOp::Gt => v > CheckedInt::new(0),
             } {
                 return true;
             }
@@ -548,9 +540,9 @@ mod tests {
     use super::*;
 
     fn construct_linear_sum(terms: &[(IntVar, i32)], constant: i32) -> LinearSum {
-        let mut ret = LinearSum::constant(constant);
+        let mut ret = LinearSum::constant(CheckedInt::new(constant));
         for &(v, c) in terms {
-            ret.add_coef(v, c);
+            ret.add_coef(v, CheckedInt::new(c));
         }
         ret
     }
@@ -573,12 +565,30 @@ mod tests {
             norm_csp.vars.refine_domain(&constraint),
             UpdateStatus::Updated
         );
-        assert_eq!(norm_csp.vars.int_var(a).lower_bound(), 0);
-        assert_eq!(norm_csp.vars.int_var(a).upper_bound(), 35);
-        assert_eq!(norm_csp.vars.int_var(b).lower_bound(), 0);
-        assert_eq!(norm_csp.vars.int_var(b).upper_bound(), 23);
-        assert_eq!(norm_csp.vars.int_var(c).lower_bound(), 0);
-        assert_eq!(norm_csp.vars.int_var(c).upper_bound(), 17);
+        assert_eq!(
+            norm_csp.vars.int_var(a).lower_bound_checked(),
+            CheckedInt::new(0)
+        );
+        assert_eq!(
+            norm_csp.vars.int_var(a).upper_bound_checked(),
+            CheckedInt::new(35)
+        );
+        assert_eq!(
+            norm_csp.vars.int_var(b).lower_bound_checked(),
+            CheckedInt::new(0)
+        );
+        assert_eq!(
+            norm_csp.vars.int_var(b).upper_bound_checked(),
+            CheckedInt::new(23)
+        );
+        assert_eq!(
+            norm_csp.vars.int_var(c).lower_bound_checked(),
+            CheckedInt::new(0)
+        );
+        assert_eq!(
+            norm_csp.vars.int_var(c).upper_bound_checked(),
+            CheckedInt::new(17)
+        );
     }
 
     #[test]
@@ -598,9 +608,21 @@ mod tests {
             norm_csp.vars.refine_domain(&constraint),
             UpdateStatus::Updated
         );
-        assert_eq!(norm_csp.vars.int_var(a).lower_bound(), 21);
-        assert_eq!(norm_csp.vars.int_var(a).upper_bound(), 100);
-        assert_eq!(norm_csp.vars.int_var(b).lower_bound(), -10);
-        assert_eq!(norm_csp.vars.int_var(b).upper_bound(), 43);
+        assert_eq!(
+            norm_csp.vars.int_var(a).lower_bound_checked(),
+            CheckedInt::new(21)
+        );
+        assert_eq!(
+            norm_csp.vars.int_var(a).upper_bound_checked(),
+            CheckedInt::new(100)
+        );
+        assert_eq!(
+            norm_csp.vars.int_var(b).lower_bound_checked(),
+            CheckedInt::new(-10)
+        );
+        assert_eq!(
+            norm_csp.vars.int_var(b).upper_bound_checked(),
+            CheckedInt::new(43)
+        );
     }
 }

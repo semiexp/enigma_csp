@@ -1,3 +1,4 @@
+use crate::arithmetic::CheckedInt;
 use crate::util::{ConvertMapIndex, UpdateStatus};
 use std::collections::{btree_map, BTreeMap};
 use std::ops::{Add, BitAnd, BitOr, BitXor, Mul, Not, Sub};
@@ -6,28 +7,37 @@ use super::CmpOp;
 
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct Domain {
-    low: i32,
-    high: i32,
+    low: CheckedInt,
+    high: CheckedInt,
 }
 
 impl Domain {
     pub fn range(low: i32, high: i32) -> Domain {
+        Domain {
+            low: CheckedInt::new(low),
+            high: CheckedInt::new(high),
+        }
+    }
+
+    pub(crate) fn range_from_checked(low: CheckedInt, high: CheckedInt) -> Domain {
         Domain { low, high }
     }
 
-    pub fn enumerate(&self) -> Vec<i32> {
-        (self.low..=self.high).into_iter().collect::<Vec<_>>()
+    pub(crate) fn enumerate(&self) -> Vec<CheckedInt> {
+        (self.low.get()..=self.high.get())
+            .map(CheckedInt::new)
+            .collect::<Vec<_>>()
     }
 
-    pub fn lower_bound(&self) -> i32 {
+    pub(crate) fn lower_bound_checked(&self) -> CheckedInt {
         self.low
     }
 
-    pub fn upper_bound(&self) -> i32 {
+    pub(crate) fn upper_bound_checked(&self) -> CheckedInt {
         self.high
     }
 
-    pub fn is_constant(&self) -> Option<i32> {
+    pub(crate) fn is_constant(&self) -> Option<CheckedInt> {
         if self.low == self.high {
             Some(self.low)
         } else {
@@ -39,7 +49,7 @@ impl Domain {
         self.low > self.high
     }
 
-    pub fn refine_upper_bound(&mut self, v: i32) -> UpdateStatus {
+    pub(crate) fn refine_upper_bound(&mut self, v: CheckedInt) -> UpdateStatus {
         if self.high <= v {
             UpdateStatus::NotUpdated
         } else {
@@ -52,7 +62,7 @@ impl Domain {
         }
     }
 
-    pub fn refine_lower_bound(&mut self, v: i32) -> UpdateStatus {
+    pub(crate) fn refine_lower_bound(&mut self, v: CheckedInt) -> UpdateStatus {
         if self.low >= v {
             UpdateStatus::NotUpdated
         } else {
@@ -70,29 +80,20 @@ impl Add<Domain> for Domain {
     type Output = Domain;
 
     fn add(self, rhs: Domain) -> Domain {
-        Domain::range(
-            self.low.checked_add(rhs.low).unwrap(),
-            self.high.checked_add(rhs.high).unwrap(),
-        )
+        Domain::range_from_checked(self.low + rhs.low, self.high + rhs.high)
     }
 }
 
-impl Mul<i32> for Domain {
+impl Mul<CheckedInt> for Domain {
     type Output = Domain;
 
-    fn mul(self, rhs: i32) -> Domain {
-        if rhs == 0 {
+    fn mul(self, rhs: CheckedInt) -> Domain {
+        if rhs == CheckedInt::new(0) {
             Domain::range(0, 0)
-        } else if rhs > 0 {
-            Domain::range(
-                self.low.checked_mul(rhs).unwrap(),
-                self.high.checked_mul(rhs).unwrap(),
-            )
+        } else if rhs > CheckedInt::new(0) {
+            Domain::range_from_checked(self.low * rhs, self.high * rhs)
         } else {
-            Domain::range(
-                self.high.checked_mul(rhs).unwrap(),
-                self.low.checked_mul(rhs).unwrap(),
-            )
+            Domain::range_from_checked(self.high * rhs, self.low * rhs)
         }
     }
 }
@@ -101,7 +102,7 @@ impl BitOr<Domain> for Domain {
     type Output = Domain;
 
     fn bitor(self, rhs: Domain) -> Domain {
-        Domain::range(self.low.min(rhs.low), self.high.max(rhs.high))
+        Domain::range_from_checked(self.low.min(rhs.low), self.high.max(rhs.high))
     }
 }
 
@@ -466,7 +467,7 @@ impl CSPVars {
             IntExpr::Var(v) => {
                 let value = self.int_var(*v);
                 if let Some(c) = value.domain.is_constant() {
-                    *expr = IntExpr::Const(c);
+                    *expr = IntExpr::Const(c.get());
                 }
             }
             IntExpr::NVar(_) => unreachable!(),
@@ -556,8 +557,8 @@ pub enum BoolVarStatus {
 
 pub enum IntVarStatus {
     Infeasible,
-    Fixed(i32),
-    Unfixed(i32), // an example of feasible value
+    Fixed(CheckedInt),
+    Unfixed(CheckedInt), // an example of feasible value
 }
 
 pub struct CSP {
@@ -616,7 +617,7 @@ impl CSP {
         } else if let Some(v) = domain.is_constant() {
             IntVarStatus::Fixed(v)
         } else {
-            IntVarStatus::Unfixed(domain.lower_bound())
+            IntVarStatus::Unfixed(domain.lower_bound_checked())
         }
     }
 
