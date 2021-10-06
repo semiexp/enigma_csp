@@ -3,8 +3,8 @@ use std::collections::{BTreeSet, BinaryHeap};
 
 use super::config::Config;
 use super::norm_csp::{
-    BoolLit, BoolVar, Constraint, ExtraConstraint, IntVar, LinearLit, LinearSum, NormCSP,
-    NormCSPVars,
+    BoolLit, BoolVar, Constraint, ExtraConstraint, IntVar, IntVarRepresentation, LinearLit,
+    LinearSum, NormCSP, NormCSPVars,
 };
 use super::sat::{Lit, SATModel, SAT};
 use super::CmpOp;
@@ -91,15 +91,33 @@ impl EncodeMap {
         var: IntVar,
     ) {
         if self.int_map[var].is_none() {
-            let domain = norm_vars.int_var(var).enumerate();
-            assert_ne!(domain.len(), 0);
-            let lits = sat.new_vars_as_lits(domain.len() - 1);
-            for i in 1..lits.len() {
-                // vars[i] implies vars[i - 1]
-                sat.add_clause(vec![!lits[i], lits[i - 1]]);
-            }
+            match norm_vars.int_var(var) {
+                IntVarRepresentation::Domain(domain) => {
+                    let domain = domain.enumerate();
+                    assert_ne!(domain.len(), 0);
+                    let lits = sat.new_vars_as_lits(domain.len() - 1);
+                    for i in 1..lits.len() {
+                        // vars[i] implies vars[i - 1]
+                        sat.add_clause(vec![!lits[i], lits[i - 1]]);
+                    }
 
-            self.int_map[var] = Some(Encoding::OrderEncoding(OrderEncoding { domain, lits }));
+                    self.int_map[var] =
+                        Some(Encoding::OrderEncoding(OrderEncoding { domain, lits }));
+                }
+                &IntVarRepresentation::Binary(cond, t, f) => {
+                    let domain;
+                    let lits;
+                    if f <= t {
+                        domain = vec![f, t];
+                        lits = vec![self.convert_bool_var(norm_vars, sat, cond)];
+                    } else {
+                        domain = vec![t, f];
+                        lits = vec![!self.convert_bool_var(norm_vars, sat, cond)];
+                    }
+                    self.int_map[var] =
+                        Some(Encoding::OrderEncoding(OrderEncoding { domain, lits }));
+                }
+            }
         }
     }
 
@@ -472,7 +490,9 @@ fn encode_linear_ge_order_encoding_with_simplification(
             aux_dom.refine_upper_bound(-(sum.constant + rem_dom.lower_bound_checked()));
             aux_dom.refine_lower_bound(-(sum.constant + rem_dom.upper_bound_checked()));
 
-            let aux_var = env.norm_vars.new_int_var(aux_dom);
+            let aux_var = env
+                .norm_vars
+                .new_int_var(IntVarRepresentation::Domain(aux_dom));
             env.map
                 .convert_int_var_order_encoding(&mut env.norm_vars, &mut env.sat, aux_var);
 

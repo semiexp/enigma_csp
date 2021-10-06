@@ -368,6 +368,24 @@ fn normalize_int_expr(env: &mut NormalizerEnv, expr: &IntExpr) -> LinearSum {
 
             let t = normalize_int_expr(env, t);
             let f = normalize_int_expr(env, f);
+
+            if t.is_constant() && f.is_constant() {
+                let val_true = t.constant;
+                let val_false = f.constant;
+                match c.as_ref() {
+                    &BoolExpr::Var(c) => {
+                        let c = env.convert_bool_var(c);
+                        let v = env.norm.new_binary_int_var(c, val_true, val_false);
+                        return LinearSum::singleton(v);
+                    }
+                    &BoolExpr::NVar(c) => {
+                        let v = env.norm.new_binary_int_var(c, val_true, val_false);
+                        return LinearSum::singleton(v);
+                    }
+                    _ => (),
+                }
+            }
+
             let dom = env.norm.get_domain_linear_sum(&t) | env.norm.get_domain_linear_sum(&f);
             let v = env.norm.new_int_var(dom);
 
@@ -407,6 +425,7 @@ mod tests {
     use super::super::csp;
     use super::super::csp::Domain;
     use super::super::norm_csp;
+    use super::super::norm_csp::IntVarRepresentation;
     use super::*;
     use crate::util;
 
@@ -506,7 +525,14 @@ mod tests {
             }
             let mut unfixed_int_domains = vec![];
             for nv in &unfixed_int_vars {
-                unfixed_int_domains.push(self.norm.vars.int_var(*nv).enumerate());
+                match &self.norm.vars.int_var(*nv) {
+                    IntVarRepresentation::Binary(_, t, f) => {
+                        unfixed_int_domains.push(vec![(*t).min(*f), (*t).max(*f)]);
+                    }
+                    &IntVarRepresentation::Domain(domain) => {
+                        unfixed_int_domains.push(domain.enumerate());
+                    }
+                }
             }
 
             for (vb, vi) in util::product_binary(

@@ -812,4 +812,41 @@ mod tests {
         tester.add_expr(z.expr().iff(c.expr().eq(IntExpr::Const(2))));
         tester.check();
     }
+
+    #[test]
+    fn test_integration_exhaustive_binary1() {
+        let mut tester = IntegrationTester::new();
+
+        let x = tester.new_bool_var();
+        let a = tester.new_int_var(Domain::range(0, 3));
+        tester.add_expr(
+            x.expr()
+                .ite(IntExpr::Const(2), IntExpr::Const(3))
+                .ge(a.expr()),
+        );
+
+        tester.check();
+    }
+
+    #[test]
+    fn test_integration_exhaustive_binary2() {
+        let mut tester = IntegrationTester::new();
+
+        let x = tester.new_bool_var();
+        let y = tester.new_bool_var();
+        let z = tester.new_bool_var();
+        let a = tester.new_int_var(Domain::range(0, 3));
+        let b = tester.new_int_var(Domain::range(0, 3));
+        let c = tester.new_int_var(Domain::range(0, 3));
+        tester.add_expr(
+            (x.expr().ite(IntExpr::Const(1), IntExpr::Const(2))
+                + y.expr().ite(IntExpr::Const(2), IntExpr::Const(1)))
+            .ge(a.expr() + b.expr() * 2 - c.expr()),
+        );
+        tester
+            .add_expr((a.expr() + z.expr().ite(IntExpr::Const(1), IntExpr::Const(0))).le(c.expr()));
+        tester.add_expr(x.expr() | z.expr());
+
+        tester.check();
+    }
 }

@@ -155,6 +155,10 @@ impl LinearSum {
         ret
     }
 
+    pub fn is_constant(&self) -> bool {
+        self.term.is_empty()
+    }
+
     pub(super) fn add_constant(&mut self, v: CheckedInt) {
         self.constant += v;
     }
@@ -299,10 +303,56 @@ impl Constraint {
     }
 }
 
+pub(super) enum IntVarRepresentation {
+    Domain(super::csp::Domain),
+    Binary(BoolVar, CheckedInt, CheckedInt), // condition, true, false
+}
+
+impl IntVarRepresentation {
+    #[allow(dead_code)]
+    fn as_domain(&self) -> &super::csp::Domain {
+        match self {
+            IntVarRepresentation::Domain(domain) => domain,
+            _ => panic!(),
+        }
+    }
+
+    pub(super) fn enumerate(&self) -> Vec<CheckedInt> {
+        match self {
+            IntVarRepresentation::Domain(domain) => domain.enumerate(),
+            IntVarRepresentation::Binary(_, t, f) => {
+                let mut ret = vec![];
+                if *t < *f {
+                    ret.push(*t);
+                    ret.push(*f);
+                } else {
+                    ret.push(*f);
+                    ret.push(*t);
+                }
+                ret
+            }
+        }
+    }
+
+    pub(super) fn lower_bound_checked(&self) -> CheckedInt {
+        match self {
+            IntVarRepresentation::Domain(domain) => domain.lower_bound_checked(),
+            IntVarRepresentation::Binary(_, t, f) => (*t).min(*f),
+        }
+    }
+
+    pub(super) fn upper_bound_checked(&self) -> CheckedInt {
+        match self {
+            IntVarRepresentation::Domain(domain) => domain.upper_bound_checked(),
+            IntVarRepresentation::Binary(_, t, f) => (*t).max(*f),
+        }
+    }
+}
+
 pub(super) struct NormCSPVars {
     // TODO: remove `pub(super)`
     num_bool_var: usize,
-    pub(super) int_var: Vec<super::csp::Domain>,
+    pub(super) int_var: Vec<IntVarRepresentation>,
 }
 
 impl NormCSPVars {
@@ -314,11 +364,11 @@ impl NormCSPVars {
         (0..self.int_var.len()).map(|i| IntVar(i))
     }
 
-    pub(super) fn int_var(&self, var: IntVar) -> &super::csp::Domain {
+    pub(super) fn int_var(&self, var: IntVar) -> &IntVarRepresentation {
         &self.int_var[var.0]
     }
 
-    pub(super) fn new_int_var(&mut self, domain: super::csp::Domain) -> IntVar {
+    pub(super) fn new_int_var(&mut self, domain: IntVarRepresentation) -> IntVar {
         let id = self.int_var.len();
         self.int_var.push(domain);
         IntVar(id)
@@ -328,7 +378,13 @@ impl NormCSPVars {
         let mut ret = Domain::range_from_checked(linear_sum.constant, linear_sum.constant);
 
         for (var, coef) in &linear_sum.term {
-            ret = ret + self.int_var(*var).clone() * *coef;
+            match self.int_var(*var) {
+                IntVarRepresentation::Domain(dom) => ret = ret + dom.clone() * *coef,
+                IntVarRepresentation::Binary(_, t, f) => {
+                    let dom = Domain::range(t.min(f).get(), t.max(f).get());
+                    ret = ret + dom * *coef;
+                }
+            }
         }
 
         ret
@@ -349,9 +405,9 @@ impl NormCSPVars {
             if v == target {
                 target_coef = Some(c);
             } else {
-                let dom = self.int_var(v);
+                let repr = self.int_var(v);
                 range_other = range_other
-                    + Range::new(dom.lower_bound_checked(), dom.upper_bound_checked()) * c;
+                    + Range::new(repr.lower_bound_checked(), repr.upper_bound_checked()) * c;
             }
         }
 
@@ -413,9 +469,10 @@ impl NormCSPVars {
                 range = range | self.refine_var(linear_lit.op, &linear_lit.sum, v);
             }
 
-            let domain = &mut self.int_var[v.0];
-            status |= domain.refine_lower_bound(range.low);
-            status |= domain.refine_upper_bound(range.high);
+            if let IntVarRepresentation::Domain(domain) = &mut self.int_var[v.0] {
+                status |= domain.refine_lower_bound(range.low);
+                status |= domain.refine_upper_bound(range.high);
+            }
         }
         status
     }
@@ -454,7 +511,17 @@ impl NormCSP {
     }
 
     pub fn new_int_var(&mut self, domain: super::csp::Domain) -> IntVar {
-        self.vars.new_int_var(domain)
+        self.vars.new_int_var(IntVarRepresentation::Domain(domain))
+    }
+
+    pub fn new_binary_int_var(
+        &mut self,
+        cond: BoolVar,
+        val_true: CheckedInt,
+        val_false: CheckedInt,
+    ) -> IntVar {
+        self.vars
+            .new_int_var(IntVarRepresentation::Binary(cond, val_true, val_false))
     }
 
     pub fn add_constraint(&mut self, constraint: Constraint) {
@@ -585,12 +652,30 @@ mod tests {
             norm_csp.vars.refine_domain(&constraint),
             UpdateStatus::Updated
         );
-        assert_eq!(norm_csp.vars.int_var(a).lower_bound_checked(), 0);
-        assert_eq!(norm_csp.vars.int_var(a).upper_bound_checked(), 35);
-        assert_eq!(norm_csp.vars.int_var(b).lower_bound_checked(), 0);
-        assert_eq!(norm_csp.vars.int_var(b).upper_bound_checked(), 23);
-        assert_eq!(norm_csp.vars.int_var(c).lower_bound_checked(), 0);
-        assert_eq!(norm_csp.vars.int_var(c).upper_bound_checked(), 17);
+        assert_eq!(
+            norm_csp.vars.int_var(a).as_domain().lower_bound_checked(),
+            0
+        );
+        assert_eq!(
+            norm_csp.vars.int_var(a).as_domain().upper_bound_checked(),
+            35
+        );
+        assert_eq!(
+            norm_csp.vars.int_var(b).as_domain().lower_bound_checked(),
+            0
+        );
+        assert_eq!(
+            norm_csp.vars.int_var(b).as_domain().upper_bound_checked(),
+            23
+        );
+        assert_eq!(
+            norm_csp.vars.int_var(c).as_domain().lower_bound_checked(),
+            0
+        );
+        assert_eq!(
+            norm_csp.vars.int_var(c).as_domain().upper_bound_checked(),
+            17
+        );
     }
 
     #[test]
@@ -611,19 +696,19 @@ mod tests {
             UpdateStatus::Updated
         );
         assert_eq!(
-            norm_csp.vars.int_var(a).lower_bound_checked(),
+            norm_csp.vars.int_var(a).as_domain().lower_bound_checked(),
             CheckedInt::new(21)
         );
         assert_eq!(
-            norm_csp.vars.int_var(a).upper_bound_checked(),
+            norm_csp.vars.int_var(a).as_domain().upper_bound_checked(),
             CheckedInt::new(100)
         );
         assert_eq!(
-            norm_csp.vars.int_var(b).lower_bound_checked(),
+            norm_csp.vars.int_var(b).as_domain().lower_bound_checked(),
             CheckedInt::new(-10)
         );
         assert_eq!(
-            norm_csp.vars.int_var(b).upper_bound_checked(),
+            norm_csp.vars.int_var(b).as_domain().upper_bound_checked(),
             CheckedInt::new(43)
         );
     }
