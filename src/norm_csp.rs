@@ -159,6 +159,10 @@ impl LinearSum {
         self.term.is_empty()
     }
 
+    pub fn len(&self) -> usize {
+        self.term.len()
+    }
+
     pub(super) fn add_constant(&mut self, v: CheckedInt) {
         self.constant += v;
     }

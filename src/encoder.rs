@@ -355,6 +355,46 @@ fn encode_constraint(env: &mut EncoderEnv, constr: Constraint) {
         encode(env, linear_lits.remove(0), &bool_lit);
     } else {
         for linear_lit in linear_lits {
+            if linear_lit.op == CmpOp::Ge && linear_lit.sum.len() == 1 {
+                // v * coef + constant >= 0
+                let constant = linear_lit.sum.constant;
+                let (&v, &coef) = linear_lit.sum.iter().next().unwrap();
+
+                let encoding = env.map.int_map[v].as_ref().unwrap().as_order_encoding();
+                if coef > 0 {
+                    let lb = (-constant).div_ceil(coef);
+                    if encoding.domain[0] >= lb {
+                        // already satisfied
+                        return;
+                    } else if encoding.domain[encoding.domain.len() - 1] < lb {
+                        // skipped (unsatisfiable literal)
+                        continue;
+                    }
+                    for i in 1..encoding.domain.len() {
+                        if encoding.domain[i] >= lb {
+                            bool_lit.push(encoding.lits[i - 1]);
+                            break;
+                        }
+                    }
+                } else {
+                    let ub = constant.div_floor(-coef);
+                    // v <= ub iff !(v >= ub + 1)
+                    let nlb = ub + CheckedInt::new(1);
+                    if encoding.domain[0] >= nlb {
+                        continue;
+                    } else if encoding.domain[encoding.domain.len() - 1] < nlb {
+                        return;
+                    }
+                    for i in 1..encoding.domain.len() {
+                        if encoding.domain[i] >= nlb {
+                            bool_lit.push(!encoding.lits[i - 1]);
+                            break;
+                        }
+                    }
+                }
+                continue;
+            }
+
             let aux = env.sat.new_var();
             bool_lit.push(aux.as_lit(false));
             encode(env, linear_lit, &vec![aux.as_lit(true)]);

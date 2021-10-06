@@ -769,6 +769,27 @@ mod tests {
     }
 
     #[test]
+    fn test_integration_exhaustive_complex3() {
+        let mut tester = IntegrationTester::new();
+
+        let x = tester.new_bool_var();
+        let y = tester.new_bool_var();
+        let z = tester.new_bool_var();
+        let a = tester.new_int_var(Domain::range(0, 3));
+        let b = tester.new_int_var(Domain::range(0, 3));
+        let c = tester.new_int_var(Domain::range(0, 3));
+        tester.add_expr(x.expr() | (a.expr().ge(IntExpr::Const(2))));
+        tester.add_expr(
+            y.expr() | (b.expr().eq(IntExpr::Const(2))) | (c.expr().ne(IntExpr::Const(1))),
+        );
+        tester.add_expr(
+            (z.expr().ite(IntExpr::Const(1), IntExpr::Const(2)) + b.expr()).ge(a.expr() + c.expr()),
+        );
+
+        tester.check();
+    }
+
+    #[test]
     fn test_integration_exhaustive_enumerative1() {
         let mut tester = IntegrationTester::new();
 
