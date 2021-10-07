@@ -290,6 +290,8 @@ fn encode_constraint(env: &mut EncoderEnv, constr: Constraint) {
             let encoded = encode_simple_linear_direct_encoding(env, &linear_lit);
             if let Some(encoded) = encoded {
                 bool_lits_for_direct_encoding.extend(encoded);
+            } else {
+                return;
             }
             continue;
         }
