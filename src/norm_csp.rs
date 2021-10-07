@@ -313,6 +313,13 @@ pub(super) enum IntVarRepresentation {
 }
 
 impl IntVarRepresentation {
+    pub(super) fn is_domain(&self) -> bool {
+        match self {
+            IntVarRepresentation::Domain(_) => true,
+            _ => false,
+        }
+    }
+
     #[allow(dead_code)]
     fn as_domain(&self) -> &super::csp::Domain {
         match self {

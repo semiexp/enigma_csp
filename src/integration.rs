@@ -870,4 +870,18 @@ mod tests {
 
         tester.check();
     }
+
+    #[test]
+    fn test_integration_exhaustive_binary3() {
+        let mut tester = IntegrationTester::new();
+
+        let x = tester.new_bool_var();
+        tester.add_expr(
+            x.expr()
+                .ite(IntExpr::Const(1), IntExpr::Const(0))
+                .eq(IntExpr::Const(1)),
+        );
+
+        tester.check();
+    }
 }

@@ -213,7 +213,9 @@ pub fn encode(norm: &mut NormCSP, sat: &mut SAT, map: &mut EncodeMap, config: &C
     let mut direct_encoding_vars = BTreeSet::<IntVar>::new();
     if config.use_direct_encoding {
         for var in norm.unencoded_int_vars() {
-            direct_encoding_vars.insert(var);
+            if norm.vars.int_var(var).is_domain() {
+                direct_encoding_vars.insert(var);
+            }
         }
         for constr in &norm.constraints {
             for lit in &constr.linear_lit {
