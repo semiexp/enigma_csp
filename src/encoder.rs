@@ -146,6 +146,10 @@ impl EncodeMap {
         self.bool_map[var]
     }
 
+    pub fn get_bool_lit(&self, lit: BoolLit) -> Option<Lit> {
+        self.bool_map[lit.var].map(|l| if lit.negated { !l } else { l })
+    }
+
     pub(crate) fn get_int_value_checked(
         &self,
         model: &SATModel,

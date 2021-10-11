@@ -1,7 +1,7 @@
 // Normalized CSP
 
 use std::collections::{btree_map, BTreeMap};
-use std::ops::{Add, AddAssign, BitAnd, BitOr, Mul, MulAssign, Sub, SubAssign};
+use std::ops::{Add, AddAssign, BitAnd, BitOr, Mul, MulAssign, Not, Sub, SubAssign};
 
 use super::csp::Domain;
 use super::CmpOp;
@@ -26,7 +26,7 @@ impl ConvertMapIndex for IntVar {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub struct BoolLit {
     pub(super) var: BoolVar,
     pub(super) negated: bool,
@@ -35,6 +35,24 @@ pub struct BoolLit {
 impl BoolLit {
     pub fn new(var: BoolVar, negated: bool) -> BoolLit {
         BoolLit { var, negated }
+    }
+
+    pub fn negate_if(self, cond: bool) -> BoolLit {
+        BoolLit {
+            var: self.var,
+            negated: self.negated ^ cond,
+        }
+    }
+}
+
+impl Not for BoolLit {
+    type Output = BoolLit;
+
+    fn not(self) -> Self::Output {
+        BoolLit {
+            var: self.var,
+            negated: !self.negated,
+        }
     }
 }
 
@@ -603,6 +621,10 @@ impl Assignment {
 
     pub fn set_int(&mut self, var: IntVar, val: i32) {
         self.int_val.insert(var, CheckedInt::new(val));
+    }
+
+    pub fn get_bool(&self, var: BoolVar) -> Option<bool> {
+        self.bool_val.get(&var).copied()
     }
 
     pub fn eval_constraint(&self, constr: &Constraint) -> bool {

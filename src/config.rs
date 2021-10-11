@@ -9,6 +9,7 @@ pub struct Config {
     pub domain_product_threshold: usize,
     pub native_linear_encoding_terms: usize,
     pub use_direct_encoding: bool,
+    pub merge_equivalent_variables: bool,
 }
 
 impl Config {
@@ -20,6 +21,7 @@ impl Config {
             domain_product_threshold: 1000,
             native_linear_encoding_terms: 4,
             use_direct_encoding: true,
+            merge_equivalent_variables: false,
         }
     }
 
@@ -48,6 +50,11 @@ impl Config {
                 &mut config.use_direct_encoding,
                 "direct-encoding",
                 "use direct encoding if applicable",
+            ),
+            (
+                &mut config.merge_equivalent_variables,
+                "merge-equivalent-variables",
+                "merge equivalent variables (which is caused by, for example, (iff x y))",
             ),
         ];
         for (opt, name, desc) in &mut bool_flags {

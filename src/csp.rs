@@ -225,6 +225,13 @@ impl BoolExpr {
             _ => None,
         }
     }
+
+    pub fn as_var(&self) -> Option<BoolVar> {
+        match self {
+            &BoolExpr::Var(v) => Some(v),
+            _ => None,
+        }
+    }
 }
 
 impl BitAnd<BoolExpr> for BoolExpr {

@@ -65,7 +65,12 @@ impl IntegratedSolver {
             return None;
         }
 
-        normalize(&mut self.csp, &mut self.norm, &mut self.normalize_map);
+        normalize(
+            &mut self.csp,
+            &mut self.norm,
+            &mut self.normalize_map,
+            &self.config,
+        );
 
         if is_first && self.config.use_norm_domain_refinement {
             self.norm.refine_domain();
@@ -208,9 +213,9 @@ pub struct Model<'a> {
 impl<'a> Model<'a> {
     pub fn get_bool(&self, var: BoolVar) -> bool {
         match self.normalize_map.get_bool_var(var) {
-            Some(norm_var) => {
+            Some(norm_lit) => {
                 self.encode_map
-                    .get_bool_var(norm_var)
+                    .get_bool_lit(norm_lit)
                     .map(|sat_lit| self.model.assignment(sat_lit.var()) ^ sat_lit.is_negated())
                     .unwrap_or(false) // unused variable optimization
             }
