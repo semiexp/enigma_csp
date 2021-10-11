@@ -1,11 +1,13 @@
 use pyo3::prelude::*;
 
+use crate::config::Config;
 use crate::csugar_cli::csugar_cli;
 
 #[pyfunction]
 fn solver(input: String) -> String {
     let mut bytes = input.as_bytes();
-    let res = csugar_cli(&mut bytes);
+    let config = Config::default();
+    let res = csugar_cli(&mut bytes, config);
     res
 }
 

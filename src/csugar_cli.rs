@@ -6,9 +6,7 @@ use super::config::Config;
 use super::integration::IntegratedSolver;
 use super::parser::{parse, ParseResult, Var, VarMap};
 
-pub fn csugar_cli<R: BufRead>(input: &mut R) -> String {
-    let config = Config::parse_from_args();
-
+pub fn csugar_cli<R: BufRead>(input: &mut R, config: Config) -> String {
     let mut var_map = VarMap::new();
     let mut solver = IntegratedSolver::new();
     solver.set_config(config);
