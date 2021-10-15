@@ -337,18 +337,42 @@ fn encode_constraint(env: &mut EncoderEnv, constr: Constraint) {
         }
     }
 
-    fn encode(env: &mut EncoderEnv, mut linear: LinearLit, bool_lit: &Vec<Lit>) {
-        match linear.op {
+    fn encode(env: &mut EncoderEnv, linear: LinearLit, bool_lit: &Vec<Lit>) {
+        // TODO: shared auxiliary variables may deteriorate the performance
+        if linear.op == CmpOp::Eq {
+            let mut linear = linear;
+            linear.op = CmpOp::Ge;
+            encode(env, linear.clone(), bool_lit);
+            linear.sum *= -1;
+            encode(env, linear, bool_lit);
+            return;
+        }
+
+        let (mut decomposed, extra) = decompose_linear_lit(env, &linear);
+
+        for mut linear in extra {
+            match linear.op {
+                CmpOp::Ge => {
+                    encode_linear_ge_order_encoding(env, &linear.sum, &vec![]);
+                }
+                CmpOp::Eq => {
+                    encode_linear_ge_order_encoding(env, &linear.sum, &vec![]);
+                    linear.sum *= -1;
+                    encode_linear_ge_order_encoding(env, &linear.sum, &vec![]);
+                }
+                _ => unreachable!(),
+            }
+        }
+        match decomposed.op {
             CmpOp::Ge => {
-                encode_linear_ge_order_encoding_with_simplification(env, &linear.sum, bool_lit);
+                encode_linear_ge_order_encoding(env, &decomposed.sum, bool_lit);
             }
             CmpOp::Eq => {
-                // TODO: don't create the same aux vars twice
-                encode_linear_ge_order_encoding_with_simplification(env, &linear.sum, bool_lit);
-                linear.sum *= -1;
-                encode_linear_ge_order_encoding_with_simplification(env, &linear.sum, bool_lit);
+                encode_linear_ge_order_encoding(env, &decomposed.sum, bool_lit);
+                decomposed.sum *= -1;
+                encode_linear_ge_order_encoding(env, &decomposed.sum, bool_lit);
             }
-            _ => unimplemented!(),
+            _ => unreachable!(),
         }
     }
 
@@ -499,13 +523,11 @@ impl<'a> LinearInfoForOrderEncoding<'a> {
     }
 }
 
-fn encode_linear_ge_order_encoding_with_simplification(
-    env: &mut EncoderEnv,
-    sum: &LinearSum,
-    bool_lit: &Vec<Lit>,
-) {
+fn decompose_linear_lit(env: &mut EncoderEnv, lit: &LinearLit) -> (LinearLit, Vec<LinearLit>) {
+    assert!(lit.op == CmpOp::Ge || lit.op == CmpOp::Eq);
+
     let mut heap = BinaryHeap::new();
-    for (&var, &coef) in &sum.term {
+    for (&var, &coef) in &lit.sum.term {
         let dom_size = env.map.int_map[var]
             .as_ref()
             .unwrap()
@@ -514,6 +536,8 @@ fn encode_linear_ge_order_encoding_with_simplification(
             .len();
         heap.push(Reverse((dom_size, var, coef)));
     }
+
+    let mut ret = vec![];
 
     let mut pending: Vec<(usize, IntVar, CheckedInt)> = vec![];
     let mut dom_product = 1usize;
@@ -535,8 +559,8 @@ fn encode_linear_ge_order_encoding_with_simplification(
                 rem_sum.add_coef(var, coef);
             }
             let rem_dom = env.norm_vars.get_domain_linear_sum(&rem_sum);
-            aux_dom.refine_upper_bound(-(sum.constant + rem_dom.lower_bound_checked()));
-            aux_dom.refine_lower_bound(-(sum.constant + rem_dom.upper_bound_checked()));
+            aux_dom.refine_upper_bound(-(lit.sum.constant + rem_dom.lower_bound_checked()));
+            aux_dom.refine_lower_bound(-(lit.sum.constant + rem_dom.upper_bound_checked()));
 
             let aux_var = env
                 .norm_vars
@@ -546,12 +570,7 @@ fn encode_linear_ge_order_encoding_with_simplification(
 
             // aux_sum >= aux_var
             aux_sum.add_coef(aux_var, CheckedInt::new(-1));
-            if pending.len() + 1 <= env.config.native_linear_encoding_terms {
-                // TODO: make this parameter configurable
-                encode_linear_ge_order_encoding_native(env, &aux_sum, &vec![]);
-            } else {
-                encode_linear_ge_order_encoding(env, &aux_sum, &vec![]);
-            }
+            ret.push(LinearLit::new(aux_sum, lit.op));
 
             pending.clear();
             let dom_size = env.map.int_map[aux_var]
@@ -569,11 +588,19 @@ fn encode_linear_ge_order_encoding_with_simplification(
         heap.pop();
     }
 
-    let mut sum = LinearSum::constant(sum.constant);
+    let mut sum = LinearSum::constant(lit.sum.constant);
     for &(_, var, coef) in &pending {
         sum.add_coef(var, coef);
     }
-    encode_linear_ge_order_encoding(env, &sum, bool_lit);
+    (LinearLit::new(sum, lit.op), ret)
+}
+
+fn encode_linear_ge_order_encoding(env: &mut EncoderEnv, sum: &LinearSum, bool_lit: &Vec<Lit>) {
+    if bool_lit.is_empty() && sum.len() <= env.config.native_linear_encoding_terms {
+        encode_linear_ge_order_encoding_native(env, sum, bool_lit);
+    } else {
+        encode_linear_ge_order_encoding_literals(env, sum, bool_lit);
+    }
 }
 
 fn encode_linear_ge_order_encoding_native(
@@ -615,8 +642,11 @@ fn encode_linear_ge_order_encoding_native(
         .add_order_encoding_linear(lits, domain, coefs, constant);
 }
 
-fn encode_linear_ge_order_encoding(env: &mut EncoderEnv, sum: &LinearSum, bool_lit: &Vec<Lit>) {
-    // TODO: better ordering of variables
+fn encode_linear_ge_order_encoding_literals(
+    env: &mut EncoderEnv,
+    sum: &LinearSum,
+    bool_lit: &Vec<Lit>,
+) {
     let mut coef = vec![];
     let mut encoding = vec![];
     for (v, c) in sum.terms() {
