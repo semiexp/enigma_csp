@@ -10,6 +10,7 @@ pub struct Config {
     pub native_linear_encoding_terms: usize,
     pub use_direct_encoding: bool,
     pub merge_equivalent_variables: bool,
+    pub verbose: bool,
 }
 
 impl Config {
@@ -22,6 +23,7 @@ impl Config {
             native_linear_encoding_terms: 4,
             use_direct_encoding: true,
             merge_equivalent_variables: false,
+            verbose: false,
         }
     }
 
@@ -56,6 +58,7 @@ impl Config {
                 "merge-equivalent-variables",
                 "merge equivalent variables (which is caused by, for example, (iff x y))",
             ),
+            (&mut config.verbose, "verbose", "show verbose outputs"),
         ];
         for (opt, name, desc) in &mut bool_flags {
             if **opt {

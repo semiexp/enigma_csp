@@ -61,13 +61,14 @@ impl NormalizeMap {
     }
 }
 
-struct NormalizerEnv<'a, 'b, 'c> {
+struct NormalizerEnv<'a, 'b, 'c, 'd> {
     csp_vars: &'a mut CSPVars,
     norm: &'b mut NormCSP,
     map: &'c mut NormalizeMap,
+    config: &'d Config,
 }
 
-impl<'a, 'b, 'c> NormalizerEnv<'a, 'b, 'c> {
+impl<'a, 'b, 'c, 'd> NormalizerEnv<'a, 'b, 'c, 'd> {
     fn convert_bool_var(&mut self, var: BoolVar) -> NBoolLit {
         self.map.convert_bool_var(self.csp_vars, self.norm, var)
     }
@@ -83,6 +84,7 @@ pub fn normalize(csp: &mut CSP, norm: &mut NormCSP, map: &mut NormalizeMap, conf
         csp_vars: &mut csp.vars,
         norm,
         map,
+        config,
     };
 
     if config.merge_equivalent_variables {
@@ -128,6 +130,14 @@ pub fn normalize(csp: &mut CSP, norm: &mut NormCSP, map: &mut NormalizeMap, conf
 }
 
 fn normalize_stmt(env: &mut NormalizerEnv, stmt: Stmt) {
+    if env.config.verbose {
+        let mut buf = Vec::<u8>::new();
+        stmt.pretty_print(&mut buf).unwrap();
+        eprintln!("{}", String::from_utf8(buf).unwrap());
+    }
+
+    let num_constrs_before_norm = env.norm.constraints.len();
+
     match stmt {
         Stmt::Expr(expr) => normalize_and_register_expr(env, expr),
         Stmt::AllDifferent(_exprs) => {
@@ -154,6 +164,13 @@ fn normalize_stmt(env: &mut NormalizerEnv, stmt: Stmt) {
                     vertices_converted,
                     edges,
                 ));
+        }
+    }
+    if env.config.verbose {
+        for i in num_constrs_before_norm..env.norm.constraints.len() {
+            let mut buf = Vec::<u8>::new();
+            env.norm.constraints[i].pretty_print(&mut buf).unwrap();
+            eprintln!("{}", String::from_utf8(buf).unwrap());
         }
     }
 }

@@ -57,8 +57,10 @@ impl IntegratedSolver {
         self.already_used = true;
 
         if self.config.use_constant_folding {
-            self.csp
-                .optimize(is_first && self.config.use_constant_propagation);
+            self.csp.optimize(
+                is_first && self.config.use_constant_propagation,
+                self.config.verbose,
+            );
         }
 
         if self.csp.is_inconsistent() {

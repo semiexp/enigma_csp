@@ -1,6 +1,7 @@
 use crate::arithmetic::CheckedInt;
 use crate::util::{ConvertMapIndex, UpdateStatus};
 use std::collections::{btree_map, BTreeMap};
+use std::io::Write;
 use std::ops::{Add, BitAnd, BitOr, BitXor, Mul, Not, Sub};
 
 use super::CmpOp;
@@ -192,6 +193,40 @@ pub enum Stmt {
     ActiveVerticesConnected(Vec<BoolExpr>, Vec<(usize, usize)>),
 }
 
+impl Stmt {
+    pub fn pretty_print<W: Write>(&self, out: &mut W) -> std::io::Result<()> {
+        match self {
+            Stmt::Expr(e) => e.pretty_print(out)?,
+            Stmt::AllDifferent(exprs) => {
+                write!(out, "(alldifferent")?;
+                for expr in exprs {
+                    write!(out, " ")?;
+                    expr.pretty_print(out)?;
+                }
+                write!(out, ")")?;
+            }
+            Stmt::ActiveVerticesConnected(exprs, edges) => {
+                write!(out, "(active-vertices-connected")?;
+                for (i, expr) in exprs.iter().enumerate() {
+                    write!(out, " {}:", i)?;
+                    expr.pretty_print(out)?;
+                }
+                write!(out, " graph=[")?;
+                let mut is_first = true;
+                for &(u, v) in edges {
+                    if !is_first {
+                        write!(out, " ")?;
+                    } else {
+                        is_first = false;
+                    }
+                    write!(out, "{}--{}", u, v)?;
+                }
+                write!(out, "])")?;
+            }
+        }
+        Ok(())
+    }
+}
 #[derive(Clone, Hash, PartialEq, Eq, Debug)]
 pub enum BoolExpr {
     Const(bool),
@@ -231,6 +266,75 @@ impl BoolExpr {
             &BoolExpr::Var(v) => Some(v),
             _ => None,
         }
+    }
+
+    pub fn pretty_print<W: Write>(&self, out: &mut W) -> std::io::Result<()> {
+        match self {
+            &BoolExpr::Const(b) => write!(out, "{}", b)?,
+            &BoolExpr::Var(v) => write!(out, "<b{}>", v.0)?,
+            &BoolExpr::NVar(v) => write!(out, "<nb{}>", v.id())?,
+            BoolExpr::And(exprs) => {
+                write!(out, "(&&")?;
+                for expr in exprs {
+                    write!(out, " ")?;
+                    expr.pretty_print(out)?;
+                }
+                write!(out, ")")?;
+            }
+            BoolExpr::Or(exprs) => {
+                write!(out, "(||")?;
+                for expr in exprs {
+                    write!(out, " ")?;
+                    expr.pretty_print(out)?;
+                }
+                write!(out, ")")?;
+            }
+            BoolExpr::Not(expr) => {
+                write!(out, "(! ")?;
+                expr.pretty_print(out)?;
+                write!(out, ")")?;
+            }
+            BoolExpr::Xor(e1, e2) => {
+                write!(out, "(xor ")?;
+                e1.pretty_print(out)?;
+                write!(out, " ")?;
+                e2.pretty_print(out)?;
+                write!(out, ")")?;
+            }
+            BoolExpr::Iff(e1, e2) => {
+                write!(out, "(iff ")?;
+                e1.pretty_print(out)?;
+                write!(out, " ")?;
+                e2.pretty_print(out)?;
+                write!(out, ")")?;
+            }
+            BoolExpr::Imp(e1, e2) => {
+                write!(out, "(=> ")?;
+                e1.pretty_print(out)?;
+                write!(out, " ")?;
+                e2.pretty_print(out)?;
+                write!(out, ")")?;
+            }
+            BoolExpr::Cmp(op, e1, e2) => {
+                write!(
+                    out,
+                    "({} ",
+                    match op {
+                        CmpOp::Eq => "==",
+                        CmpOp::Ne => "!=",
+                        CmpOp::Le => "<=",
+                        CmpOp::Lt => "<",
+                        CmpOp::Ge => ">=",
+                        CmpOp::Gt => ">",
+                    }
+                )?;
+                e1.pretty_print(out)?;
+                write!(out, " ")?;
+                e2.pretty_print(out)?;
+                write!(out, ")")?;
+            }
+        }
+        Ok(())
     }
 }
 
@@ -298,6 +402,38 @@ impl IntExpr {
 
     pub fn gt(self, rhs: IntExpr) -> BoolExpr {
         BoolExpr::Cmp(CmpOp::Gt, Box::new(self), Box::new(rhs))
+    }
+
+    pub fn pretty_print<W: Write>(&self, out: &mut W) -> std::io::Result<()> {
+        match self {
+            &IntExpr::Const(c) => write!(out, "{}", c)?,
+            &IntExpr::Var(v) => write!(out, "<i{}>", v.0)?,
+            &IntExpr::NVar(v) => write!(out, "<ni{}>", v.id())?,
+            IntExpr::Linear(terms) => {
+                write!(out, "(")?;
+                let mut is_first = true;
+                for (expr, coef) in terms {
+                    if !is_first {
+                        write!(out, "+")?;
+                    } else {
+                        is_first = false;
+                    }
+                    expr.pretty_print(out)?;
+                    write!(out, "*{}", coef)?;
+                }
+                write!(out, ")")?;
+            }
+            IntExpr::If(cond, t, f) => {
+                write!(out, "(if ")?;
+                cond.pretty_print(out)?;
+                write!(out, " ")?;
+                t.pretty_print(out)?;
+                write!(out, " ")?;
+                f.pretty_print(out)?;
+                write!(out, ")")?;
+            }
+        }
+        Ok(())
     }
 }
 
@@ -645,7 +781,15 @@ impl CSP {
         }
     }
 
-    pub fn optimize(&mut self, use_propagate: bool) {
+    pub fn optimize(&mut self, use_propagate: bool, verbose: bool) {
+        let mut pp_before_optimize = vec![];
+        if verbose {
+            for stmt in &self.constraints {
+                let mut buf = Vec::<u8>::new();
+                stmt.pretty_print(&mut buf).unwrap();
+                pp_before_optimize.push(String::from_utf8(buf).unwrap());
+            }
+        }
         if use_propagate {
             loop {
                 self.apply_constant_folding();
@@ -670,6 +814,20 @@ impl CSP {
             }
         } else {
             self.apply_constant_folding();
+        }
+
+        if verbose {
+            let mut pp_after_optimize = vec![];
+            for stmt in &self.constraints {
+                let mut buf = Vec::<u8>::new();
+                stmt.pretty_print(&mut buf).unwrap();
+                pp_after_optimize.push(String::from_utf8(buf).unwrap());
+            }
+
+            assert_eq!(pp_before_optimize.len(), pp_after_optimize.len());
+            for i in 0..pp_before_optimize.len() {
+                eprintln!("{} -> {}", pp_before_optimize[i], pp_after_optimize[i]);
+            }
         }
     }
 }

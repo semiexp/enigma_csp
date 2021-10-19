@@ -11,6 +11,12 @@ use crate::util::{ConvertMapIndex, UpdateStatus};
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug, Hash)]
 pub struct BoolVar(usize);
 
+impl BoolVar {
+    pub fn id(&self) -> usize {
+        self.0
+    }
+}
+
 impl ConvertMapIndex for BoolVar {
     fn to_index(&self) -> usize {
         self.0
@@ -19,6 +25,12 @@ impl ConvertMapIndex for BoolVar {
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug, Hash)]
 pub struct IntVar(usize);
+
+impl IntVar {
+    pub fn id(&self) -> usize {
+        self.0
+    }
+}
 
 impl ConvertMapIndex for IntVar {
     fn to_index(&self) -> usize {
@@ -322,6 +334,53 @@ impl Constraint {
 
     pub fn add_linear(&mut self, lit: LinearLit) {
         self.linear_lit.push(lit);
+    }
+
+    pub fn pretty_print<W: std::io::Write>(&self, out: &mut W) -> std::io::Result<()> {
+        write!(out, "[")?;
+        let mut is_first = true;
+        for lit in &self.bool_lit {
+            if !is_first {
+                write!(out, " ")?;
+            } else {
+                is_first = false;
+            }
+            if lit.negated {
+                write!(out, "!")?;
+            }
+            write!(out, "<nb{}>", lit.var.id())?;
+        }
+
+        for lit in &self.linear_lit {
+            if !is_first {
+                write!(out, " ")?;
+            } else {
+                is_first = false;
+            }
+
+            for (i, (var, coef)) in lit.sum.iter().enumerate() {
+                if i > 0 {
+                    write!(out, "+")?;
+                }
+                write!(out, "<ni{}>*{}", var.id(), coef.get())?;
+            }
+
+            write!(
+                out,
+                "+{}{}0",
+                lit.sum.constant.get(),
+                match lit.op {
+                    CmpOp::Eq => "==",
+                    CmpOp::Ne => "!=",
+                    CmpOp::Le => "<=",
+                    CmpOp::Lt => "<",
+                    CmpOp::Ge => ">=",
+                    CmpOp::Gt => ">",
+                }
+            )?;
+        }
+        write!(out, "]")?;
+        Ok(())
     }
 }
 
