@@ -359,6 +359,8 @@ fn normalize_disjunction(
         if constrs.iter().any(|constr| constr.len() == 0) {
             return vec![];
         }
+
+        let mut complex_constr = vec![];
         for mut constr in constrs {
             if constr.len() == 0 {
                 unreachable!();
@@ -367,12 +369,36 @@ fn normalize_disjunction(
                 aux.bool_lit.extend(c.bool_lit);
                 aux.linear_lit.extend(c.linear_lit);
             } else {
-                let v = env.norm.new_bool_var();
-                aux.add_bool(NBoolLit::new(v, false));
+                complex_constr.push(constr);
+            }
+        }
+        if complex_constr.len() == 2 && aux.bool_lit.len() == 0 && aux.linear_lit.len() == 0 {
+            let v = env.norm.new_bool_var();
+            for (i, constr) in complex_constr.into_iter().enumerate() {
                 for mut con in constr {
-                    con.add_bool(NBoolLit::new(v, true));
+                    con.add_bool(NBoolLit::new(v, i == 0));
                     ret.push(con);
                 }
+            }
+            return ret;
+        }
+        if complex_constr.len() == 1 && aux.bool_lit.len() <= 1 && aux.linear_lit.len() == 0 {
+            for constr in complex_constr {
+                for mut con in constr {
+                    for &lit in &aux.bool_lit {
+                        con.add_bool(lit);
+                    }
+                    ret.push(con);
+                }
+            }
+            return ret;
+        }
+        for constr in complex_constr {
+            let v = env.norm.new_bool_var();
+            aux.add_bool(NBoolLit::new(v, false));
+            for mut con in constr {
+                con.add_bool(NBoolLit::new(v, true));
+                ret.push(con);
             }
         }
 
@@ -422,7 +448,17 @@ fn normalize_int_expr(env: &mut NormalizerEnv, expr: &IntExpr) -> LinearSum {
                         let v = env.norm.new_binary_int_var(c, val_true, val_false);
                         return LinearSum::singleton(v);
                     }
-                    _ => (),
+                    _ => {
+                        let b = env.norm.new_bool_var();
+                        let constr =
+                            normalize_bool_expr(env, &BoolExpr::NVar(b).iff(*c.clone()), false);
+                        for c in constr {
+                            env.norm.add_constraint(c);
+                        }
+
+                        let v = env.norm.new_binary_int_var(b, val_true, val_false);
+                        return LinearSum::singleton(v);
+                    }
                 }
             }
 
