@@ -2,6 +2,7 @@ extern crate getopts;
 use getopts::Options;
 use std::env;
 
+#[derive(Clone)]
 pub struct Config {
     pub use_constant_folding: bool,
     pub use_constant_propagation: bool,
@@ -14,7 +15,7 @@ pub struct Config {
 }
 
 impl Config {
-    pub fn default() -> Config {
+    pub const fn default() -> Config {
         Config {
             use_constant_folding: true,
             use_constant_propagation: true,
