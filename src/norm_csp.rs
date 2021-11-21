@@ -518,7 +518,9 @@ impl NormCSPVars {
             CmpOp::Eq | CmpOp::Ne => unreachable!(),
         }
 
-        if target_coef > 0 {
+        if range_other.is_empty() {
+            Range::empty()
+        } else if target_coef > 0 {
             let lb = (-range_other.high).div_ceil(target_coef);
             Range::at_least(lb)
         } else {
@@ -803,5 +805,33 @@ mod tests {
             norm_csp.vars.int_var(b).as_domain().upper_bound_checked(),
             CheckedInt::new(43)
         );
+    }
+
+    #[test]
+    fn test_norm_csp_refinement3() {
+        let mut norm_csp = NormCSP::new();
+
+        let a = norm_csp.new_int_var(Domain::range(1, 2));
+        let b = norm_csp.new_int_var(Domain::range(3, 4));
+        let c = norm_csp.new_int_var(Domain::range(7, 8));
+
+        let mut constraint1 = Constraint::new();
+        constraint1.add_linear(LinearLit::new(
+            construct_linear_sum(&[(a, 1), (b, 1), (c, -1)], 0),
+            CmpOp::Ge,
+        ));
+
+        assert_eq!(
+            norm_csp.vars.refine_domain(&constraint1),
+            UpdateStatus::Unsatisfiable
+        );
+
+        let mut constraint2 = Constraint::new();
+        constraint2.add_linear(LinearLit::new(
+            construct_linear_sum(&[(a, 1), (b, 1), (c, -1)], -10),
+            CmpOp::Le,
+        ));
+
+        norm_csp.vars.refine_domain(&constraint1);
     }
 }
