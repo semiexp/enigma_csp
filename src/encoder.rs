@@ -8,7 +8,7 @@ use super::norm_csp::{
 };
 use super::sat::{Lit, SATModel, SAT};
 use super::CmpOp;
-use crate::arithmetic::CheckedInt;
+use crate::arithmetic::{CheckedInt, Range};
 use crate::util::ConvertMap;
 
 /// Order encoding of an integer variable with domain of `domain`.
@@ -18,9 +18,29 @@ struct OrderEncoding {
     lits: Vec<Lit>,
 }
 
+impl OrderEncoding {
+    fn range(&self) -> Range {
+        if self.domain.is_empty() {
+            Range::empty()
+        } else {
+            Range::new(self.domain[0], self.domain[self.domain.len() - 1])
+        }
+    }
+}
+
 struct DirectEncoding {
     domain: Vec<CheckedInt>,
     lits: Vec<Lit>,
+}
+
+impl DirectEncoding {
+    fn range(&self) -> Range {
+        if self.domain.is_empty() {
+            Range::empty()
+        } else {
+            Range::new(self.domain[0], self.domain[self.domain.len() - 1])
+        }
+    }
 }
 
 enum Encoding {
@@ -47,6 +67,13 @@ impl Encoding {
         match self {
             Encoding::DirectEncoding(_) => true,
             _ => false,
+        }
+    }
+
+    fn range(&self) -> Range {
+        match self {
+            Encoding::OrderEncoding(encoding) => encoding.range(),
+            Encoding::DirectEncoding(encoding) => encoding.range(),
         }
     }
 }
@@ -300,6 +327,47 @@ fn encode_constraint(env: &mut EncoderEnv, constr: Constraint) {
                 return;
             }
             continue;
+        }
+
+        // Unsatisfiable literals should be removed.
+        // Otherwise, panic may happen (test_integration_csp_optimization3)
+        let mut range = Range::constant(linear_lit.sum.constant);
+        for (var, coef) in linear_lit.sum.terms() {
+            let encoding = env.map.int_map[var].as_ref().unwrap();
+            let var_range = encoding.range();
+            range = range + var_range * coef;
+        }
+        match linear_lit.op {
+            CmpOp::Eq => {
+                if range.low > 0 || range.high < 0 {
+                    continue;
+                }
+            }
+            CmpOp::Ne => {
+                if range.low == 0 && range.high == 0 {
+                    continue;
+                }
+            }
+            CmpOp::Le => {
+                if range.low > 0 {
+                    continue;
+                }
+            }
+            CmpOp::Lt => {
+                if range.low >= 0 {
+                    continue;
+                }
+            }
+            CmpOp::Ge => {
+                if range.high < 0 {
+                    continue;
+                }
+            }
+            CmpOp::Gt => {
+                if range.high <= 0 {
+                    continue;
+                }
+            }
         }
 
         match linear_lit.op {

@@ -1,11 +1,11 @@
 // Normalized CSP
 
 use std::collections::{btree_map, BTreeMap};
-use std::ops::{Add, AddAssign, BitAnd, BitOr, Mul, MulAssign, Not, Sub, SubAssign};
+use std::ops::{Add, AddAssign, Mul, MulAssign, Not, Sub, SubAssign};
 
 use super::csp::Domain;
 use super::CmpOp;
-use crate::arithmetic::CheckedInt;
+use crate::arithmetic::{CheckedInt, Range};
 use crate::util::{ConvertMapIndex, UpdateStatus};
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug, Hash)]
@@ -65,96 +65,6 @@ impl Not for BoolLit {
             var: self.var,
             negated: !self.negated,
         }
-    }
-}
-
-#[derive(Clone, Copy, Debug)]
-struct Range {
-    low: CheckedInt,
-    high: CheckedInt,
-}
-
-impl Range {
-    fn new(low: CheckedInt, high: CheckedInt) -> Range {
-        Range { low, high }
-    }
-
-    pub fn empty() -> Range {
-        Range {
-            low: CheckedInt::max_value(),
-            high: CheckedInt::min_value(),
-        }
-    }
-
-    pub fn any() -> Range {
-        Range {
-            low: CheckedInt::min_value(),
-            high: CheckedInt::max_value(),
-        }
-    }
-
-    fn at_least(c: CheckedInt) -> Range {
-        Range {
-            low: c,
-            high: CheckedInt::max_value(),
-        }
-    }
-
-    fn at_most(c: CheckedInt) -> Range {
-        Range {
-            low: CheckedInt::min_value(),
-            high: c,
-        }
-    }
-
-    fn constant(c: CheckedInt) -> Range {
-        Range { low: c, high: c }
-    }
-
-    pub fn is_empty(&self) -> bool {
-        self.low > self.high
-    }
-}
-
-impl Add<Range> for Range {
-    type Output = Range;
-
-    fn add(self, rhs: Range) -> Self::Output {
-        if self.is_empty() || rhs.is_empty() {
-            Range::empty()
-        } else {
-            Range::new(self.low + rhs.low, self.high + rhs.high)
-        }
-    }
-}
-
-impl Mul<CheckedInt> for Range {
-    type Output = Range;
-
-    fn mul(self, rhs: CheckedInt) -> Self::Output {
-        if self.is_empty() {
-            Range::empty()
-        } else if rhs >= 0 {
-            Range::new(self.low * rhs, self.high * rhs)
-        } else {
-            Range::new(self.high * rhs, self.low * rhs)
-        }
-    }
-}
-
-impl BitAnd<Range> for Range {
-    type Output = Range;
-
-    fn bitand(self, rhs: Range) -> Self::Output {
-        Range::new(self.low.max(rhs.low), self.high.min(rhs.high))
-    }
-}
-
-impl BitOr<Range> for Range {
-    type Output = Range;
-
-    fn bitor(self, rhs: Range) -> Self::Output {
-        Range::new(self.low.min(rhs.low), self.high.max(rhs.high))
     }
 }
 

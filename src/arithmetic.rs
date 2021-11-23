@@ -1,5 +1,5 @@
 use std::cmp::{PartialEq, PartialOrd};
-use std::ops::{Add, AddAssign, Mul, MulAssign, Neg, Sub, SubAssign};
+use std::ops::{Add, AddAssign, BitAnd, BitOr, Mul, MulAssign, Neg, Sub, SubAssign};
 
 /// Integer type for internal use.
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug, Hash)]
@@ -112,6 +112,96 @@ impl PartialOrd<i32> for CheckedInt {
 impl PartialOrd<CheckedInt> for i32 {
     fn partial_cmp(&self, other: &CheckedInt) -> Option<std::cmp::Ordering> {
         Some(self.cmp(&other.0))
+    }
+}
+
+#[derive(Clone, Copy, Debug)]
+pub struct Range {
+    pub low: CheckedInt,
+    pub high: CheckedInt,
+}
+
+impl Range {
+    pub fn new(low: CheckedInt, high: CheckedInt) -> Range {
+        Range { low, high }
+    }
+
+    pub fn empty() -> Range {
+        Range {
+            low: CheckedInt::max_value(),
+            high: CheckedInt::min_value(),
+        }
+    }
+
+    pub fn any() -> Range {
+        Range {
+            low: CheckedInt::min_value(),
+            high: CheckedInt::max_value(),
+        }
+    }
+
+    pub fn at_least(c: CheckedInt) -> Range {
+        Range {
+            low: c,
+            high: CheckedInt::max_value(),
+        }
+    }
+
+    pub fn at_most(c: CheckedInt) -> Range {
+        Range {
+            low: CheckedInt::min_value(),
+            high: c,
+        }
+    }
+
+    pub fn constant(c: CheckedInt) -> Range {
+        Range { low: c, high: c }
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.low > self.high
+    }
+}
+
+impl Add<Range> for Range {
+    type Output = Range;
+
+    fn add(self, rhs: Range) -> Self::Output {
+        if self.is_empty() || rhs.is_empty() {
+            Range::empty()
+        } else {
+            Range::new(self.low + rhs.low, self.high + rhs.high)
+        }
+    }
+}
+
+impl Mul<CheckedInt> for Range {
+    type Output = Range;
+
+    fn mul(self, rhs: CheckedInt) -> Self::Output {
+        if self.is_empty() {
+            Range::empty()
+        } else if rhs >= 0 {
+            Range::new(self.low * rhs, self.high * rhs)
+        } else {
+            Range::new(self.high * rhs, self.low * rhs)
+        }
+    }
+}
+
+impl BitAnd<Range> for Range {
+    type Output = Range;
+
+    fn bitand(self, rhs: Range) -> Self::Output {
+        Range::new(self.low.max(rhs.low), self.high.min(rhs.high))
+    }
+}
+
+impl BitOr<Range> for Range {
+    type Output = Range;
+
+    fn bitor(self, rhs: Range) -> Self::Output {
+        Range::new(self.low.min(rhs.low), self.high.max(rhs.high))
     }
 }
 

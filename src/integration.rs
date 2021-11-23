@@ -591,6 +591,27 @@ mod tests {
     }
 
     #[test]
+    fn test_integration_csp_optimization3() {
+        let mut solver = IntegratedSolver::new();
+
+        let mut vars = vec![];
+        let mut coefs = vec![];
+        for _ in 0..15 {
+            let v = solver.new_bool_var();
+            vars.push(v);
+            coefs.push((
+                Box::new(v.expr().ite(IntExpr::Const(1), IntExpr::Const(0))),
+                1,
+            ));
+        }
+        solver.add_expr(vars[0].expr());
+        solver.add_expr(IntExpr::Linear(coefs).eq(IntExpr::Const(0)));
+
+        let res = solver.solve();
+        assert!(res.is_none());
+    }
+
+    #[test]
     fn test_integration_irrefutable_logic1() {
         let mut solver = IntegratedSolver::new();
 
