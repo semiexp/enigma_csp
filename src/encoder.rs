@@ -518,7 +518,7 @@ enum ExtendedLit {
 }
 
 /// Helper struct for encoding linear constraints on variables represented in order encoding.
-/// With this struct, all coefficients can be virtually treated as positive.
+/// With this struct, all coefficients can be virtually treated as 1.
 struct LinearInfoForOrderEncoding<'a> {
     coef: CheckedInt,
     encoding: &'a OrderEncoding,
@@ -529,11 +529,6 @@ impl<'a> LinearInfoForOrderEncoding<'a> {
         LinearInfoForOrderEncoding { coef, encoding }
     }
 
-    /// Coefficient after normalizing negative coefficients
-    fn coef(&self) -> CheckedInt {
-        self.coef.abs()
-    }
-
     fn domain_size(&self) -> usize {
         self.encoding.domain.len()
     }
@@ -541,9 +536,9 @@ impl<'a> LinearInfoForOrderEncoding<'a> {
     /// j-th smallest domain value after normalizing negative coefficients
     fn domain(&self, j: usize) -> CheckedInt {
         if self.coef > 0 {
-            self.encoding.domain[j]
+            self.encoding.domain[j] * self.coef
         } else {
-            -self.encoding.domain[self.encoding.domain.len() - 1 - j]
+            self.encoding.domain[self.encoding.domain.len() - 1 - j] * self.coef
         }
     }
 
@@ -704,7 +699,7 @@ fn encode_linear_ge_order_encoding_native(
         }
         lits.push(lits_r);
         domain.push(domain_r);
-        coefs.push(info[i].coef().get());
+        coefs.push(1);
     }
 
     env.sat
@@ -739,10 +734,7 @@ fn encode_linear_ge_order_encoding_literals(
             return;
         }
         if idx + 1 == info.len() {
-            let a = info[idx].coef();
-            // a * x >= -constant
-            // x >= ceil(-constant / a)
-            let threshold = (-constant).div_ceil(a);
+            let threshold = -constant;
             match info[idx].at_least_val(threshold) {
                 ExtendedLit::True => (),
                 ExtendedLit::False => sat.add_clause(clause.clone()),
@@ -757,8 +749,8 @@ fn encode_linear_ge_order_encoding_literals(
         let mut min_possible = constant;
         let mut max_possible = constant;
         for i in idx..info.len() {
-            min_possible += info[i].domain_min() * info[i].coef();
-            max_possible += info[i].domain_max() * info[i].coef();
+            min_possible += info[i].domain_min();
+            max_possible += info[i].domain_max();
         }
         if min_possible >= 0 {
             return;
@@ -770,7 +762,7 @@ fn encode_linear_ge_order_encoding_literals(
 
         let domain_size = info[idx].domain_size();
         for j in 0..domain_size {
-            let new_constant = constant + info[idx].domain(j) * info[idx].coef();
+            let new_constant = constant + info[idx].domain(j);
             if j + 1 < domain_size {
                 clause.push(info[idx].at_least(j + 1));
             }
