@@ -43,37 +43,46 @@ impl DirectEncoding {
     }
 }
 
-enum Encoding {
-    OrderEncoding(OrderEncoding),
-    DirectEncoding(DirectEncoding),
+struct Encoding {
+    order_encoding: Option<OrderEncoding>,
+    direct_encoding: Option<DirectEncoding>,
 }
 
 impl Encoding {
-    fn as_order_encoding(&self) -> &OrderEncoding {
-        match self {
-            Encoding::OrderEncoding(e) => e,
-            _ => panic!(),
+    fn order_encoding(enc: OrderEncoding) -> Encoding {
+        Encoding {
+            order_encoding: Some(enc),
+            direct_encoding: None,
         }
+    }
+
+    fn direct_encoding(enc: DirectEncoding) -> Encoding {
+        Encoding {
+            order_encoding: None,
+            direct_encoding: Some(enc),
+        }
+    }
+
+    fn as_order_encoding(&self) -> &OrderEncoding {
+        self.order_encoding.as_ref().unwrap()
     }
 
     fn as_direct_encoding(&self) -> &DirectEncoding {
-        match self {
-            Encoding::DirectEncoding(e) => e,
-            _ => panic!(),
-        }
+        self.direct_encoding.as_ref().unwrap()
     }
 
     fn is_direct_encoding(&self) -> bool {
-        match self {
-            Encoding::DirectEncoding(_) => true,
-            _ => false,
-        }
+        assert!(self.order_encoding.is_some() || self.direct_encoding.is_some());
+        return self.direct_encoding.is_some();
     }
 
     fn range(&self) -> Range {
-        match self {
-            Encoding::OrderEncoding(encoding) => encoding.range(),
-            Encoding::DirectEncoding(encoding) => encoding.range(),
+        if let Some(order_encoding) = &self.order_encoding {
+            order_encoding.range()
+        } else if let Some(direct_encoding) = &self.direct_encoding {
+            direct_encoding.range()
+        } else {
+            panic!();
         }
     }
 }
@@ -129,7 +138,7 @@ impl EncodeMap {
                     }
 
                     self.int_map[var] =
-                        Some(Encoding::OrderEncoding(OrderEncoding { domain, lits }));
+                        Some(Encoding::order_encoding(OrderEncoding { domain, lits }));
                 }
                 &IntVarRepresentation::Binary(cond, t, f) => {
                     let domain;
@@ -142,7 +151,7 @@ impl EncodeMap {
                         lits = vec![!self.convert_bool_var(norm_vars, sat, cond)];
                     }
                     self.int_map[var] =
-                        Some(Encoding::OrderEncoding(OrderEncoding { domain, lits }));
+                        Some(Encoding::order_encoding(OrderEncoding { domain, lits }));
                 }
             }
         }
@@ -165,7 +174,7 @@ impl EncodeMap {
                 }
             }
 
-            self.int_map[var] = Some(Encoding::DirectEncoding(DirectEncoding { domain, lits }));
+            self.int_map[var] = Some(Encoding::direct_encoding(DirectEncoding { domain, lits }));
         }
     }
 
@@ -187,38 +196,37 @@ impl EncodeMap {
         }
         let encoding = self.int_map[var].as_ref().unwrap();
 
-        match encoding {
-            Encoding::OrderEncoding(encoding) => {
-                // Find the number of true value in `encoding.vars`
-                let mut left = 0;
-                let mut right = encoding.lits.len();
-                while left < right {
-                    let mid = (left + right + 1) / 2;
-                    if model.assignment_lit(encoding.lits[mid - 1]) {
-                        left = mid;
-                    } else {
-                        right = mid - 1;
-                    }
+        if let Some(encoding) = &encoding.order_encoding {
+            // Find the number of true value in `encoding.vars`
+            let mut left = 0;
+            let mut right = encoding.lits.len();
+            while left < right {
+                let mid = (left + right + 1) / 2;
+                if model.assignment_lit(encoding.lits[mid - 1]) {
+                    left = mid;
+                } else {
+                    right = mid - 1;
                 }
-                Some(encoding.domain[left as usize])
             }
-            Encoding::DirectEncoding(encoding) => {
-                let mut ret = None;
-                for i in 0..encoding.lits.len() {
-                    if model.assignment_lit(encoding.lits[i]) {
-                        assert!(
-                            ret.is_none(),
-                            "multiple indicator bits are set for a direct-encoded variable"
-                        );
-                        ret = Some(encoding.domain[i as usize]);
-                    }
+            Some(encoding.domain[left as usize])
+        } else if let Some(encoding) = &encoding.direct_encoding {
+            let mut ret = None;
+            for i in 0..encoding.lits.len() {
+                if model.assignment_lit(encoding.lits[i]) {
+                    assert!(
+                        ret.is_none(),
+                        "multiple indicator bits are set for a direct-encoded variable"
+                    );
+                    ret = Some(encoding.domain[i as usize]);
                 }
-                assert!(
-                    ret.is_some(),
-                    "no indicator bits are set for a direct-encoded variable"
-                );
-                ret
             }
+            assert!(
+                ret.is_some(),
+                "no indicator bits are set for a direct-encoded variable"
+            );
+            ret
+        } else {
+            panic!();
         }
     }
 
