@@ -520,65 +520,58 @@ enum ExtendedLit {
 /// Helper struct for encoding linear constraints on variables represented in order encoding.
 /// With this struct, all coefficients can be virtually treated as positive.
 struct LinearInfoForOrderEncoding<'a> {
-    coef: Vec<CheckedInt>,
-    encoding: Vec<&'a OrderEncoding>,
+    coef: CheckedInt,
+    encoding: &'a OrderEncoding,
 }
 
 impl<'a> LinearInfoForOrderEncoding<'a> {
-    pub fn new(
-        coef: Vec<CheckedInt>,
-        encoding: Vec<&'a OrderEncoding>,
-    ) -> LinearInfoForOrderEncoding<'a> {
+    pub fn new(coef: CheckedInt, encoding: &'a OrderEncoding) -> LinearInfoForOrderEncoding<'a> {
         LinearInfoForOrderEncoding { coef, encoding }
     }
 
-    fn len(&self) -> usize {
-        self.coef.len()
+    /// Coefficient after normalizing negative coefficients
+    fn coef(&self) -> CheckedInt {
+        self.coef.abs()
     }
 
-    /// Coefficient of the i-th variable (after normalizing negative coefficients)
-    fn coef(&self, i: usize) -> CheckedInt {
-        self.coef[i].abs()
+    fn domain_size(&self) -> usize {
+        self.encoding.domain.len()
     }
 
-    fn domain_size(&self, i: usize) -> usize {
-        self.encoding[i].domain.len()
-    }
-
-    /// j-th smallest domain value for the i-th variable (after normalizing negative coefficients)
-    fn domain(&self, i: usize, j: usize) -> CheckedInt {
-        if self.coef[i] > 0 {
-            self.encoding[i].domain[j]
+    /// j-th smallest domain value after normalizing negative coefficients
+    fn domain(&self, j: usize) -> CheckedInt {
+        if self.coef > 0 {
+            self.encoding.domain[j]
         } else {
-            -self.encoding[i].domain[self.encoding[i].domain.len() - 1 - j]
+            -self.encoding.domain[self.encoding.domain.len() - 1 - j]
         }
     }
 
-    fn domain_min(&self, i: usize) -> CheckedInt {
-        self.domain(i, 0)
+    fn domain_min(&self) -> CheckedInt {
+        self.domain(0)
     }
 
-    fn domain_max(&self, i: usize) -> CheckedInt {
-        self.domain(i, self.domain_size(i) - 1)
+    fn domain_max(&self) -> CheckedInt {
+        self.domain(self.domain_size() - 1)
     }
 
-    /// The literal asserting that (the value of the i-th variable) is at least `domain(i, j)`.
-    fn at_least(&self, i: usize, j: usize) -> Lit {
-        assert!(0 < j && j < self.encoding[i].domain.len());
-        if self.coef[i] > 0 {
-            self.encoding[i].lits[j - 1]
+    /// The literal asserting that (the value) is at least `domain(i, j)`.
+    fn at_least(&self, j: usize) -> Lit {
+        assert!(0 < j && j < self.encoding.domain.len());
+        if self.coef > 0 {
+            self.encoding.lits[j - 1]
         } else {
-            !self.encoding[i].lits[self.encoding[i].domain.len() - 1 - j]
+            !self.encoding.lits[self.encoding.domain.len() - 1 - j]
         }
     }
 
-    /// The literal asserting (x >= val) under the assumption that x is in the domain of the i-th variable.
-    fn at_least_val(&self, i: usize, val: CheckedInt) -> ExtendedLit {
-        let dom_size = self.domain_size(i);
+    /// The literal asserting (x >= val) under the assumption that x is in the domain.
+    fn at_least_val(&self, val: CheckedInt) -> ExtendedLit {
+        let dom_size = self.domain_size();
 
-        if val <= self.domain(i, 0) {
+        if val <= self.domain(0) {
             ExtendedLit::True
-        } else if val > self.domain(i, dom_size - 1) {
+        } else if val > self.domain(dom_size - 1) {
             ExtendedLit::False
         } else {
             // compute the largest j such that val <= domain[j]
@@ -587,14 +580,14 @@ impl<'a> LinearInfoForOrderEncoding<'a> {
 
             while left < right {
                 let mid = (left + right) / 2;
-                if val <= self.domain(i, mid) {
+                if val <= self.domain(mid) {
                     right = mid;
                 } else {
                     left = mid + 1;
                 }
             }
 
-            ExtendedLit::Lit(self.at_least(i, left))
+            ExtendedLit::Lit(self.at_least(left))
         }
     }
 }
@@ -686,14 +679,14 @@ fn encode_linear_ge_order_encoding_native(
 ) {
     assert!(bool_lit.is_empty()); // TODO
 
-    let mut coef = vec![];
-    let mut encoding = vec![];
+    let mut info = vec![];
     for (v, c) in sum.terms() {
         assert_ne!(c, 0);
-        coef.push(c);
-        encoding.push(env.map.int_map[v].as_ref().unwrap().as_order_encoding());
+        info.push(LinearInfoForOrderEncoding::new(
+            c,
+            env.map.int_map[v].as_ref().unwrap().as_order_encoding(),
+        ));
     }
-    let info = LinearInfoForOrderEncoding::new(coef, encoding);
 
     let mut lits = vec![];
     let mut domain = vec![];
@@ -703,15 +696,15 @@ fn encode_linear_ge_order_encoding_native(
     for i in 0..info.len() {
         let mut lits_r = vec![];
         let mut domain_r = vec![];
-        for j in 0..info.domain_size(i) {
+        for j in 0..info[i].domain_size() {
             if j > 0 {
-                lits_r.push(info.at_least(i, j));
+                lits_r.push(info[i].at_least(j));
             }
-            domain_r.push(info.domain(i, j).get());
+            domain_r.push(info[i].domain(j).get());
         }
         lits.push(lits_r);
         domain.push(domain_r);
-        coefs.push(info.coef(i).get());
+        coefs.push(info[i].coef().get());
     }
 
     env.sat
@@ -723,17 +716,17 @@ fn encode_linear_ge_order_encoding_literals(
     sum: &LinearSum,
     bool_lit: &Vec<Lit>,
 ) {
-    let mut coef = vec![];
-    let mut encoding = vec![];
+    let mut info = vec![];
     for (v, c) in sum.terms() {
         assert_ne!(c, 0);
-        coef.push(c);
-        encoding.push(env.map.int_map[v].as_ref().unwrap().as_order_encoding());
+        info.push(LinearInfoForOrderEncoding::new(
+            c,
+            env.map.int_map[v].as_ref().unwrap().as_order_encoding(),
+        ));
     }
-    let info = LinearInfoForOrderEncoding::new(coef, encoding);
 
     fn encode_sub(
-        info: &LinearInfoForOrderEncoding,
+        info: &[LinearInfoForOrderEncoding],
         sat: &mut SAT,
         clause: &mut Vec<Lit>,
         idx: usize,
@@ -746,11 +739,11 @@ fn encode_linear_ge_order_encoding_literals(
             return;
         }
         if idx + 1 == info.len() {
-            let a = info.coef(idx);
+            let a = info[idx].coef();
             // a * x >= -constant
             // x >= ceil(-constant / a)
             let threshold = (-constant).div_ceil(a);
-            match info.at_least_val(idx, threshold) {
+            match info[idx].at_least_val(threshold) {
                 ExtendedLit::True => (),
                 ExtendedLit::False => sat.add_clause(clause.clone()),
                 ExtendedLit::Lit(lit) => {
@@ -764,8 +757,8 @@ fn encode_linear_ge_order_encoding_literals(
         let mut min_possible = constant;
         let mut max_possible = constant;
         for i in idx..info.len() {
-            min_possible += info.domain_min(i) * info.coef(i);
-            max_possible += info.domain_max(i) * info.coef(i);
+            min_possible += info[i].domain_min() * info[i].coef();
+            max_possible += info[i].domain_max() * info[i].coef();
         }
         if min_possible >= 0 {
             return;
@@ -775,11 +768,11 @@ fn encode_linear_ge_order_encoding_literals(
             return;
         }
 
-        let domain_size = info.domain_size(idx);
+        let domain_size = info[idx].domain_size();
         for j in 0..domain_size {
-            let new_constant = constant + info.domain(idx, j) * info.coef(idx);
+            let new_constant = constant + info[idx].domain(j) * info[idx].coef();
             if j + 1 < domain_size {
-                clause.push(info.at_least(idx, j + 1));
+                clause.push(info[idx].at_least(j + 1));
             }
             encode_sub(info, sat, clause, idx + 1, new_constant);
             if j + 1 < domain_size {
