@@ -542,6 +542,7 @@ impl<'a> LinearInfoForOrderEncoding<'a> {
         }
     }
 
+    #[allow(unused)]
     fn domain_min(&self) -> CheckedInt {
         self.domain(0)
     }
@@ -585,6 +586,48 @@ impl<'a> LinearInfoForOrderEncoding<'a> {
             ExtendedLit::Lit(self.at_least(left))
         }
     }
+}
+
+struct LinearInfoForDirectEncoding<'a> {
+    coef: CheckedInt,
+    encoding: &'a DirectEncoding,
+}
+
+impl<'a> LinearInfoForDirectEncoding<'a> {
+    pub fn new(coef: CheckedInt, encoding: &'a DirectEncoding) -> LinearInfoForDirectEncoding<'a> {
+        LinearInfoForDirectEncoding { coef, encoding }
+    }
+
+    fn domain_size(&self) -> usize {
+        self.encoding.domain.len()
+    }
+
+    fn domain(&self, j: usize) -> CheckedInt {
+        if self.coef > 0 {
+            self.encoding.domain[j] * self.coef
+        } else {
+            self.encoding.domain[self.encoding.domain.len() - 1 - j] * self.coef
+        }
+    }
+
+    #[allow(unused)]
+    fn domain_min(&self) -> CheckedInt {
+        self.domain(0)
+    }
+
+    fn domain_max(&self) -> CheckedInt {
+        self.domain(self.domain_size() - 1)
+    }
+
+    // The literal asserting that (the value) equals `domain(j)`.
+    fn equals(&self, j: usize) -> Lit {
+        self.encoding.lits[j]
+    }
+}
+
+enum LinearInfo<'a> {
+    Order(LinearInfoForOrderEncoding<'a>),
+    Direct(LinearInfoForDirectEncoding<'a>),
 }
 
 fn decompose_linear_lit(env: &mut EncoderEnv, lit: &LinearLit) -> (LinearLit, Vec<LinearLit>) {
@@ -663,7 +706,13 @@ fn encode_linear_ge_order_encoding(env: &mut EncoderEnv, sum: &LinearSum, bool_l
     if bool_lit.is_empty() && sum.len() <= env.config.native_linear_encoding_terms {
         encode_linear_ge_order_encoding_native(env, sum, bool_lit);
     } else {
-        encode_linear_ge_order_encoding_literals(env, sum, bool_lit);
+        // encode_linear_ge_order_encoding_literals(env, sum, bool_lit);
+        let clauses = encode_linear_gt_mixed(env, sum);
+        for mut clause in clauses {
+            let mut c = bool_lit.clone();
+            c.append(&mut clause);
+            env.sat.add_clause(c);
+        }
     }
 }
 
@@ -706,77 +755,6 @@ fn encode_linear_ge_order_encoding_native(
         .add_order_encoding_linear(lits, domain, coefs, constant);
 }
 
-fn encode_linear_ge_order_encoding_literals(
-    env: &mut EncoderEnv,
-    sum: &LinearSum,
-    bool_lit: &Vec<Lit>,
-) {
-    let mut info = vec![];
-    for (v, c) in sum.terms() {
-        assert_ne!(c, 0);
-        info.push(LinearInfoForOrderEncoding::new(
-            c,
-            env.map.int_map[v].as_ref().unwrap().as_order_encoding(),
-        ));
-    }
-
-    fn encode_sub(
-        info: &[LinearInfoForOrderEncoding],
-        sat: &mut SAT,
-        clause: &mut Vec<Lit>,
-        idx: usize,
-        constant: CheckedInt,
-    ) {
-        if idx == info.len() {
-            if constant < 0 {
-                sat.add_clause(clause.clone());
-            }
-            return;
-        }
-        if idx + 1 == info.len() {
-            let threshold = -constant;
-            match info[idx].at_least_val(threshold) {
-                ExtendedLit::True => (),
-                ExtendedLit::False => sat.add_clause(clause.clone()),
-                ExtendedLit::Lit(lit) => {
-                    clause.push(lit);
-                    sat.add_clause(clause.clone());
-                    clause.pop();
-                }
-            }
-            return;
-        }
-        let mut min_possible = constant;
-        let mut max_possible = constant;
-        for i in idx..info.len() {
-            min_possible += info[i].domain_min();
-            max_possible += info[i].domain_max();
-        }
-        if min_possible >= 0 {
-            return;
-        }
-        if max_possible < 0 {
-            sat.add_clause(clause.clone());
-            return;
-        }
-
-        let domain_size = info[idx].domain_size();
-        for j in 0..domain_size {
-            let new_constant = constant + info[idx].domain(j);
-            if j + 1 < domain_size {
-                clause.push(info[idx].at_least(j + 1));
-            }
-            encode_sub(info, sat, clause, idx + 1, new_constant);
-            if j + 1 < domain_size {
-                clause.pop();
-            }
-        }
-    }
-
-    let mut clause = bool_lit.clone();
-    encode_sub(&info, &mut env.sat, &mut clause, 0, sum.constant);
-}
-
 // Return Some(clause) where `clause` encodes `lit` (the truth value of `clause` is equal to that of `lit`),
 // or None when `lit` always holds.
 fn encode_simple_linear_direct_encoding(env: &mut EncoderEnv, lit: &LinearLit) -> Option<Vec<Lit>> {
@@ -807,4 +785,127 @@ fn encode_simple_linear_direct_encoding(env: &mut EncoderEnv, lit: &LinearLit) -
     } else {
         Some(oks)
     }
+}
+
+fn encode_linear_gt_mixed(env: &EncoderEnv, sum: &LinearSum) -> Vec<Vec<Lit>> {
+    let mut info = vec![];
+    for (var, coef) in sum.terms() {
+        let encoding = env.map.int_map[var].as_ref().unwrap();
+
+        if let Some(order_encoding) = &encoding.order_encoding {
+            // Prefer order encoding
+            info.push(LinearInfo::Order(LinearInfoForOrderEncoding::new(
+                coef,
+                order_encoding,
+            )));
+        } else if let Some(direct_encoding) = &encoding.direct_encoding {
+            info.push(LinearInfo::Direct(LinearInfoForDirectEncoding::new(
+                coef,
+                direct_encoding,
+            )));
+        }
+    }
+
+    fn encode_sub(
+        info: &[LinearInfo],
+        clause: &mut Vec<Lit>,
+        idx: usize,
+        upper_bound: CheckedInt,
+        min_relax_on_erasure: Option<CheckedInt>,
+        clauses_buf: &mut Vec<Vec<Lit>>,
+    ) {
+        if upper_bound < 0 {
+            if let Some(min_relax_on_erasure) = min_relax_on_erasure {
+                if upper_bound + min_relax_on_erasure < 0 {
+                    return;
+                }
+            }
+            clauses_buf.push(clause.clone());
+            return;
+        }
+        if idx == info.len() {
+            return;
+        }
+
+        match &info[idx] {
+            LinearInfo::Order(order_encoding) => {
+                if idx + 1 == info.len() {
+                    match order_encoding.at_least_val(-(upper_bound - order_encoding.domain_max()))
+                    {
+                        ExtendedLit::True => (),
+                        ExtendedLit::False => panic!(),
+                        ExtendedLit::Lit(lit) => {
+                            clause.push(lit);
+                            clauses_buf.push(clause.clone());
+                            clause.pop();
+                        }
+                    }
+                    return;
+                }
+                let ub_for_this_term = order_encoding.domain_max();
+
+                for i in 0..(order_encoding.domain_size() - 1) {
+                    // assume (value) <= domain[i]
+                    let value = order_encoding.domain(i);
+                    let next_ub = upper_bound - ub_for_this_term + value;
+                    // let next_min_relax = min_relax_on_erasure.unwrap_or(CheckedInt::max_value()).min(order_encoding.domain(i + 1) - value);
+                    clause.push(order_encoding.at_least(i + 1));
+                    encode_sub(info, clause, idx + 1, next_ub, None, clauses_buf);
+                    clause.pop();
+                }
+
+                encode_sub(
+                    info,
+                    clause,
+                    idx + 1,
+                    upper_bound,
+                    min_relax_on_erasure,
+                    clauses_buf,
+                );
+            }
+            LinearInfo::Direct(direct_encoding) => {
+                let ub_for_this_term = direct_encoding.domain_max();
+
+                for i in 0..(direct_encoding.domain_size() - 1) {
+                    let value = direct_encoding.domain(i);
+                    let next_ub = upper_bound - ub_for_this_term + value;
+                    let next_min_relax = min_relax_on_erasure
+                        .unwrap_or(CheckedInt::max_value())
+                        .min(ub_for_this_term - value);
+                    clause.push(!direct_encoding.equals(i));
+                    encode_sub(
+                        info,
+                        clause,
+                        idx + 1,
+                        next_ub,
+                        Some(next_min_relax),
+                        clauses_buf,
+                    );
+                    clause.pop();
+                }
+
+                encode_sub(
+                    info,
+                    clause,
+                    idx + 1,
+                    upper_bound,
+                    min_relax_on_erasure,
+                    clauses_buf,
+                );
+            }
+        }
+    }
+
+    let mut upper_bound = sum.constant;
+    for linear in &info {
+        upper_bound += match linear {
+            LinearInfo::Order(order_encoding) => order_encoding.domain_max(),
+            LinearInfo::Direct(direct_encoding) => direct_encoding.domain_max(),
+        };
+    }
+
+    let mut clauses_buf: Vec<Vec<Lit>> = vec![];
+    encode_sub(&info, &mut vec![], 0, upper_bound, None, &mut clauses_buf);
+
+    clauses_buf
 }
