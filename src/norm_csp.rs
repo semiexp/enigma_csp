@@ -315,23 +315,6 @@ impl IntVarRepresentation {
         }
     }
 
-    pub(super) fn enumerate(&self) -> Vec<CheckedInt> {
-        match self {
-            IntVarRepresentation::Domain(domain) => domain.enumerate(),
-            IntVarRepresentation::Binary(_, t, f) => {
-                let mut ret = vec![];
-                if *t < *f {
-                    ret.push(*t);
-                    ret.push(*f);
-                } else {
-                    ret.push(*f);
-                    ret.push(*t);
-                }
-                ret
-            }
-        }
-    }
-
     pub(super) fn lower_bound_checked(&self) -> CheckedInt {
         match self {
             IntVarRepresentation::Domain(domain) => domain.lower_bound_checked(),

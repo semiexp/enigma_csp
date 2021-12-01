@@ -164,17 +164,36 @@ impl EncodeMap {
         var: IntVar,
     ) {
         if self.int_map[var].is_none() {
-            let domain = norm_vars.int_var(var).enumerate();
-            assert_ne!(domain.len(), 0);
-            let lits = sat.new_vars_as_lits(domain.len());
-            sat.add_clause(lits.clone());
-            for i in 1..lits.len() {
-                for j in 0..i {
-                    sat.add_clause(vec![!lits[i], !lits[j]]);
+            match norm_vars.int_var(var) {
+                IntVarRepresentation::Domain(domain) => {
+                    let domain = domain.enumerate();
+                    assert_ne!(domain.len(), 0);
+                    let lits = sat.new_vars_as_lits(domain.len());
+                    sat.add_clause(lits.clone());
+                    for i in 1..lits.len() {
+                        for j in 0..i {
+                            sat.add_clause(vec![!lits[i], !lits[j]]);
+                        }
+                    }
+
+                    self.int_map[var] =
+                        Some(Encoding::direct_encoding(DirectEncoding { domain, lits }));
+                }
+                &IntVarRepresentation::Binary(cond, t, f) => {
+                    let c = self.convert_bool_var(norm_vars, sat, cond);
+                    let domain;
+                    let lits;
+                    if f <= t {
+                        domain = vec![f, t];
+                        lits = vec![!c, c];
+                    } else {
+                        domain = vec![t, f];
+                        lits = vec![c, !c];
+                    }
+                    self.int_map[var] =
+                        Some(Encoding::direct_encoding(DirectEncoding { domain, lits }));
                 }
             }
-
-            self.int_map[var] = Some(Encoding::direct_encoding(DirectEncoding { domain, lits }));
         }
     }
 
@@ -621,7 +640,11 @@ impl<'a> LinearInfoForDirectEncoding<'a> {
 
     // The literal asserting that (the value) equals `domain(j)`.
     fn equals(&self, j: usize) -> Lit {
-        self.encoding.lits[j]
+        if self.coef > 0 {
+            self.encoding.lits[j]
+        } else {
+            self.encoding.lits[self.domain_size() - 1 - j]
+        }
     }
 }
 
@@ -635,12 +658,14 @@ fn decompose_linear_lit(env: &mut EncoderEnv, lit: &LinearLit) -> (LinearLit, Ve
 
     let mut heap = BinaryHeap::new();
     for (&var, &coef) in &lit.sum.term {
-        let dom_size = env.map.int_map[var]
-            .as_ref()
-            .unwrap()
-            .as_order_encoding()
-            .domain
-            .len();
+        let encoding = env.map.int_map[var].as_ref().unwrap();
+        let dom_size = if let Some(order_encoding) = &encoding.order_encoding {
+            order_encoding.domain.len()
+        } else if let Some(direct_encoding) = &encoding.direct_encoding {
+            direct_encoding.domain.len()
+        } else {
+            panic!();
+        };
         heap.push(Reverse((dom_size, var, coef)));
     }
 
@@ -703,7 +728,21 @@ fn decompose_linear_lit(env: &mut EncoderEnv, lit: &LinearLit) -> (LinearLit, Ve
 }
 
 fn encode_linear_ge_order_encoding(env: &mut EncoderEnv, sum: &LinearSum, bool_lit: &Vec<Lit>) {
-    if bool_lit.is_empty() && sum.len() <= env.config.native_linear_encoding_terms {
+    let mut support_order_encoding_all = true;
+    for (var, _) in sum.terms() {
+        if env.map.int_map[var]
+            .as_ref()
+            .unwrap()
+            .order_encoding
+            .is_none()
+        {
+            support_order_encoding_all = false;
+        }
+    }
+    if support_order_encoding_all
+        && bool_lit.is_empty()
+        && sum.len() <= env.config.native_linear_encoding_terms
+    {
         encode_linear_ge_order_encoding_native(env, sum, bool_lit);
     } else {
         // encode_linear_ge_order_encoding_literals(env, sum, bool_lit);
