@@ -564,6 +564,39 @@ mod tests {
     }
 
     #[test]
+    fn test_integration_bool_lit_after_decomposition() {
+        let mut config = Config::default();
+        config.domain_product_threshold = 1;
+        let mut solver = IntegratedSolver::new();
+        solver.set_config(config);
+
+        let x = solver.new_bool_var();
+
+        let a = solver.new_int_var(Domain::range(0, 5));
+        let b = solver.new_int_var(Domain::range(0, 5));
+        let c = solver.new_int_var(Domain::range(0, 5));
+        let d = solver.new_int_var(Domain::range(0, 5));
+        let e = solver.new_int_var(Domain::range(0, 5));
+
+        solver.add_expr(
+            x.expr()
+                .imp((a.expr() + b.expr() + c.expr() + d.expr()).le(e.expr())),
+        );
+        solver.add_expr(x.expr().imp(a.expr().ge(IntExpr::Const(4))));
+        solver.add_expr(x.expr().imp(b.expr().ge(IntExpr::Const(4))));
+        solver.add_expr((!x.expr()).imp(a.expr().ge(IntExpr::Const(4))));
+        solver.add_expr((!x.expr()).imp(b.expr().ge(IntExpr::Const(4))));
+        solver.add_expr((!x.expr()).imp(c.expr().ge(IntExpr::Const(4))));
+        solver.add_expr((!x.expr()).imp(d.expr().ge(IntExpr::Const(4))));
+        solver.add_expr((!x.expr()).imp(e.expr().ge(IntExpr::Const(4))));
+
+        let res = solver.solve();
+        assert!(res.is_some());
+        let res = res.unwrap();
+        assert_eq!(res.get_bool(x), false);
+    }
+
+    #[test]
     fn test_integration_csp_optimization1() {
         let mut solver = IntegratedSolver::new();
 

@@ -430,12 +430,12 @@ fn encode_constraint(env: &mut EncoderEnv, constr: Constraint) {
         for mut linear in extra {
             match linear.op {
                 CmpOp::Ge => {
-                    encode_linear_ge_order_encoding(env, &linear.sum, &vec![]);
+                    encode_linear_ge_order_encoding(env, &linear.sum, bool_lit);
                 }
                 CmpOp::Eq => {
-                    encode_linear_ge_order_encoding(env, &linear.sum, &vec![]);
+                    encode_linear_ge_order_encoding(env, &linear.sum, bool_lit);
                     linear.sum *= -1;
-                    encode_linear_ge_order_encoding(env, &linear.sum, &vec![]);
+                    encode_linear_ge_order_encoding(env, &linear.sum, bool_lit);
                 }
                 _ => unreachable!(),
             }
