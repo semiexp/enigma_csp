@@ -322,6 +322,23 @@ pub fn encode(norm: &mut NormCSP, sat: &mut SAT, map: &mut EncodeMap, config: &C
     norm.num_encoded_vars = norm.vars.int_var.len();
 }
 
+fn is_unsatisfiable_linear(env: &EncoderEnv, linear_lit: &LinearLit) -> bool {
+    let mut range = Range::constant(linear_lit.sum.constant);
+    for (var, coef) in linear_lit.sum.terms() {
+        let encoding = env.map.int_map[var].as_ref().unwrap();
+        let var_range = encoding.range();
+        range = range + var_range * coef;
+    }
+    match linear_lit.op {
+        CmpOp::Eq => range.low > 0 || range.high < 0,
+        CmpOp::Ne => range.low == 0 && range.high == 0,
+        CmpOp::Le => range.low > 0,
+        CmpOp::Lt => range.low >= 0,
+        CmpOp::Ge => range.high < 0,
+        CmpOp::Gt => range.high <= 0,
+    }
+}
+
 fn encode_constraint(env: &mut EncoderEnv, constr: Constraint) {
     if constr.linear_lit.len() == 0 {
         let mut clause = vec![];
@@ -358,43 +375,8 @@ fn encode_constraint(env: &mut EncoderEnv, constr: Constraint) {
 
         // Unsatisfiable literals should be removed.
         // Otherwise, panic may happen (test_integration_csp_optimization3)
-        let mut range = Range::constant(linear_lit.sum.constant);
-        for (var, coef) in linear_lit.sum.terms() {
-            let encoding = env.map.int_map[var].as_ref().unwrap();
-            let var_range = encoding.range();
-            range = range + var_range * coef;
-        }
-        match linear_lit.op {
-            CmpOp::Eq => {
-                if range.low > 0 || range.high < 0 {
-                    continue;
-                }
-            }
-            CmpOp::Ne => {
-                if range.low == 0 && range.high == 0 {
-                    continue;
-                }
-            }
-            CmpOp::Le => {
-                if range.low > 0 {
-                    continue;
-                }
-            }
-            CmpOp::Lt => {
-                if range.low >= 0 {
-                    continue;
-                }
-            }
-            CmpOp::Ge => {
-                if range.high < 0 {
-                    continue;
-                }
-            }
-            CmpOp::Gt => {
-                if range.high <= 0 {
-                    continue;
-                }
-            }
+        if is_unsatisfiable_linear(env, &linear_lit) {
+            continue;
         }
 
         match linear_lit.op {
