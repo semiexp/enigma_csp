@@ -150,6 +150,16 @@ impl Add<LinearSum> for LinearSum {
     }
 }
 
+impl Add<i32> for LinearSum {
+    type Output = LinearSum;
+
+    fn add(self, rhs: i32) -> LinearSum {
+        let mut ret = self;
+        ret += rhs;
+        ret
+    }
+}
+
 impl AddAssign<i32> for LinearSum {
     fn add_assign(&mut self, rhs: i32) {
         self.add_constant(CheckedInt::new(rhs));

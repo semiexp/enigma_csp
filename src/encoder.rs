@@ -340,175 +340,175 @@ fn is_unsatisfiable_linear(env: &EncoderEnv, linear_lit: &LinearLit) -> bool {
 }
 
 fn encode_constraint(env: &mut EncoderEnv, constr: Constraint) {
-    if constr.linear_lit.len() == 0 {
-        let mut clause = vec![];
-        for lit in constr.bool_lit {
-            clause.push(env.convert_bool_lit(lit));
-        }
-
-        env.sat.add_clause(clause);
-        return;
-    }
-    let mut linear_lits = vec![];
-    let mut bool_lits_for_direct_encoding = vec![];
-
-    for mut linear_lit in constr.linear_lit {
-        // use direct encoding if applicable
-        let use_simple_direct_encoding;
-        {
-            let terms = linear_lit.sum.terms();
-            use_simple_direct_encoding = terms.len() == 1
-                && env.map.int_map[terms[0].0]
-                    .as_ref()
-                    .unwrap()
-                    .is_direct_encoding();
-        }
-        if use_simple_direct_encoding {
-            let encoded = encode_simple_linear_direct_encoding(env, &linear_lit);
-            if let Some(encoded) = encoded {
-                bool_lits_for_direct_encoding.extend(encoded);
-            } else {
-                return;
-            }
-            continue;
-        }
-
-        // Unsatisfiable literals should be removed.
-        // Otherwise, panic may happen (test_integration_csp_optimization3)
-        if is_unsatisfiable_linear(env, &linear_lit) {
-            continue;
-        }
-
-        match linear_lit.op {
-            CmpOp::Eq => {
-                linear_lits.push(linear_lit);
-            }
-            CmpOp::Ne => {
-                {
-                    let mut linear_lit = linear_lit.clone();
-                    linear_lit.sum *= -1;
-                    linear_lit.sum += -1;
-                    linear_lits.push(LinearLit::new(linear_lit.sum, CmpOp::Ge));
-                }
-                {
-                    linear_lit.sum += -1;
-                    linear_lits.push(LinearLit::new(linear_lit.sum, CmpOp::Ge));
-                }
-            }
-            CmpOp::Le => {
-                linear_lit.sum *= -1;
-                linear_lits.push(LinearLit::new(linear_lit.sum, CmpOp::Ge));
-            }
-            CmpOp::Lt => {
-                linear_lit.sum *= -1;
-                linear_lit.sum += -1;
-                linear_lits.push(LinearLit::new(linear_lit.sum, CmpOp::Ge));
-            }
-            CmpOp::Ge => {
-                linear_lits.push(LinearLit::new(linear_lit.sum, CmpOp::Ge));
-            }
-            CmpOp::Gt => {
-                linear_lit.sum += -1;
-                linear_lits.push(LinearLit::new(linear_lit.sum, CmpOp::Ge));
-            }
-        }
-    }
-
-    fn encode(env: &mut EncoderEnv, linear: LinearLit, bool_lit: &Vec<Lit>) {
-        // TODO: shared auxiliary variables may deteriorate the performance
-        if linear.op == CmpOp::Eq {
-            let mut linear = linear;
-            linear.op = CmpOp::Ge;
-            encode(env, linear.clone(), bool_lit);
-            linear.sum *= -1;
-            encode(env, linear, bool_lit);
-            return;
-        }
-
-        let (mut decomposed, extra) = decompose_linear_lit(env, &linear);
-
-        for mut linear in extra {
-            match linear.op {
-                CmpOp::Ge => {
-                    encode_linear_ge_order_encoding(env, &linear.sum, bool_lit);
-                }
-                CmpOp::Eq => {
-                    encode_linear_ge_order_encoding(env, &linear.sum, bool_lit);
-                    linear.sum *= -1;
-                    encode_linear_ge_order_encoding(env, &linear.sum, bool_lit);
-                }
-                _ => unreachable!(),
-            }
-        }
-        match decomposed.op {
-            CmpOp::Ge => {
-                encode_linear_ge_order_encoding(env, &decomposed.sum, bool_lit);
-            }
-            CmpOp::Eq => {
-                encode_linear_ge_order_encoding(env, &decomposed.sum, bool_lit);
-                decomposed.sum *= -1;
-                encode_linear_ge_order_encoding(env, &decomposed.sum, bool_lit);
-            }
-            _ => unreachable!(),
-        }
-    }
-
-    let mut bool_lit = constr
+    let mut bool_lits = constr
         .bool_lit
         .into_iter()
         .map(|lit| env.convert_bool_lit(lit))
         .collect::<Vec<_>>();
-    bool_lit.extend(bool_lits_for_direct_encoding);
+    if constr.linear_lit.len() == 0 {
+        env.sat.add_clause(bool_lits);
+        return;
+    }
 
-    if linear_lits.len() == 1 {
-        encode(env, linear_lits.remove(0), &bool_lit);
-    } else {
-        for linear_lit in linear_lits {
-            if linear_lit.op == CmpOp::Ge && linear_lit.sum.len() == 1 {
-                // v * coef + constant >= 0
-                let constant = linear_lit.sum.constant;
-                let (&v, &coef) = linear_lit.sum.iter().next().unwrap();
+    let mut simplified_linears: Vec<Vec<LinearLit>> = vec![];
+    for linear_lit in constr.linear_lit {
+        if is_unsatisfiable_linear(env, &linear_lit) {
+            continue;
+        }
 
-                let encoding = env.map.int_map[v].as_ref().unwrap().as_order_encoding();
-                if coef > 0 {
-                    let lb = (-constant).div_ceil(coef);
-                    if encoding.domain[0] >= lb {
-                        // already satisfied
-                        return;
-                    } else if encoding.domain[encoding.domain.len() - 1] < lb {
-                        // skipped (unsatisfiable literal)
-                        continue;
-                    }
-                    for i in 1..encoding.domain.len() {
-                        if encoding.domain[i] >= lb {
-                            bool_lit.push(encoding.lits[i - 1]);
-                            break;
-                        }
-                    }
+        match suggest_encoder(env, &linear_lit) {
+            EncoderKind::MixedGe => {
+                if linear_lit.op == CmpOp::Ne {
+                    // `ne` is decomposed to a disjunction of 2 linear literals and handled separately
+                    simplified_linears.push(decompose_linear_lit(
+                        env,
+                        &LinearLit::new(linear_lit.sum.clone() * (-1) + (-1), CmpOp::Ge),
+                    ));
+                    simplified_linears.push(decompose_linear_lit(
+                        env,
+                        &LinearLit::new(linear_lit.sum.clone() + (-1), CmpOp::Ge),
+                    ));
                 } else {
-                    let ub = constant.div_floor(-coef);
-                    // v <= ub iff !(v >= ub + 1)
-                    let nlb = ub + CheckedInt::new(1);
-                    if encoding.domain[0] >= nlb {
-                        continue;
-                    } else if encoding.domain[encoding.domain.len() - 1] < nlb {
-                        return;
+                    let simplified_sums = match linear_lit.op {
+                        CmpOp::Eq => {
+                            vec![linear_lit.sum.clone(), linear_lit.sum.clone() * -1]
+                        }
+                        CmpOp::Ne => unreachable!(),
+                        CmpOp::Le => vec![linear_lit.sum * -1],
+                        CmpOp::Lt => vec![linear_lit.sum * -1 + (-1)],
+                        CmpOp::Ge => vec![linear_lit.sum],
+                        CmpOp::Gt => vec![linear_lit.sum + (-1)],
+                    };
+                    let mut decomposed = vec![];
+                    for sum in simplified_sums {
+                        decomposed.append(&mut decompose_linear_lit(
+                            env,
+                            &LinearLit::new(sum, CmpOp::Ge),
+                        ));
                     }
-                    for i in 1..encoding.domain.len() {
-                        if encoding.domain[i] >= nlb {
-                            bool_lit.push(!encoding.lits[i - 1]);
-                            break;
+                    simplified_linears.push(decomposed);
+                }
+            }
+            EncoderKind::DirectSimple => {
+                simplified_linears.push(vec![linear_lit]);
+            }
+        }
+    }
+
+    if simplified_linears.len() == 0 {
+        env.sat.add_clause(bool_lits);
+        return;
+    }
+
+    if simplified_linears.len() == 1 && bool_lits.len() == 0 {
+        // native encoding may be applicable
+        let linears = simplified_linears.remove(0);
+        for linear_lit in linears {
+            match suggest_encoder(env, &linear_lit) {
+                EncoderKind::MixedGe => {
+                    assert_eq!(linear_lit.op, CmpOp::Ge);
+                    if is_ge_order_encoding_native_applicable(env, &linear_lit.sum) {
+                        encode_linear_ge_order_encoding_native(env, &linear_lit.sum);
+                    } else {
+                        let encoded = encode_linear_ge_mixed(env, &linear_lit.sum);
+                        for clause in encoded {
+                            env.sat.add_clause(clause);
                         }
                     }
                 }
-                continue;
+                EncoderKind::DirectSimple => {
+                    let encoded = encode_simple_linear_direct_encoding(env, &linear_lit);
+                    if let Some(encoded) = encoded {
+                        env.sat.add_clause(encoded);
+                    }
+                }
             }
-
-            let aux = env.sat.new_var();
-            bool_lit.push(aux.as_lit(false));
-            encode(env, linear_lit, &vec![aux.as_lit(true)]);
         }
-        env.sat.add_clause(bool_lit);
+        return;
+    }
+
+    // Vec<Lit>: a clause
+    // Vec<Vec<Lit>>: list clauses whose conjunction is equivalent to a linear literal
+    // Vec<Vec<Vec<Lit>>>: the above for each linear literal
+    let mut encoded_lits: Vec<Vec<Vec<Lit>>> = vec![];
+    for linear_lits in simplified_linears {
+        let mut encoded_conjunction = vec![];
+        for linear_lit in linear_lits {
+            match suggest_encoder(env, &linear_lit) {
+                EncoderKind::MixedGe => {
+                    let mut encoded = encode_linear_ge_mixed(env, &linear_lit.sum);
+                    encoded_conjunction.append(&mut encoded);
+                }
+                EncoderKind::DirectSimple => {
+                    let encoded = encode_simple_linear_direct_encoding(env, &linear_lit);
+                    if let Some(encoded) = encoded {
+                        encoded_conjunction.push(encoded);
+                    }
+                }
+            }
+        }
+
+        if encoded_conjunction.len() == 0 {
+            // This constraint always holds
+            return;
+        }
+        if encoded_conjunction.len() == 1 {
+            let mut clause = encoded_conjunction.remove(0);
+            bool_lits.append(&mut clause);
+            continue;
+        }
+        encoded_lits.push(encoded_conjunction);
+    }
+
+    if encoded_lits.len() == 0 {
+        env.sat.add_clause(bool_lits);
+    } else if encoded_lits.len() == 1 {
+        // TODO: a channeling literal may be needed if `bool_lits` contains too many literals
+        let clauses = encoded_lits.remove(0);
+        for mut clause in clauses {
+            clause.append(&mut bool_lits.clone());
+            env.sat.add_clause(clause);
+        }
+    } else {
+        let mut channeling_lits = vec![];
+        if encoded_lits.len() == 2 && bool_lits.len() == 0 {
+            let v = env.sat.new_var();
+            channeling_lits.push(v.as_lit(false));
+            channeling_lits.push(v.as_lit(true));
+        } else {
+            for _ in 0..encoded_lits.len() {
+                let v = env.sat.new_var();
+                channeling_lits.push(v.as_lit(true));
+                bool_lits.push(v.as_lit(false));
+            }
+            env.sat.add_clause(bool_lits);
+        }
+        for (i, clauses) in encoded_lits.into_iter().enumerate() {
+            let channeling_lit = channeling_lits[i];
+            for mut clause in clauses {
+                clause.push(channeling_lit);
+                env.sat.add_clause(clause);
+            }
+        }
+    }
+}
+
+enum EncoderKind {
+    MixedGe,
+    DirectSimple,
+}
+
+fn suggest_encoder(env: &EncoderEnv, linear_lit: &LinearLit) -> EncoderKind {
+    let terms = linear_lit.sum.terms();
+    if terms.len() == 1
+        && env.map.int_map[terms[0].0]
+            .as_ref()
+            .unwrap()
+            .is_direct_encoding()
+    {
+        EncoderKind::DirectSimple
+    } else {
+        EncoderKind::MixedGe
     }
 }
 
@@ -635,7 +635,7 @@ enum LinearInfo<'a> {
     Direct(LinearInfoForDirectEncoding<'a>),
 }
 
-fn decompose_linear_lit(env: &mut EncoderEnv, lit: &LinearLit) -> (LinearLit, Vec<LinearLit>) {
+fn decompose_linear_lit(env: &mut EncoderEnv, lit: &LinearLit) -> Vec<LinearLit> {
     assert!(lit.op == CmpOp::Ge || lit.op == CmpOp::Eq);
 
     let mut heap = BinaryHeap::new();
@@ -706,11 +706,11 @@ fn decompose_linear_lit(env: &mut EncoderEnv, lit: &LinearLit) -> (LinearLit, Ve
     for &(_, var, coef) in &pending {
         sum.add_coef(var, coef);
     }
-    (LinearLit::new(sum, lit.op), ret)
+    ret.push(LinearLit::new(sum, lit.op));
+    ret
 }
 
-fn encode_linear_ge_order_encoding(env: &mut EncoderEnv, sum: &LinearSum, bool_lit: &Vec<Lit>) {
-    let mut support_order_encoding_all = true;
+fn is_ge_order_encoding_native_applicable(env: &EncoderEnv, sum: &LinearSum) -> bool {
     for (var, _) in sum.terms() {
         if env.map.int_map[var]
             .as_ref()
@@ -718,31 +718,13 @@ fn encode_linear_ge_order_encoding(env: &mut EncoderEnv, sum: &LinearSum, bool_l
             .order_encoding
             .is_none()
         {
-            support_order_encoding_all = false;
+            return false;
         }
     }
-    if support_order_encoding_all
-        && bool_lit.is_empty()
-        && sum.len() <= env.config.native_linear_encoding_terms
-    {
-        encode_linear_ge_order_encoding_native(env, sum, bool_lit);
-    } else {
-        let clauses = encode_linear_ge_mixed(env, sum);
-        for mut clause in clauses {
-            let mut c = bool_lit.clone();
-            c.append(&mut clause);
-            env.sat.add_clause(c);
-        }
-    }
+    sum.len() <= env.config.native_linear_encoding_terms
 }
 
-fn encode_linear_ge_order_encoding_native(
-    env: &mut EncoderEnv,
-    sum: &LinearSum,
-    bool_lit: &Vec<Lit>,
-) {
-    assert!(bool_lit.is_empty()); // TODO
-
+fn encode_linear_ge_order_encoding_native(env: &mut EncoderEnv, sum: &LinearSum) {
     let mut info = vec![];
     for (v, c) in sum.terms() {
         assert_ne!(c, 0);
