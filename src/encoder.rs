@@ -727,8 +727,7 @@ fn encode_linear_ge_order_encoding(env: &mut EncoderEnv, sum: &LinearSum, bool_l
     {
         encode_linear_ge_order_encoding_native(env, sum, bool_lit);
     } else {
-        // encode_linear_ge_order_encoding_literals(env, sum, bool_lit);
-        let clauses = encode_linear_gt_mixed(env, sum);
+        let clauses = encode_linear_ge_mixed(env, sum);
         for mut clause in clauses {
             let mut c = bool_lit.clone();
             c.append(&mut clause);
@@ -808,7 +807,7 @@ fn encode_simple_linear_direct_encoding(env: &mut EncoderEnv, lit: &LinearLit) -
     }
 }
 
-fn encode_linear_gt_mixed(env: &EncoderEnv, sum: &LinearSum) -> Vec<Vec<Lit>> {
+fn encode_linear_ge_mixed(env: &EncoderEnv, sum: &LinearSum) -> Vec<Vec<Lit>> {
     let mut info = vec![];
     for (var, coef) in sum.terms() {
         let encoding = env.map.int_map[var].as_ref().unwrap();
