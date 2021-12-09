@@ -9,6 +9,23 @@ use super::norm_csp::NormCSP;
 use super::normalizer::{normalize, NormalizeMap};
 use super::sat::{SATModel, SAT};
 
+#[derive(Clone, Debug)]
+pub struct PerfStats {
+    pub time_normalize: f64,
+    pub time_encode: f64,
+    pub time_sat_solver: f64,
+}
+
+impl PerfStats {
+    pub fn new() -> PerfStats {
+        PerfStats {
+            time_normalize: 0.0f64,
+            time_encode: 0.0f64,
+            time_sat_solver: 0.0f64,
+        }
+    }
+}
+
 pub struct IntegratedSolver {
     csp: CSP,
     normalize_map: NormalizeMap,
@@ -17,6 +34,7 @@ pub struct IntegratedSolver {
     sat: SAT,
     already_used: bool,
     config: Config,
+    perf_stats: PerfStats,
 }
 
 impl IntegratedSolver {
@@ -29,6 +47,7 @@ impl IntegratedSolver {
             sat: SAT::new(),
             already_used: false,
             config: Config::default(),
+            perf_stats: PerfStats::new(),
         }
     }
 
@@ -67,12 +86,14 @@ impl IntegratedSolver {
             return None;
         }
 
+        let start = std::time::Instant::now();
         normalize(
             &mut self.csp,
             &mut self.norm,
             &mut self.normalize_map,
             &self.config,
         );
+        self.perf_stats.time_normalize += start.elapsed().as_secs_f64();
 
         if is_first && self.config.use_norm_domain_refinement {
             self.norm.refine_domain();
@@ -81,14 +102,20 @@ impl IntegratedSolver {
             return None;
         }
 
+        let start = std::time::Instant::now();
         encode(
             &mut self.norm,
             &mut self.sat,
             &mut self.encode_map,
             &self.config,
         );
+        self.perf_stats.time_encode += start.elapsed().as_secs_f64();
 
-        match self.sat.solve() {
+        let start = std::time::Instant::now();
+        let solver_result = self.sat.solve();
+        self.perf_stats.time_sat_solver += start.elapsed().as_secs_f64();
+
+        match solver_result {
             Some(model) => Some(Model {
                 csp: &self.csp,
                 normalize_map: &self.normalize_map,
@@ -201,6 +228,10 @@ impl IntegratedSolver {
         }
 
         Some(assignment)
+    }
+
+    pub fn perf_stats(&self) -> PerfStats {
+        self.perf_stats.clone()
     }
 }
 
