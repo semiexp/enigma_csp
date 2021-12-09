@@ -896,6 +896,17 @@ mod tests {
     }
 
     #[test]
+    fn test_integration_exhaustive_enumerative3() {
+        let mut tester = IntegrationTester::new();
+
+        let a = tester.new_int_var(Domain::range(0, 1));
+        let b = tester.new_int_var(Domain::range(0, 1));
+        let c = tester.new_int_var(Domain::range(0, 1));
+        tester.add_expr(a.expr().eq(b.expr()) | b.expr().eq(c.expr()));
+        tester.check();
+    }
+
+    #[test]
     fn test_integration_exhaustive_binary1() {
         let mut tester = IntegrationTester::new();
 

@@ -277,6 +277,7 @@ pub fn encode(norm: &mut NormCSP, sat: &mut SAT, map: &mut EncodeMap, config: &C
         }
         for constr in &norm.constraints {
             for lit in &constr.linear_lit {
+                // TODO: use direct encoding for more complex cases
                 let is_simple =
                     (lit.op == CmpOp::Eq || lit.op == CmpOp::Ne) && lit.sum.terms().len() <= 1;
                 if !is_simple {
@@ -392,6 +393,10 @@ fn encode_constraint(env: &mut EncoderEnv, constr: Constraint) {
             EncoderKind::DirectSimple => {
                 simplified_linears.push(vec![linear_lit]);
             }
+            EncoderKind::DirectEqNe => {
+                assert!(linear_lit.op == CmpOp::Eq || linear_lit.op == CmpOp::Ne);
+                simplified_linears.push(decompose_linear_lit(env, &linear_lit));
+            }
         }
     }
 
@@ -422,6 +427,17 @@ fn encode_constraint(env: &mut EncoderEnv, constr: Constraint) {
                         env.sat.add_clause(encoded);
                     }
                 }
+                EncoderKind::DirectEqNe => {
+                    assert!(linear_lit.op == CmpOp::Eq || linear_lit.op == CmpOp::Ne);
+                    let encoded = if linear_lit.op == CmpOp::Eq {
+                        encode_linear_eq_direct(env, &linear_lit.sum)
+                    } else {
+                        encode_linear_ne_direct(env, &linear_lit.sum)
+                    };
+                    for clause in encoded {
+                        env.sat.add_clause(clause);
+                    }
+                }
             }
         }
         return;
@@ -443,6 +459,17 @@ fn encode_constraint(env: &mut EncoderEnv, constr: Constraint) {
                     let encoded = encode_simple_linear_direct_encoding(env, &linear_lit);
                     if let Some(encoded) = encoded {
                         encoded_conjunction.push(encoded);
+                    }
+                }
+                EncoderKind::DirectEqNe => {
+                    assert!(linear_lit.op == CmpOp::Eq || linear_lit.op == CmpOp::Ne);
+                    let encoded = if linear_lit.op == CmpOp::Eq {
+                        encode_linear_eq_direct(env, &linear_lit.sum)
+                    } else {
+                        encode_linear_ne_direct(env, &linear_lit.sum)
+                    };
+                    for clause in encoded {
+                        encoded_conjunction.push(clause);
                     }
                 }
             }
@@ -496,6 +523,7 @@ fn encode_constraint(env: &mut EncoderEnv, constr: Constraint) {
 enum EncoderKind {
     MixedGe,
     DirectSimple,
+    DirectEqNe,
 }
 
 fn suggest_encoder(env: &EncoderEnv, linear_lit: &LinearLit) -> EncoderKind {
@@ -506,10 +534,15 @@ fn suggest_encoder(env: &EncoderEnv, linear_lit: &LinearLit) -> EncoderKind {
             .unwrap()
             .is_direct_encoding()
     {
-        EncoderKind::DirectSimple
-    } else {
-        EncoderKind::MixedGe
+        return EncoderKind::DirectSimple;
     }
+    let is_all_direct_encoded = terms
+        .iter()
+        .all(|&(v, _)| env.map.int_map[v].as_ref().unwrap().is_direct_encoding());
+    if (linear_lit.op == CmpOp::Eq || linear_lit.op == CmpOp::Ne) && is_all_direct_encoded {
+        return EncoderKind::DirectEqNe;
+    }
+    EncoderKind::MixedGe
 }
 
 enum ExtendedLit {
@@ -611,7 +644,6 @@ impl<'a> LinearInfoForDirectEncoding<'a> {
         }
     }
 
-    #[allow(unused)]
     fn domain_min(&self) -> CheckedInt {
         self.domain(0)
     }
@@ -636,7 +668,12 @@ enum LinearInfo<'a> {
 }
 
 fn decompose_linear_lit(env: &mut EncoderEnv, lit: &LinearLit) -> Vec<LinearLit> {
-    assert!(lit.op == CmpOp::Ge || lit.op == CmpOp::Eq);
+    assert!(lit.op == CmpOp::Ge || lit.op == CmpOp::Eq || lit.op == CmpOp::Ne);
+    let op_for_aux_lits = if lit.op == CmpOp::Ge {
+        CmpOp::Ge
+    } else {
+        CmpOp::Eq
+    };
 
     let mut heap = BinaryHeap::new();
     for (&var, &coef) in &lit.sum.term {
@@ -684,7 +721,7 @@ fn decompose_linear_lit(env: &mut EncoderEnv, lit: &LinearLit) -> Vec<LinearLit>
 
             // aux_sum >= aux_var
             aux_sum.add_coef(aux_var, CheckedInt::new(-1));
-            ret.push(LinearLit::new(aux_sum, lit.op));
+            ret.push(LinearLit::new(aux_sum, op_for_aux_lits));
 
             pending.clear();
             let dom_size = env.map.int_map[aux_var]
@@ -908,6 +945,242 @@ fn encode_linear_ge_mixed(env: &EncoderEnv, sum: &LinearSum) -> Vec<Vec<Lit>> {
 
     let mut clauses_buf: Vec<Vec<Lit>> = vec![];
     encode_sub(&info, &mut vec![], 0, upper_bound, None, &mut clauses_buf);
+
+    clauses_buf
+}
+
+fn encode_linear_eq_direct(env: &EncoderEnv, sum: &LinearSum) -> Vec<Vec<Lit>> {
+    let mut info = vec![];
+    for (var, coef) in sum.terms() {
+        let encoding = env.map.int_map[var].as_ref().unwrap();
+
+        let direct_encoding = encoding.as_direct_encoding();
+        info.push(LinearInfoForDirectEncoding::new(coef, direct_encoding));
+    }
+    info.sort_by(|encoding1, encoding2| {
+        encoding1
+            .encoding
+            .lits
+            .len()
+            .cmp(&encoding2.encoding.lits.len())
+    });
+
+    fn encode_sub(
+        info: &[LinearInfoForDirectEncoding],
+        clause: &mut Vec<Lit>,
+        idx: usize,
+        lower_bound: CheckedInt,
+        upper_bound: CheckedInt,
+        min_relax_for_lb: Option<CheckedInt>,
+        min_relax_for_ub: Option<CheckedInt>,
+        clauses_buf: &mut Vec<Vec<Lit>>,
+    ) {
+        if lower_bound > 0 || upper_bound < 0 {
+            let mut cannot_prune = true;
+            if lower_bound > 0
+                && min_relax_for_lb
+                    .map(|m| lower_bound - m <= 0)
+                    .unwrap_or(true)
+            {
+                cannot_prune = true;
+            }
+            if upper_bound < 0
+                && min_relax_for_ub
+                    .map(|m| upper_bound + m >= 0)
+                    .unwrap_or(true)
+            {
+                cannot_prune = true;
+            }
+            if cannot_prune {
+                clauses_buf.push(clause.clone());
+            }
+            return;
+        }
+        if idx == info.len() {
+            return;
+        }
+        if idx == info.len() - 1 {
+            let direct_encoding = &info[idx];
+            let lb_for_this_term = direct_encoding.domain_min();
+            let ub_for_this_term = direct_encoding.domain_max();
+
+            let prev_lb = lower_bound - lb_for_this_term;
+            let prev_ub = upper_bound - ub_for_this_term;
+
+            let mut possible_cand = vec![];
+
+            for i in 0..direct_encoding.domain_size() {
+                let value = direct_encoding.domain(i);
+
+                if prev_ub + value < 0 || 0 < prev_lb + value {
+                    continue;
+                }
+                possible_cand.push(direct_encoding.equals(i));
+            }
+
+            assert!(!possible_cand.is_empty());
+            if possible_cand.len() == direct_encoding.domain_size() {
+                return;
+            }
+            let n_possible_cand = possible_cand.len();
+            clause.append(&mut possible_cand);
+            clauses_buf.push(clause.clone());
+            clause.truncate(clause.len() - n_possible_cand);
+            return;
+        }
+
+        let direct_encoding = &info[idx];
+        let lb_for_this_term = direct_encoding.domain_min();
+        let ub_for_this_term = direct_encoding.domain_max();
+
+        for i in 0..direct_encoding.domain_size() {
+            let value = direct_encoding.domain(i);
+            let next_lb = lower_bound - lb_for_this_term + value;
+            let next_ub = upper_bound - ub_for_this_term + value;
+            let next_min_relax_for_lb = Some(
+                min_relax_for_lb
+                    .unwrap_or(CheckedInt::max_value())
+                    .min(value - lb_for_this_term),
+            );
+            let next_min_relax_for_ub = Some(
+                min_relax_for_ub
+                    .unwrap_or(CheckedInt::max_value())
+                    .min(ub_for_this_term - value),
+            );
+            clause.push(!direct_encoding.equals(i));
+            encode_sub(
+                info,
+                clause,
+                idx + 1,
+                next_lb,
+                next_ub,
+                next_min_relax_for_lb,
+                next_min_relax_for_ub,
+                clauses_buf,
+            );
+            clause.pop();
+        }
+
+        encode_sub(
+            info,
+            clause,
+            idx + 1,
+            lower_bound,
+            upper_bound,
+            min_relax_for_lb,
+            min_relax_for_ub,
+            clauses_buf,
+        );
+    }
+
+    let mut lower_bound = sum.constant;
+    let mut upper_bound = sum.constant;
+    for direct_encoding in &info {
+        lower_bound += direct_encoding.domain_min();
+        upper_bound += direct_encoding.domain_max();
+    }
+
+    let mut clauses_buf = vec![];
+    encode_sub(
+        &info,
+        &mut vec![],
+        0,
+        lower_bound,
+        upper_bound,
+        None,
+        None,
+        &mut clauses_buf,
+    );
+
+    clauses_buf
+}
+
+fn encode_linear_ne_direct(env: &EncoderEnv, sum: &LinearSum) -> Vec<Vec<Lit>> {
+    let mut info = vec![];
+    for (var, coef) in sum.terms() {
+        let encoding = env.map.int_map[var].as_ref().unwrap();
+
+        let direct_encoding = encoding.as_direct_encoding();
+        info.push(LinearInfoForDirectEncoding::new(coef, direct_encoding));
+    }
+
+    fn encode_sub(
+        info: &[LinearInfoForDirectEncoding],
+        clause: &mut Vec<Lit>,
+        idx: usize,
+        lower_bound: CheckedInt,
+        upper_bound: CheckedInt,
+        clauses_buf: &mut Vec<Vec<Lit>>,
+    ) {
+        if lower_bound > 0 || upper_bound < 0 {
+            return;
+        }
+        if idx == info.len() {
+            assert_eq!(lower_bound, upper_bound);
+            if lower_bound == 0 {
+                clauses_buf.push(clause.clone());
+            }
+            return;
+        }
+        if idx == info.len() - 1 {
+            let direct_encoding = &info[idx];
+            let lb_for_this_term = direct_encoding.domain_min();
+            let ub_for_this_term = direct_encoding.domain_max();
+
+            assert_eq!(
+                lower_bound - lb_for_this_term,
+                upper_bound - ub_for_this_term
+            );
+            let prev_val = lower_bound - lb_for_this_term;
+
+            let mut forbidden = None;
+            for i in 0..direct_encoding.domain_size() {
+                let value = direct_encoding.domain(i);
+
+                if prev_val + value == 0 {
+                    assert!(forbidden.is_none());
+                    forbidden = Some(direct_encoding.equals(i));
+                }
+            }
+
+            if let Some(forbidden) = forbidden {
+                clause.push(!forbidden);
+                clauses_buf.push(clause.clone());
+                clause.pop();
+            }
+            return;
+        }
+
+        let direct_encoding = &info[idx];
+        let lb_for_this_term = direct_encoding.domain_min();
+        let ub_for_this_term = direct_encoding.domain_max();
+
+        for i in 0..direct_encoding.domain_size() {
+            let value = direct_encoding.domain(i);
+            let next_lb = lower_bound - lb_for_this_term + value;
+            let next_ub = upper_bound - ub_for_this_term + value;
+            clause.push(!direct_encoding.equals(i));
+            encode_sub(info, clause, idx + 1, next_lb, next_ub, clauses_buf);
+            clause.pop();
+        }
+    }
+
+    let mut lower_bound = sum.constant;
+    let mut upper_bound = sum.constant;
+    for direct_encoding in &info {
+        lower_bound += direct_encoding.domain_min();
+        upper_bound += direct_encoding.domain_max();
+    }
+
+    let mut clauses_buf = vec![];
+    encode_sub(
+        &info,
+        &mut vec![],
+        0,
+        lower_bound,
+        upper_bound,
+        &mut clauses_buf,
+    );
 
     clauses_buf
 }
