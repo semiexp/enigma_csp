@@ -76,6 +76,18 @@ impl PyConfig {
     }
 
     #[getter]
+    fn get_native_linear_encoding_domain_product_threshold(&self) -> PyResult<i32> {
+        Ok(self.config.native_linear_encoding_domain_product_threshold as i32)
+    }
+
+    #[setter]
+    fn set_native_linear_encoding_domain_product_threshold(&mut self, value: i32) -> PyResult<()> {
+        assert!(value >= 0);
+        self.config.native_linear_encoding_domain_product_threshold = value as usize;
+        Ok(())
+    }
+
+    #[getter]
     fn get_use_direct_encoding(&self) -> PyResult<bool> {
         Ok(self.config.use_direct_encoding)
     }

@@ -9,6 +9,7 @@ pub struct Config {
     pub use_norm_domain_refinement: bool,
     pub domain_product_threshold: usize,
     pub native_linear_encoding_terms: usize,
+    pub native_linear_encoding_domain_product_threshold: usize,
     pub use_direct_encoding: bool,
     pub merge_equivalent_variables: bool,
     pub verbose: bool,
@@ -22,6 +23,7 @@ impl Config {
             use_norm_domain_refinement: true,
             domain_product_threshold: 1000,
             native_linear_encoding_terms: 4,
+            native_linear_encoding_domain_product_threshold: 20,
             use_direct_encoding: true,
             merge_equivalent_variables: false,
             verbose: false,
@@ -88,6 +90,7 @@ impl Config {
         }
         opts.optopt("", "domain-product-threshold", "Specify the threshold of domain product for introducing an auxiliary variable by Tseitin transformation.", "THRESHOLD");
         opts.optopt("", "native-linear-encoding-terms", "Specify the maximum number of terms in a linear sum which is encoded by the native linear constraint (0 for disabling this).", "TERMS");
+        opts.optopt("", "native-linear-encoding-domain-product", "Specify the minimum domain product of linear sums which are encoded by the native linear constraint.", "DOMAIN_PRODUCT");
         opts.optflag("h", "help", "Display this help");
 
         let matches = match opts.parse(&args[1..]) {
@@ -142,6 +145,19 @@ impl Config {
                 Err(f) => {
                     println!(
                         "error: parse failed for --native-linear-encoding-terms: {}",
+                        f.to_string()
+                    );
+                    std::process::exit(1);
+                }
+            };
+            config.native_linear_encoding_terms = v;
+        }
+        if let Some(s) = matches.opt_str("native-linear-encoding-domain-product") {
+            let v = match s.parse::<usize>() {
+                Ok(v) => v,
+                Err(f) => {
+                    println!(
+                        "error: parse failed for --native-linear-encoding-domain-product: {}",
                         f.to_string()
                     );
                     std::process::exit(1);

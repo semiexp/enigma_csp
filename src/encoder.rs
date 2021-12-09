@@ -758,7 +758,19 @@ fn is_ge_order_encoding_native_applicable(env: &EncoderEnv, sum: &LinearSum) -> 
             return false;
         }
     }
-    sum.len() <= env.config.native_linear_encoding_terms
+    if sum.len() > env.config.native_linear_encoding_terms {
+        return false;
+    }
+    let mut domain_product = 1usize;
+    for (var, _) in sum.terms() {
+        domain_product *= env.map.int_map[var]
+            .as_ref()
+            .unwrap()
+            .as_order_encoding()
+            .domain
+            .len();
+    }
+    domain_product >= env.config.native_linear_encoding_domain_product_threshold
 }
 
 fn encode_linear_ge_order_encoding_native(env: &mut EncoderEnv, sum: &LinearSum) {
