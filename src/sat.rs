@@ -14,6 +14,7 @@ impl Var {
     }
 }
 
+#[repr(C)]
 #[derive(Clone, Copy, Debug)]
 pub struct Lit(GlucoseLit);
 
@@ -66,12 +67,9 @@ impl SAT {
         vars.iter().map(|v| v.as_lit(false)).collect()
     }
 
-    pub fn add_clause(&mut self, clause: Vec<Lit>) {
-        let mut c = vec![];
-        for l in clause {
-            c.push(l.0);
-        }
-        self.solver.add_clause(&c);
+    pub fn add_clause(&mut self, clause: &[Lit]) {
+        self.solver
+            .add_clause(unsafe { std::mem::transmute::<&[Lit], &[GlucoseLit]>(clause) });
     }
 
     pub fn add_order_encoding_linear(

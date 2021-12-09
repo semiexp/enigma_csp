@@ -1,5 +1,6 @@
 use std::cmp::Reverse;
 use std::collections::{BTreeSet, BinaryHeap};
+use std::ops::Index;
 
 use super::config::Config;
 use super::norm_csp::{
@@ -10,6 +11,49 @@ use super::sat::{Lit, SATModel, SAT};
 use super::CmpOp;
 use crate::arithmetic::{CheckedInt, Range};
 use crate::util::ConvertMap;
+
+struct ClauseSet {
+    data: Vec<Lit>,
+    indices: Vec<usize>,
+}
+
+impl ClauseSet {
+    fn new() -> ClauseSet {
+        ClauseSet {
+            data: vec![],
+            indices: vec![0],
+        }
+    }
+
+    fn len(&self) -> usize {
+        self.indices.len() - 1
+    }
+
+    fn push(&mut self, clause: &[Lit]) {
+        self.indices.push(self.data.len() + clause.len());
+        for &l in clause {
+            self.data.push(l);
+        }
+    }
+
+    fn append(&mut self, mut other: ClauseSet) {
+        let offset = self.data.len();
+        self.data.append(&mut other.data);
+        for i in 1..other.indices.len() {
+            self.indices.push(other.indices[i] + offset);
+        }
+    }
+}
+
+impl Index<usize> for ClauseSet {
+    type Output = [Lit];
+
+    fn index(&self, index: usize) -> &Self::Output {
+        let start = self.indices[index];
+        let end = self.indices[index + 1];
+        &self.data[start..end]
+    }
+}
 
 /// Order encoding of an integer variable with domain of `domain`.
 /// `vars[i]` is the logical variable representing (the value of this int variable) >= `domain[i+1]`.
@@ -134,7 +178,7 @@ impl EncodeMap {
                     let lits = sat.new_vars_as_lits(domain.len() - 1);
                     for i in 1..lits.len() {
                         // vars[i] implies vars[i - 1]
-                        sat.add_clause(vec![!lits[i], lits[i - 1]]);
+                        sat.add_clause(&vec![!lits[i], lits[i - 1]]);
                     }
 
                     self.int_map[var] =
@@ -169,10 +213,10 @@ impl EncodeMap {
                     let domain = domain.enumerate();
                     assert_ne!(domain.len(), 0);
                     let lits = sat.new_vars_as_lits(domain.len());
-                    sat.add_clause(lits.clone());
+                    sat.add_clause(&lits);
                     for i in 1..lits.len() {
                         for j in 0..i {
-                            sat.add_clause(vec![!lits[i], !lits[j]]);
+                            sat.add_clause(&vec![!lits[i], !lits[j]]);
                         }
                     }
 
@@ -347,7 +391,7 @@ fn encode_constraint(env: &mut EncoderEnv, constr: Constraint) {
         .map(|lit| env.convert_bool_lit(lit))
         .collect::<Vec<_>>();
     if constr.linear_lit.len() == 0 {
-        env.sat.add_clause(bool_lits);
+        env.sat.add_clause(&bool_lits);
         return;
     }
 
@@ -401,7 +445,7 @@ fn encode_constraint(env: &mut EncoderEnv, constr: Constraint) {
     }
 
     if simplified_linears.len() == 0 {
-        env.sat.add_clause(bool_lits);
+        env.sat.add_clause(&bool_lits);
         return;
     }
 
@@ -416,15 +460,15 @@ fn encode_constraint(env: &mut EncoderEnv, constr: Constraint) {
                         encode_linear_ge_order_encoding_native(env, &linear_lit.sum);
                     } else {
                         let encoded = encode_linear_ge_mixed(env, &linear_lit.sum);
-                        for clause in encoded {
-                            env.sat.add_clause(clause);
+                        for i in 0..encoded.len() {
+                            env.sat.add_clause(&encoded[i]);
                         }
                     }
                 }
                 EncoderKind::DirectSimple => {
                     let encoded = encode_simple_linear_direct_encoding(env, &linear_lit);
                     if let Some(encoded) = encoded {
-                        env.sat.add_clause(encoded);
+                        env.sat.add_clause(&encoded);
                     }
                 }
                 EncoderKind::DirectEqNe => {
@@ -434,8 +478,8 @@ fn encode_constraint(env: &mut EncoderEnv, constr: Constraint) {
                     } else {
                         encode_linear_ne_direct(env, &linear_lit.sum)
                     };
-                    for clause in encoded {
-                        env.sat.add_clause(clause);
+                    for i in 0..encoded.len() {
+                        env.sat.add_clause(&encoded[i]);
                     }
                 }
             }
@@ -444,21 +488,21 @@ fn encode_constraint(env: &mut EncoderEnv, constr: Constraint) {
     }
 
     // Vec<Lit>: a clause
-    // Vec<Vec<Lit>>: list clauses whose conjunction is equivalent to a linear literal
-    // Vec<Vec<Vec<Lit>>>: the above for each linear literal
-    let mut encoded_lits: Vec<Vec<Vec<Lit>>> = vec![];
+    // ClauseSet: list clauses whose conjunction is equivalent to a linear literal
+    // Vec<ClauseSet>: the above for each linear literal
+    let mut encoded_lits: Vec<ClauseSet> = vec![];
     for linear_lits in simplified_linears {
-        let mut encoded_conjunction = vec![];
+        let mut encoded_conjunction: ClauseSet = ClauseSet::new();
         for linear_lit in linear_lits {
             match suggest_encoder(env, &linear_lit) {
                 EncoderKind::MixedGe => {
-                    let mut encoded = encode_linear_ge_mixed(env, &linear_lit.sum);
-                    encoded_conjunction.append(&mut encoded);
+                    let encoded = encode_linear_ge_mixed(env, &linear_lit.sum);
+                    encoded_conjunction.append(encoded);
                 }
                 EncoderKind::DirectSimple => {
                     let encoded = encode_simple_linear_direct_encoding(env, &linear_lit);
                     if let Some(encoded) = encoded {
-                        encoded_conjunction.push(encoded);
+                        encoded_conjunction.push(&encoded);
                     }
                 }
                 EncoderKind::DirectEqNe => {
@@ -468,9 +512,7 @@ fn encode_constraint(env: &mut EncoderEnv, constr: Constraint) {
                     } else {
                         encode_linear_ne_direct(env, &linear_lit.sum)
                     };
-                    for clause in encoded {
-                        encoded_conjunction.push(clause);
-                    }
+                    encoded_conjunction.append(encoded);
                 }
             }
         }
@@ -480,21 +522,23 @@ fn encode_constraint(env: &mut EncoderEnv, constr: Constraint) {
             return;
         }
         if encoded_conjunction.len() == 1 {
-            let mut clause = encoded_conjunction.remove(0);
-            bool_lits.append(&mut clause);
+            bool_lits.extend_from_slice(&encoded_conjunction[0]);
             continue;
         }
         encoded_lits.push(encoded_conjunction);
     }
 
     if encoded_lits.len() == 0 {
-        env.sat.add_clause(bool_lits);
+        env.sat.add_clause(&bool_lits);
     } else if encoded_lits.len() == 1 {
         // TODO: a channeling literal may be needed if `bool_lits` contains too many literals
         let clauses = encoded_lits.remove(0);
-        for mut clause in clauses {
-            clause.append(&mut bool_lits.clone());
-            env.sat.add_clause(clause);
+        let mut buffer = vec![];
+        for i in 0..clauses.len() {
+            buffer.clear();
+            buffer.extend_from_slice(&clauses[i]);
+            buffer.extend_from_slice(&bool_lits);
+            env.sat.add_clause(&buffer);
         }
     } else {
         let mut channeling_lits = vec![];
@@ -508,13 +552,16 @@ fn encode_constraint(env: &mut EncoderEnv, constr: Constraint) {
                 channeling_lits.push(v.as_lit(true));
                 bool_lits.push(v.as_lit(false));
             }
-            env.sat.add_clause(bool_lits);
+            env.sat.add_clause(&bool_lits);
         }
         for (i, clauses) in encoded_lits.into_iter().enumerate() {
             let channeling_lit = channeling_lits[i];
-            for mut clause in clauses {
-                clause.push(channeling_lit);
-                env.sat.add_clause(clause);
+            let mut buffer = vec![];
+            for i in 0..clauses.len() {
+                buffer.clear();
+                buffer.extend_from_slice(&clauses[i]);
+                buffer.push(channeling_lit);
+                env.sat.add_clause(&buffer);
             }
         }
     }
@@ -838,7 +885,7 @@ fn encode_simple_linear_direct_encoding(env: &mut EncoderEnv, lit: &LinearLit) -
     }
 }
 
-fn encode_linear_ge_mixed(env: &EncoderEnv, sum: &LinearSum) -> Vec<Vec<Lit>> {
+fn encode_linear_ge_mixed(env: &EncoderEnv, sum: &LinearSum) -> ClauseSet {
     let mut info = vec![];
     for (var, coef) in sum.terms() {
         let encoding = env.map.int_map[var].as_ref().unwrap();
@@ -863,7 +910,7 @@ fn encode_linear_ge_mixed(env: &EncoderEnv, sum: &LinearSum) -> Vec<Vec<Lit>> {
         idx: usize,
         upper_bound: CheckedInt,
         min_relax_on_erasure: Option<CheckedInt>,
-        clauses_buf: &mut Vec<Vec<Lit>>,
+        clauses_buf: &mut ClauseSet,
     ) {
         if upper_bound < 0 {
             if let Some(min_relax_on_erasure) = min_relax_on_erasure {
@@ -871,7 +918,7 @@ fn encode_linear_ge_mixed(env: &EncoderEnv, sum: &LinearSum) -> Vec<Vec<Lit>> {
                     return;
                 }
             }
-            clauses_buf.push(clause.clone());
+            clauses_buf.push(&clause);
             return;
         }
         if idx == info.len() {
@@ -887,7 +934,7 @@ fn encode_linear_ge_mixed(env: &EncoderEnv, sum: &LinearSum) -> Vec<Vec<Lit>> {
                         ExtendedLit::False => panic!(),
                         ExtendedLit::Lit(lit) => {
                             clause.push(lit);
-                            clauses_buf.push(clause.clone());
+                            clauses_buf.push(&clause);
                             clause.pop();
                         }
                     }
@@ -955,13 +1002,13 @@ fn encode_linear_ge_mixed(env: &EncoderEnv, sum: &LinearSum) -> Vec<Vec<Lit>> {
         };
     }
 
-    let mut clauses_buf: Vec<Vec<Lit>> = vec![];
+    let mut clauses_buf = ClauseSet::new();
     encode_sub(&info, &mut vec![], 0, upper_bound, None, &mut clauses_buf);
 
     clauses_buf
 }
 
-fn encode_linear_eq_direct(env: &EncoderEnv, sum: &LinearSum) -> Vec<Vec<Lit>> {
+fn encode_linear_eq_direct(env: &EncoderEnv, sum: &LinearSum) -> ClauseSet {
     let mut info = vec![];
     for (var, coef) in sum.terms() {
         let encoding = env.map.int_map[var].as_ref().unwrap();
@@ -985,7 +1032,7 @@ fn encode_linear_eq_direct(env: &EncoderEnv, sum: &LinearSum) -> Vec<Vec<Lit>> {
         upper_bound: CheckedInt,
         min_relax_for_lb: Option<CheckedInt>,
         min_relax_for_ub: Option<CheckedInt>,
-        clauses_buf: &mut Vec<Vec<Lit>>,
+        clauses_buf: &mut ClauseSet,
     ) {
         if lower_bound > 0 || upper_bound < 0 {
             let mut cannot_prune = true;
@@ -1004,7 +1051,7 @@ fn encode_linear_eq_direct(env: &EncoderEnv, sum: &LinearSum) -> Vec<Vec<Lit>> {
                 cannot_prune = true;
             }
             if cannot_prune {
-                clauses_buf.push(clause.clone());
+                clauses_buf.push(&clause);
             }
             return;
         }
@@ -1036,7 +1083,7 @@ fn encode_linear_eq_direct(env: &EncoderEnv, sum: &LinearSum) -> Vec<Vec<Lit>> {
             }
             let n_possible_cand = possible_cand.len();
             clause.append(&mut possible_cand);
-            clauses_buf.push(clause.clone());
+            clauses_buf.push(&clause);
             clause.truncate(clause.len() - n_possible_cand);
             return;
         }
@@ -1092,7 +1139,7 @@ fn encode_linear_eq_direct(env: &EncoderEnv, sum: &LinearSum) -> Vec<Vec<Lit>> {
         upper_bound += direct_encoding.domain_max();
     }
 
-    let mut clauses_buf = vec![];
+    let mut clauses_buf = ClauseSet::new();
     encode_sub(
         &info,
         &mut vec![],
@@ -1107,7 +1154,7 @@ fn encode_linear_eq_direct(env: &EncoderEnv, sum: &LinearSum) -> Vec<Vec<Lit>> {
     clauses_buf
 }
 
-fn encode_linear_ne_direct(env: &EncoderEnv, sum: &LinearSum) -> Vec<Vec<Lit>> {
+fn encode_linear_ne_direct(env: &EncoderEnv, sum: &LinearSum) -> ClauseSet {
     let mut info = vec![];
     for (var, coef) in sum.terms() {
         let encoding = env.map.int_map[var].as_ref().unwrap();
@@ -1122,7 +1169,7 @@ fn encode_linear_ne_direct(env: &EncoderEnv, sum: &LinearSum) -> Vec<Vec<Lit>> {
         idx: usize,
         lower_bound: CheckedInt,
         upper_bound: CheckedInt,
-        clauses_buf: &mut Vec<Vec<Lit>>,
+        clauses_buf: &mut ClauseSet,
     ) {
         if lower_bound > 0 || upper_bound < 0 {
             return;
@@ -1130,7 +1177,7 @@ fn encode_linear_ne_direct(env: &EncoderEnv, sum: &LinearSum) -> Vec<Vec<Lit>> {
         if idx == info.len() {
             assert_eq!(lower_bound, upper_bound);
             if lower_bound == 0 {
-                clauses_buf.push(clause.clone());
+                clauses_buf.push(&clause);
             }
             return;
         }
@@ -1157,7 +1204,7 @@ fn encode_linear_ne_direct(env: &EncoderEnv, sum: &LinearSum) -> Vec<Vec<Lit>> {
 
             if let Some(forbidden) = forbidden {
                 clause.push(!forbidden);
-                clauses_buf.push(clause.clone());
+                clauses_buf.push(&clause);
                 clause.pop();
             }
             return;
@@ -1184,7 +1231,7 @@ fn encode_linear_ne_direct(env: &EncoderEnv, sum: &LinearSum) -> Vec<Vec<Lit>> {
         upper_bound += direct_encoding.domain_max();
     }
 
-    let mut clauses_buf = vec![];
+    let mut clauses_buf = ClauseSet::new();
     encode_sub(
         &info,
         &mut vec![],
@@ -1196,3 +1243,5 @@ fn encode_linear_ne_direct(env: &EncoderEnv, sum: &LinearSum) -> Vec<Vec<Lit>> {
 
     clauses_buf
 }
+
+// TODO: add tests for ClauseSet
