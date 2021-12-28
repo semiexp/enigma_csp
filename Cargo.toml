@@ -13,9 +13,8 @@ crate-type = ["cdylib", "lib"]
 getopts = "0.2"
 nom = "7.0.0"
 
-[dependencies.pyo3]
-version = "0.14.5"
-features = ["extension-module"]
+[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+pyo3 = { version = "0.14.5", features = ["extension-module"] }
 
 [build-dependencies]
 cc = "1.0"
