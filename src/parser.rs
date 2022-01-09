@@ -148,7 +148,11 @@ pub fn parse<'a, 'b>(var_map: &'a VarMap, input: &'b str) -> ParseResult<'b> {
         let high = child[3].as_int();
         ParseResult::IntVarDecl(var_name, Domain::range(low, high))
     } else if op_name == "alldifferent" {
-        todo!();
+        let exprs = child[1..]
+            .iter()
+            .map(|c| parse_int_expr(var_map, c))
+            .collect::<Vec<_>>();
+        ParseResult::Stmt(Stmt::AllDifferent(exprs))
     } else if op_name == "graph-active-vertices-connected" {
         let num_vertices = child[1].as_usize();
         let num_edges = child[2].as_usize();

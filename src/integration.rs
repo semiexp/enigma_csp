@@ -371,7 +371,19 @@ mod tests {
                             return false;
                         }
                     }
-                    Stmt::AllDifferent(_) => todo!(),
+                    Stmt::AllDifferent(exprs) => {
+                        let values = exprs
+                            .iter()
+                            .map(|e| assignment.eval_int_expr(e))
+                            .collect::<Vec<_>>();
+                        for i in 0..values.len() {
+                            for j in (i + 1)..values.len() {
+                                if values[i] == values[j] {
+                                    return false;
+                                }
+                            }
+                        }
+                    }
                     Stmt::ActiveVerticesConnected(_, _) => todo!(),
                 }
             }
@@ -538,6 +550,19 @@ mod tests {
         assert_eq!(model.get_int(a), 1);
         assert_eq!(model.get_int(b), 2);
         assert_eq!(model.get_int(c), 1);
+    }
+
+    #[test]
+    fn test_integration_simple_alldifferent() {
+        let mut solver = IntegratedSolver::new();
+
+        let a = solver.new_int_var(Domain::range(1, 2));
+        let b = solver.new_int_var(Domain::range(1, 2));
+        let c = solver.new_int_var(Domain::range(1, 2));
+        solver.add_constraint(Stmt::AllDifferent(vec![a.expr(), b.expr(), c.expr()]));
+
+        let model = solver.solve();
+        assert!(model.is_none());
     }
 
     #[test]
@@ -764,6 +789,30 @@ mod tests {
     }
 
     #[test]
+    fn test_integration_irrefutable_alldifferent() {
+        let mut solver = IntegratedSolver::new();
+
+        let a = solver.new_int_var(Domain::range(1, 3));
+        let b = solver.new_int_var(Domain::range(1, 3));
+        let c = solver.new_int_var(Domain::range(1, 3));
+        let d = solver.new_int_var(Domain::range(1, 4));
+        solver.add_constraint(Stmt::AllDifferent(vec![
+            a.expr(),
+            b.expr(),
+            c.expr(),
+            d.expr(),
+        ]));
+
+        let res = solver.decide_irrefutable_facts(&[], &[a, b, c, d]);
+        assert!(res.is_some());
+        let res = res.unwrap();
+        assert_eq!(res.get_int(a), None);
+        assert_eq!(res.get_int(b), None);
+        assert_eq!(res.get_int(c), None);
+        assert_eq!(res.get_int(d), Some(4));
+    }
+
+    #[test]
     fn test_integration_exhaustive_bool1() {
         let mut tester = IntegrationTester::new();
 
@@ -984,6 +1033,19 @@ mod tests {
                 .ite(IntExpr::Const(1), IntExpr::Const(0))
                 .eq(IntExpr::Const(1)),
         );
+
+        tester.check();
+    }
+
+    #[test]
+    fn test_integration_exhaustive_alldifferent() {
+        let mut tester = IntegrationTester::new();
+
+        let a = tester.new_int_var(Domain::range(0, 3));
+        let b = tester.new_int_var(Domain::range(0, 3));
+        let c = tester.new_int_var(Domain::range(1, 4));
+        tester.add_constraint(Stmt::AllDifferent(vec![a.expr(), b.expr(), c.expr()]));
+        tester.add_expr((a.expr() + b.expr()).ge(c.expr()));
 
         tester.check();
     }

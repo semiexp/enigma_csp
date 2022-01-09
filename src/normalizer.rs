@@ -141,7 +141,12 @@ fn normalize_stmt(env: &mut NormalizerEnv, stmt: Stmt) {
     match stmt {
         Stmt::Expr(expr) => normalize_and_register_expr(env, expr),
         Stmt::AllDifferent(_exprs) => {
-            todo!();
+            for i in 0.._exprs.len() {
+                for j in (i + 1).._exprs.len() {
+                    let diff_expr = _exprs[i].clone().ne(_exprs[j].clone());
+                    normalize_and_register_expr(env, diff_expr);
+                }
+            }
         }
         Stmt::ActiveVerticesConnected(vertices, edges) => {
             let mut vertices_converted = vec![];
@@ -692,7 +697,19 @@ mod tests {
                             return false;
                         }
                     }
-                    Stmt::AllDifferent(_) => todo!(),
+                    Stmt::AllDifferent(exprs) => {
+                        let values = exprs
+                            .iter()
+                            .map(|e| assignment.eval_int_expr(e))
+                            .collect::<Vec<_>>();
+                        for i in 0..values.len() {
+                            for j in (i + 1)..values.len() {
+                                if values[i] == values[j] {
+                                    return false;
+                                }
+                            }
+                        }
+                    }
                     Stmt::ActiveVerticesConnected(_, _) => todo!(),
                 }
             }
@@ -919,5 +936,16 @@ mod tests {
             tester.map.bool_map[v].unwrap().var,
             tester.map.bool_map[z].unwrap().var
         );
+    }
+
+    #[test]
+    fn test_normalization_alldifferent() {
+        let mut tester = NormalizerTester::new();
+
+        let a = tester.new_int_var(Domain::range(0, 3));
+        let b = tester.new_int_var(Domain::range(0, 3));
+        let c = tester.new_int_var(Domain::range(0, 3));
+        tester.add_constraint(Stmt::AllDifferent(vec![a.expr(), b.expr(), c.expr()]));
+        tester.check();
     }
 }
