@@ -600,6 +600,37 @@ mod tests {
     }
 
     #[test]
+    fn test_integration_unused_then_used_bool() {
+        let mut solver = IntegratedSolver::new();
+
+        let x = solver.new_bool_var();
+        let y = solver.new_bool_var();
+        let z = solver.new_bool_var();
+        solver.add_expr(y.expr() | z.expr());
+
+        {
+            let model = solver.solve();
+            assert!(model.is_some());
+            let model = model.unwrap();
+            let _ = model.get_bool(x);
+            let _ = model.get_bool(y);
+            let _ = model.get_bool(z);
+        }
+
+        solver.add_expr(!x.expr());
+        {
+            let model = solver.solve();
+            assert!(model.is_some());
+            let model = model.unwrap();
+            assert_eq!(model.get_bool(x), false);
+        }
+
+        solver.add_expr(x.expr() | !(y.expr() | z.expr()));
+        let model = solver.solve();
+        assert!(model.is_none());
+    }
+
+    #[test]
     fn test_integration_solve_twice() {
         let mut solver = IntegratedSolver::new();
 
