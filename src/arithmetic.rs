@@ -1,4 +1,5 @@
 use std::cmp::{PartialEq, PartialOrd};
+use std::collections::{btree_map, BTreeMap};
 use std::ops::{Add, AddAssign, BitAnd, BitOr, Mul, MulAssign, Neg, Sub, SubAssign};
 
 /// Integer type for internal use.
@@ -202,6 +203,162 @@ impl BitOr<Range> for Range {
 
     fn bitor(self, rhs: Range) -> Self::Output {
         Range::new(self.low.min(rhs.low), self.high.max(rhs.high))
+    }
+}
+
+#[derive(Clone, Debug)]
+pub struct LinearSum<T: Ord> {
+    pub(super) term: BTreeMap<T, CheckedInt>,
+    pub(super) constant: CheckedInt,
+}
+
+impl<T: Ord> LinearSum<T> {
+    pub fn new() -> LinearSum<T> {
+        LinearSum {
+            term: BTreeMap::new(),
+            constant: CheckedInt::new(0),
+        }
+    }
+
+    pub(super) fn constant(v: CheckedInt) -> LinearSum<T> {
+        LinearSum {
+            term: BTreeMap::new(),
+            constant: v,
+        }
+    }
+
+    pub fn singleton(var: T) -> LinearSum<T> {
+        let mut ret = LinearSum::new();
+        ret.add_coef(var, CheckedInt::new(1));
+        ret
+    }
+
+    pub fn is_constant(&self) -> bool {
+        self.term.is_empty()
+    }
+
+    pub fn len(&self) -> usize {
+        self.term.len()
+    }
+
+    pub(super) fn add_constant(&mut self, v: CheckedInt) {
+        self.constant += v;
+    }
+
+    pub(super) fn add_coef(&mut self, var: T, coef: CheckedInt) {
+        if coef == 0 {
+            return;
+        }
+        let new_coef = match self.term.get(&var) {
+            Some(&e) => e + coef,
+            _ => coef,
+        };
+        if new_coef == 0 {
+            self.term.remove(&var);
+        } else {
+            self.term.insert(var, new_coef);
+        }
+    }
+
+    pub(super) fn terms(&self) -> Vec<(T, CheckedInt)>
+    where
+        T: Copy,
+    {
+        self.term.iter().map(|(v, c)| (*v, *c)).collect()
+    }
+
+    pub(super) fn iter(&self) -> btree_map::Iter<T, CheckedInt> {
+        self.term.iter()
+    }
+}
+
+impl<T: Ord> AddAssign<LinearSum<T>> for LinearSum<T> {
+    fn add_assign(&mut self, rhs: LinearSum<T>) {
+        for (key, value) in rhs.term.into_iter() {
+            self.add_coef(key, value);
+        }
+        self.add_constant(rhs.constant);
+    }
+}
+
+impl<T: Ord> Add<LinearSum<T>> for LinearSum<T> {
+    type Output = LinearSum<T>;
+
+    fn add(self, rhs: LinearSum<T>) -> LinearSum<T> {
+        let mut ret = self;
+        ret += rhs;
+        ret
+    }
+}
+
+impl<T: Ord> Add<i32> for LinearSum<T> {
+    type Output = LinearSum<T>;
+
+    fn add(self, rhs: i32) -> LinearSum<T> {
+        let mut ret = self;
+        ret += rhs;
+        ret
+    }
+}
+
+impl<T: Ord> AddAssign<i32> for LinearSum<T> {
+    fn add_assign(&mut self, rhs: i32) {
+        self.add_constant(CheckedInt::new(rhs));
+    }
+}
+
+impl<T: Ord> SubAssign<LinearSum<T>> for LinearSum<T> {
+    fn sub_assign(&mut self, rhs: LinearSum<T>) {
+        for (key, value) in rhs.term.into_iter() {
+            self.add_coef(key, -value);
+        }
+        self.add_constant(-rhs.constant);
+    }
+}
+
+impl<T: Ord> Sub<LinearSum<T>> for LinearSum<T> {
+    type Output = LinearSum<T>;
+
+    fn sub(self, rhs: LinearSum<T>) -> LinearSum<T> {
+        let mut ret = self;
+        ret -= rhs;
+        ret
+    }
+}
+
+impl<T: Ord> MulAssign<CheckedInt> for LinearSum<T> {
+    fn mul_assign(&mut self, rhs: CheckedInt) {
+        if rhs == 0 {
+            *self = LinearSum::new();
+        }
+        self.constant *= rhs;
+        for (_, value) in self.term.iter_mut() {
+            *value *= rhs;
+        }
+    }
+}
+
+impl<T: Ord> Mul<CheckedInt> for LinearSum<T> {
+    type Output = LinearSum<T>;
+
+    fn mul(self, rhs: CheckedInt) -> LinearSum<T> {
+        let mut ret = self;
+        ret *= rhs;
+        ret
+    }
+}
+
+impl<T: Ord> MulAssign<i32> for LinearSum<T> {
+    fn mul_assign(&mut self, rhs: i32) {
+        *self *= CheckedInt::new(rhs);
+    }
+}
+
+impl<T: Ord> Mul<i32> for LinearSum<T> {
+    type Output = LinearSum<T>;
+
+    fn mul(self, rhs: i32) -> LinearSum<T> {
+        self * CheckedInt::new(rhs)
     }
 }
 
