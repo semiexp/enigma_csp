@@ -260,13 +260,6 @@ impl<T: Ord> LinearSum<T> {
         }
     }
 
-    pub(super) fn terms(&self) -> Vec<(T, CheckedInt)>
-    where
-        T: Copy,
-    {
-        self.term.iter().map(|(v, c)| (*v, *c)).collect()
-    }
-
     pub(super) fn iter(&self) -> btree_map::Iter<T, CheckedInt> {
         self.term.iter()
     }

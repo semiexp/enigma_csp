@@ -322,8 +322,7 @@ pub fn encode(norm: &mut NormCSP, sat: &mut SAT, map: &mut EncodeMap, config: &C
         for constr in &norm.constraints {
             for lit in &constr.linear_lit {
                 // TODO: use direct encoding for more complex cases
-                let is_simple =
-                    (lit.op == CmpOp::Eq || lit.op == CmpOp::Ne) && lit.sum.terms().len() <= 1;
+                let is_simple = (lit.op == CmpOp::Eq || lit.op == CmpOp::Ne) && lit.sum.len() <= 1;
                 if !is_simple {
                     for (v, _) in lit.sum.iter() {
                         direct_encoding_vars.remove(v);
@@ -369,7 +368,7 @@ pub fn encode(norm: &mut NormCSP, sat: &mut SAT, map: &mut EncodeMap, config: &C
 
 fn is_unsatisfiable_linear(env: &EncoderEnv, linear_lit: &LinearLit) -> bool {
     let mut range = Range::constant(linear_lit.sum.constant);
-    for (var, coef) in linear_lit.sum.terms() {
+    for (&var, &coef) in linear_lit.sum.iter() {
         let encoding = env.map.int_map[var].as_ref().unwrap();
         let var_range = encoding.range();
         range = range + var_range * coef;
@@ -574,18 +573,18 @@ enum EncoderKind {
 }
 
 fn suggest_encoder(env: &EncoderEnv, linear_lit: &LinearLit) -> EncoderKind {
-    let terms = linear_lit.sum.terms();
-    if terms.len() == 1
-        && env.map.int_map[terms[0].0]
+    if linear_lit.sum.len() == 1
+        && env.map.int_map[*linear_lit.sum.iter().next().unwrap().0]
             .as_ref()
             .unwrap()
             .is_direct_encoding()
     {
         return EncoderKind::DirectSimple;
     }
-    let is_all_direct_encoded = terms
+    let is_all_direct_encoded = linear_lit
+        .sum
         .iter()
-        .all(|&(v, _)| env.map.int_map[v].as_ref().unwrap().is_direct_encoding());
+        .all(|(&v, _)| env.map.int_map[v].as_ref().unwrap().is_direct_encoding());
     if (linear_lit.op == CmpOp::Eq || linear_lit.op == CmpOp::Ne) && is_all_direct_encoded {
         return EncoderKind::DirectEqNe;
     }
@@ -795,7 +794,7 @@ fn decompose_linear_lit(env: &mut EncoderEnv, lit: &LinearLit) -> Vec<LinearLit>
 }
 
 fn is_ge_order_encoding_native_applicable(env: &EncoderEnv, sum: &LinearSum) -> bool {
-    for (var, _) in sum.terms() {
+    for (&var, _) in sum.iter() {
         if env.map.int_map[var]
             .as_ref()
             .unwrap()
@@ -809,7 +808,7 @@ fn is_ge_order_encoding_native_applicable(env: &EncoderEnv, sum: &LinearSum) -> 
         return false;
     }
     let mut domain_product = 1usize;
-    for (var, _) in sum.terms() {
+    for (&var, _) in sum.iter() {
         domain_product *= env.map.int_map[var]
             .as_ref()
             .unwrap()
@@ -822,7 +821,7 @@ fn is_ge_order_encoding_native_applicable(env: &EncoderEnv, sum: &LinearSum) -> 
 
 fn encode_linear_ge_order_encoding_native(env: &mut EncoderEnv, sum: &LinearSum) {
     let mut info = vec![];
-    for (v, c) in sum.terms() {
+    for (&v, &c) in sum.iter() {
         assert_ne!(c, 0);
         info.push(LinearInfoForOrderEncoding::new(
             c,
@@ -857,9 +856,8 @@ fn encode_linear_ge_order_encoding_native(env: &mut EncoderEnv, sum: &LinearSum)
 // or None when `lit` always holds.
 fn encode_simple_linear_direct_encoding(env: &mut EncoderEnv, lit: &LinearLit) -> Option<Vec<Lit>> {
     let op = lit.op;
-    let terms = lit.sum.terms();
-    assert_eq!(terms.len(), 1);
-    let (var, coef) = terms[0];
+    assert_eq!(lit.sum.len(), 1);
+    let (&var, &coef) = lit.sum.iter().next().unwrap();
 
     let encoding = env.map.int_map[var].as_ref().unwrap().as_direct_encoding();
     let mut oks = vec![];
@@ -887,7 +885,7 @@ fn encode_simple_linear_direct_encoding(env: &mut EncoderEnv, lit: &LinearLit) -
 
 fn encode_linear_ge_mixed(env: &EncoderEnv, sum: &LinearSum) -> ClauseSet {
     let mut info = vec![];
-    for (var, coef) in sum.terms() {
+    for (&var, &coef) in sum.iter() {
         let encoding = env.map.int_map[var].as_ref().unwrap();
 
         if let Some(order_encoding) = &encoding.order_encoding {
@@ -1010,7 +1008,7 @@ fn encode_linear_ge_mixed(env: &EncoderEnv, sum: &LinearSum) -> ClauseSet {
 
 fn encode_linear_eq_direct(env: &EncoderEnv, sum: &LinearSum) -> ClauseSet {
     let mut info = vec![];
-    for (var, coef) in sum.terms() {
+    for (&var, &coef) in sum.iter() {
         let encoding = env.map.int_map[var].as_ref().unwrap();
 
         let direct_encoding = encoding.as_direct_encoding();
@@ -1156,7 +1154,7 @@ fn encode_linear_eq_direct(env: &EncoderEnv, sum: &LinearSum) -> ClauseSet {
 
 fn encode_linear_ne_direct(env: &EncoderEnv, sum: &LinearSum) -> ClauseSet {
     let mut info = vec![];
-    for (var, coef) in sum.terms() {
+    for (&var, &coef) in sum.iter() {
         let encoding = env.map.int_map[var].as_ref().unwrap();
 
         let direct_encoding = encoding.as_direct_encoding();
