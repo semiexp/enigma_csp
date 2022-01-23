@@ -12,7 +12,6 @@ fn main() {
             .files(&[
                 "lib/glucose/core/Solver.cc",
                 "lib/glucose/utils/Options.cc",
-                "lib/glucose/utils/System.cc",
                 "lib/glucose/constraints/Graph.cc",
                 "lib/glucose/constraints/OrderEncodingLinear.cc",
             ])
@@ -28,7 +27,6 @@ fn main() {
             .files(&[
                 "lib/glucose/core/Solver.cc",
                 "lib/glucose/utils/Options.cc",
-                "lib/glucose/utils/System.cc",
                 "lib/glucose/constraints/Graph.cc",
                 "lib/glucose/constraints/OrderEncodingLinear.cc",
             ])
