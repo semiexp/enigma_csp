@@ -17,9 +17,9 @@ fn main() {
             ])
             .include("lib/glucose")
             .flag("-std=c++17")
+            .flag("-DGLUCOSE_FIX_OPTIONS")
             .warnings(false)
             .compile("calc");
-        println!("cargo:rustc-link-arg=--no-entry");
     } else {
         cc::Build::new()
             .cpp(true)

@@ -28,3 +28,6 @@ pub enum CmpOp {
 
 #[cfg(not(target_arch = "wasm32"))]
 pub use pyo3_binding::enigma_csp;
+
+#[cfg(target_arch = "wasm32")]
+mod wasm;

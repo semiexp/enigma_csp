@@ -1,0 +1,28 @@
+#!/usr/bin/env python3
+
+import argparse
+import os
+import subprocess
+
+
+def main():
+    path_split = os.environ["PATH"].split(os.pathsep)
+    assert "./util" in path_split
+    path_filtered = [path for path in path_split if path != "./util"]
+    os.environ["PATH"] = os.pathsep.join(path_filtered)
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-o", type=str, required=True)
+    overwritten_args, extra_args = parser.parse_known_args()
+
+    orig_output = overwritten_args.o
+    root, ext = os.path.splitext(orig_output)
+    assert ext in [".wasm", ".js"]
+    output = root + ".js"
+
+    args = ["emcc", "-o", output] + extra_args
+    subprocess.run(args)
+
+
+if __name__ == "__main__":
+    main()
