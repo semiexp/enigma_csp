@@ -1,10 +1,11 @@
 use crate::arithmetic::CheckedInt;
 use crate::util::{ConvertMapIndex, UpdateStatus};
 use std::collections::{btree_map, BTreeMap};
-use std::io::Write;
-use std::ops::{Add, BitAnd, BitOr, BitXor, Mul, Not, Sub};
+use std::ops::{Add, BitOr, Index, IndexMut, Mul};
 
 use super::CmpOp;
+
+pub use super::csp_repr::{BoolExpr, BoolVar, IntExpr, IntVar, Stmt};
 
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub struct Domain {
@@ -156,311 +157,6 @@ impl IntVarData {
     }
 }
 
-#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug, Hash)]
-pub struct BoolVar(usize);
-
-impl BoolVar {
-    pub fn expr(self) -> BoolExpr {
-        BoolExpr::Var(self)
-    }
-}
-
-impl ConvertMapIndex for BoolVar {
-    fn to_index(&self) -> usize {
-        self.0
-    }
-}
-
-#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug, Hash)]
-pub struct IntVar(usize);
-
-impl IntVar {
-    pub fn expr(self) -> IntExpr {
-        IntExpr::Var(self)
-    }
-}
-
-impl ConvertMapIndex for IntVar {
-    fn to_index(&self) -> usize {
-        self.0
-    }
-}
-
-#[derive(Clone, PartialEq, Eq, Debug)]
-pub enum Stmt {
-    Expr(BoolExpr),
-    AllDifferent(Vec<IntExpr>),
-    ActiveVerticesConnected(Vec<BoolExpr>, Vec<(usize, usize)>),
-}
-
-impl Stmt {
-    pub fn pretty_print<W: Write>(&self, out: &mut W) -> std::io::Result<()> {
-        match self {
-            Stmt::Expr(e) => e.pretty_print(out)?,
-            Stmt::AllDifferent(exprs) => {
-                write!(out, "(alldifferent")?;
-                for expr in exprs {
-                    write!(out, " ")?;
-                    expr.pretty_print(out)?;
-                }
-                write!(out, ")")?;
-            }
-            Stmt::ActiveVerticesConnected(exprs, edges) => {
-                write!(out, "(active-vertices-connected")?;
-                for (i, expr) in exprs.iter().enumerate() {
-                    write!(out, " {}:", i)?;
-                    expr.pretty_print(out)?;
-                }
-                write!(out, " graph=[")?;
-                let mut is_first = true;
-                for &(u, v) in edges {
-                    if !is_first {
-                        write!(out, " ")?;
-                    } else {
-                        is_first = false;
-                    }
-                    write!(out, "{}--{}", u, v)?;
-                }
-                write!(out, "])")?;
-            }
-        }
-        Ok(())
-    }
-}
-#[derive(Clone, Hash, PartialEq, Eq, Debug)]
-pub enum BoolExpr {
-    Const(bool),
-    Var(BoolVar),
-    NVar(super::norm_csp::BoolVar),
-    And(Vec<Box<BoolExpr>>),
-    Or(Vec<Box<BoolExpr>>),
-    Not(Box<BoolExpr>),
-    Xor(Box<BoolExpr>, Box<BoolExpr>),
-    Iff(Box<BoolExpr>, Box<BoolExpr>),
-    Imp(Box<BoolExpr>, Box<BoolExpr>),
-    Cmp(CmpOp, Box<IntExpr>, Box<IntExpr>),
-}
-
-impl BoolExpr {
-    pub fn imp(self, rhs: BoolExpr) -> BoolExpr {
-        BoolExpr::Imp(Box::new(self), Box::new(rhs))
-    }
-
-    pub fn iff(self, rhs: BoolExpr) -> BoolExpr {
-        BoolExpr::Iff(Box::new(self), Box::new(rhs))
-    }
-
-    pub fn ite(self, t: IntExpr, f: IntExpr) -> IntExpr {
-        IntExpr::If(Box::new(self), Box::new(t), Box::new(f))
-    }
-
-    fn is_const(&self) -> Option<bool> {
-        match self {
-            &BoolExpr::Const(b) => Some(b),
-            _ => None,
-        }
-    }
-
-    pub fn as_var(&self) -> Option<BoolVar> {
-        match self {
-            &BoolExpr::Var(v) => Some(v),
-            _ => None,
-        }
-    }
-
-    pub fn pretty_print<W: Write>(&self, out: &mut W) -> std::io::Result<()> {
-        match self {
-            &BoolExpr::Const(b) => write!(out, "{}", b)?,
-            &BoolExpr::Var(v) => write!(out, "<b{}>", v.0)?,
-            &BoolExpr::NVar(v) => write!(out, "<nb{}>", v.id())?,
-            BoolExpr::And(exprs) => {
-                write!(out, "(&&")?;
-                for expr in exprs {
-                    write!(out, " ")?;
-                    expr.pretty_print(out)?;
-                }
-                write!(out, ")")?;
-            }
-            BoolExpr::Or(exprs) => {
-                write!(out, "(||")?;
-                for expr in exprs {
-                    write!(out, " ")?;
-                    expr.pretty_print(out)?;
-                }
-                write!(out, ")")?;
-            }
-            BoolExpr::Not(expr) => {
-                write!(out, "(! ")?;
-                expr.pretty_print(out)?;
-                write!(out, ")")?;
-            }
-            BoolExpr::Xor(e1, e2) => {
-                write!(out, "(xor ")?;
-                e1.pretty_print(out)?;
-                write!(out, " ")?;
-                e2.pretty_print(out)?;
-                write!(out, ")")?;
-            }
-            BoolExpr::Iff(e1, e2) => {
-                write!(out, "(iff ")?;
-                e1.pretty_print(out)?;
-                write!(out, " ")?;
-                e2.pretty_print(out)?;
-                write!(out, ")")?;
-            }
-            BoolExpr::Imp(e1, e2) => {
-                write!(out, "(=> ")?;
-                e1.pretty_print(out)?;
-                write!(out, " ")?;
-                e2.pretty_print(out)?;
-                write!(out, ")")?;
-            }
-            BoolExpr::Cmp(op, e1, e2) => {
-                write!(
-                    out,
-                    "({} ",
-                    match op {
-                        CmpOp::Eq => "==",
-                        CmpOp::Ne => "!=",
-                        CmpOp::Le => "<=",
-                        CmpOp::Lt => "<",
-                        CmpOp::Ge => ">=",
-                        CmpOp::Gt => ">",
-                    }
-                )?;
-                e1.pretty_print(out)?;
-                write!(out, " ")?;
-                e2.pretty_print(out)?;
-                write!(out, ")")?;
-            }
-        }
-        Ok(())
-    }
-}
-
-impl BitAnd<BoolExpr> for BoolExpr {
-    type Output = BoolExpr;
-
-    fn bitand(self, rhs: BoolExpr) -> Self::Output {
-        BoolExpr::And(vec![Box::new(self), Box::new(rhs)])
-    }
-}
-
-impl BitOr<BoolExpr> for BoolExpr {
-    type Output = BoolExpr;
-
-    fn bitor(self, rhs: BoolExpr) -> Self::Output {
-        BoolExpr::Or(vec![Box::new(self), Box::new(rhs)])
-    }
-}
-
-impl BitXor<BoolExpr> for BoolExpr {
-    type Output = BoolExpr;
-
-    fn bitxor(self, rhs: BoolExpr) -> Self::Output {
-        BoolExpr::Xor(Box::new(self), Box::new(rhs))
-    }
-}
-
-impl Not for BoolExpr {
-    type Output = BoolExpr;
-
-    fn not(self) -> Self::Output {
-        BoolExpr::Not(Box::new(self))
-    }
-}
-
-#[derive(Clone, Hash, PartialEq, Eq, Debug)]
-pub enum IntExpr {
-    Const(i32),
-    Var(IntVar),
-    NVar(super::norm_csp::IntVar),
-    Linear(Vec<(Box<IntExpr>, i32)>),
-    If(Box<BoolExpr>, Box<IntExpr>, Box<IntExpr>),
-}
-
-impl IntExpr {
-    pub fn eq(self, rhs: IntExpr) -> BoolExpr {
-        BoolExpr::Cmp(CmpOp::Eq, Box::new(self), Box::new(rhs))
-    }
-
-    pub fn ne(self, rhs: IntExpr) -> BoolExpr {
-        BoolExpr::Cmp(CmpOp::Ne, Box::new(self), Box::new(rhs))
-    }
-
-    pub fn le(self, rhs: IntExpr) -> BoolExpr {
-        BoolExpr::Cmp(CmpOp::Le, Box::new(self), Box::new(rhs))
-    }
-
-    pub fn lt(self, rhs: IntExpr) -> BoolExpr {
-        BoolExpr::Cmp(CmpOp::Lt, Box::new(self), Box::new(rhs))
-    }
-
-    pub fn ge(self, rhs: IntExpr) -> BoolExpr {
-        BoolExpr::Cmp(CmpOp::Ge, Box::new(self), Box::new(rhs))
-    }
-
-    pub fn gt(self, rhs: IntExpr) -> BoolExpr {
-        BoolExpr::Cmp(CmpOp::Gt, Box::new(self), Box::new(rhs))
-    }
-
-    pub fn pretty_print<W: Write>(&self, out: &mut W) -> std::io::Result<()> {
-        match self {
-            &IntExpr::Const(c) => write!(out, "{}", c)?,
-            &IntExpr::Var(v) => write!(out, "<i{}>", v.0)?,
-            &IntExpr::NVar(v) => write!(out, "<ni{}>", v.id())?,
-            IntExpr::Linear(terms) => {
-                write!(out, "(")?;
-                let mut is_first = true;
-                for (expr, coef) in terms {
-                    if !is_first {
-                        write!(out, "+")?;
-                    } else {
-                        is_first = false;
-                    }
-                    expr.pretty_print(out)?;
-                    write!(out, "*{}", coef)?;
-                }
-                write!(out, ")")?;
-            }
-            IntExpr::If(cond, t, f) => {
-                write!(out, "(if ")?;
-                cond.pretty_print(out)?;
-                write!(out, " ")?;
-                t.pretty_print(out)?;
-                write!(out, " ")?;
-                f.pretty_print(out)?;
-                write!(out, ")")?;
-            }
-        }
-        Ok(())
-    }
-}
-
-impl Add<IntExpr> for IntExpr {
-    type Output = IntExpr;
-
-    fn add(self, rhs: IntExpr) -> IntExpr {
-        IntExpr::Linear(vec![(Box::new(self), 1), (Box::new(rhs), 1)])
-    }
-}
-
-impl Sub<IntExpr> for IntExpr {
-    type Output = IntExpr;
-
-    fn sub(self, rhs: IntExpr) -> IntExpr {
-        IntExpr::Linear(vec![(Box::new(self), 1), (Box::new(rhs), -1)])
-    }
-}
-
-impl Mul<i32> for IntExpr {
-    type Output = IntExpr;
-
-    fn mul(self, rhs: i32) -> IntExpr {
-        IntExpr::Linear(vec![(Box::new(self), rhs)])
-    }
-}
-
 pub(super) struct CSPVars {
     // TODO: remove `pub(super)`
     pub(super) bool_var: Vec<BoolVarData>,
@@ -469,22 +165,22 @@ pub(super) struct CSPVars {
 
 impl CSPVars {
     pub(super) fn bool_vars_iter(&self) -> impl Iterator<Item = BoolVar> {
-        (0..self.bool_var.len()).map(|x| BoolVar(x))
+        (0..self.bool_var.len()).map(|x| BoolVar::new(x))
     }
 
     pub(super) fn int_vars_iter(&self) -> impl Iterator<Item = IntVar> {
-        (0..self.int_var.len()).map(|x| IntVar(x))
+        (0..self.int_var.len()).map(|x| IntVar::new(x))
     }
 
     pub(super) fn int_var(&self, var: IntVar) -> &IntVarData {
-        &self.int_var[var.0]
+        &self.int_var[var.to_index()]
     }
 
     fn constant_folding_bool(&self, expr: &mut BoolExpr) {
         match expr {
             BoolExpr::Const(_) => (),
             BoolExpr::Var(v) => {
-                let value = &self.bool_var[v.0];
+                let value = &self[*v];
                 if !value.is_feasible(true) && value.is_feasible(false) {
                     *expr = BoolExpr::Const(false)
                 } else if value.is_feasible(true) && !value.is_feasible(false) {
@@ -653,7 +349,7 @@ impl CSPVars {
                     UpdateStatus::Unsatisfiable
                 }
             }
-            &BoolExpr::Var(v) => self.bool_var[v.0].set_infeasible(!expected),
+            &BoolExpr::Var(v) => self[v].set_infeasible(!expected),
             BoolExpr::NVar(_) => unreachable!(),
             BoolExpr::And(exprs) => {
                 if expected {
@@ -692,6 +388,34 @@ impl CSPVars {
     }
 }
 
+impl Index<BoolVar> for CSPVars {
+    type Output = BoolVarData;
+
+    fn index(&self, index: BoolVar) -> &Self::Output {
+        &self.bool_var[index.to_index()]
+    }
+}
+
+impl IndexMut<BoolVar> for CSPVars {
+    fn index_mut(&mut self, index: BoolVar) -> &mut Self::Output {
+        &mut self.bool_var[index.to_index()]
+    }
+}
+
+impl Index<IntVar> for CSPVars {
+    type Output = IntVarData;
+
+    fn index(&self, index: IntVar) -> &Self::Output {
+        &self.int_var[index.to_index()]
+    }
+}
+
+impl IndexMut<IntVar> for CSPVars {
+    fn index_mut(&mut self, index: IntVar) -> &mut Self::Output {
+        &mut self.int_var[index.to_index()]
+    }
+}
+
 pub enum BoolVarStatus {
     Infeasible,
     Fixed(bool),
@@ -725,13 +449,13 @@ impl CSP {
     pub fn new_bool_var(&mut self) -> BoolVar {
         let id = self.vars.bool_var.len();
         self.vars.bool_var.push(BoolVarData::new());
-        BoolVar(id)
+        BoolVar::new(id)
     }
 
     pub fn new_int_var(&mut self, domain: Domain) -> IntVar {
         let id = self.vars.int_var.len();
         self.vars.int_var.push(IntVarData::new(domain));
-        IntVar(id)
+        IntVar::new(id)
     }
 
     pub fn add_constraint(&mut self, stmt: Stmt) {
@@ -743,7 +467,7 @@ impl CSP {
     }
 
     pub fn get_bool_var_status(&self, var: BoolVar) -> BoolVarStatus {
-        let data = &self.vars.bool_var[var.0];
+        let data = &self.vars[var];
         match (data.is_feasible(false), data.is_feasible(true)) {
             (false, false) => BoolVarStatus::Infeasible,
             (false, true) => BoolVarStatus::Fixed(true),
@@ -950,7 +674,7 @@ mod tests {
         let z = csp.new_bool_var();
 
         let mut expr = (x.expr() ^ y.expr()) | (y.expr().imp(z.expr()));
-        csp.vars.bool_var[y.0].set_infeasible(false); // y := true
+        csp.vars[y].set_infeasible(false); // y := true
 
         csp.vars.constant_folding_bool(&mut expr);
         assert_eq!(expr, !x.expr() | z.expr());
@@ -966,8 +690,8 @@ mod tests {
         let z = csp.new_bool_var();
 
         csp.vars.constant_prop_bool(&(w.expr() & !x.expr()), true);
-        assert!(!csp.vars.bool_var[w.0].is_feasible(false));
-        assert!(!csp.vars.bool_var[x.0].is_feasible(true));
+        assert!(!csp.vars[w].is_feasible(false));
+        assert!(!csp.vars[x].is_feasible(true));
 
         let mut expr =
             (w.expr().iff(x.expr())) | ((x.expr() ^ y.expr()) | (w.expr().imp(z.expr())));

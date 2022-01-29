@@ -1,6 +1,7 @@
 pub mod arithmetic;
 pub mod config;
 pub mod csp;
+mod csp_repr;
 pub mod csugar_cli;
 
 pub mod encoder;
