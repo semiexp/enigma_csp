@@ -10,6 +10,7 @@ pub mod integration;
 pub mod norm_csp;
 pub mod normalizer;
 pub mod parser;
+pub mod puzzle;
 
 #[cfg(not(target_arch = "wasm32"))]
 mod pyo3_binding;
