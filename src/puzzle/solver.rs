@@ -1,10 +1,10 @@
 use std::ops::{Add, BitAnd, BitOr, BitXor, Bound, Not, RangeBounds, Sub};
 
-use crate::csp::{Assignment, Domain};
-use crate::csp_repr::BoolExpr as CSPBoolExpr;
-use crate::csp_repr::BoolVar as CSPBoolVar;
-use crate::csp_repr::IntExpr as CSPIntExpr;
-use crate::csp_repr::IntVar as CSPIntVar;
+use crate::csp::{Assignment, Domain, Stmt};
+pub use crate::csp_repr::BoolExpr as CSPBoolExpr;
+pub use crate::csp_repr::BoolVar as CSPBoolVar;
+pub use crate::csp_repr::IntExpr as CSPIntExpr;
+pub use crate::csp_repr::IntVar as CSPIntVar;
 use crate::integration::IntegratedSolver;
 use crate::integration::Model as IntegratedModel;
 
@@ -15,6 +15,12 @@ pub trait Convertible<T> {
 impl<T> Convertible<T> for T {
     fn convert(self) -> T {
         self
+    }
+}
+
+impl<T: Clone> Convertible<T> for &T {
+    fn convert(self) -> T {
+        self.clone()
     }
 }
 
@@ -30,6 +36,12 @@ impl Convertible<CSPBoolExpr> for CSPBoolVar {
     }
 }
 
+impl Convertible<CSPBoolExpr> for &CSPBoolVar {
+    fn convert(self) -> CSPBoolExpr {
+        self.expr()
+    }
+}
+
 impl Convertible<CSPIntExpr> for i32 {
     fn convert(self) -> CSPIntExpr {
         CSPIntExpr::Const(self)
@@ -37,6 +49,12 @@ impl Convertible<CSPIntExpr> for i32 {
 }
 
 impl Convertible<CSPIntExpr> for CSPIntVar {
+    fn convert(self) -> CSPIntExpr {
+        self.expr()
+    }
+}
+
+impl Convertible<CSPIntExpr> for &CSPIntVar {
     fn convert(self) -> CSPIntExpr {
         self.expr()
     }
@@ -381,6 +399,32 @@ where
     }
 }
 
+impl<X> Not for &Value<X>
+where
+    X: Clone + Unary<CSPBoolExpr, CSPBoolExpr>,
+{
+    type Output = Value<<X as Unary<CSPBoolExpr, CSPBoolExpr>>::Output>;
+
+    fn not(self) -> Self::Output {
+        Value(self.0.clone().generate(|x| !x))
+    }
+}
+
+impl<X: Clone> Value<X> {
+    pub fn imp<Y, Z>(
+        &self,
+        rhs: Z,
+    ) -> Value<<(X, Y) as PropagateBinary<CSPBoolExpr, CSPBoolExpr, CSPBoolExpr>>::Output>
+    where
+        Y: Clone,
+        Z: std::borrow::Borrow<Value<Y>>,
+        (X, Y): PropagateBinary<CSPBoolExpr, CSPBoolExpr, CSPBoolExpr>,
+    {
+        let rhs = rhs.borrow();
+        Value((self.0.clone(), rhs.0.clone()).generate(|x, y| x.imp(y)))
+    }
+}
+
 macro_rules! binary_op {
     ($trait_name:ident, $trait_func:ident, $input_type:ty, $output_type:ty, $gen:expr) => {
         impl<X, Y> $trait_name<Value<Y>> for Value<X>
@@ -539,6 +583,10 @@ where
 }
 
 impl<T: Clone> Value<Array1DImpl<T>> {
+    pub fn len(&self) -> usize {
+        self.0.data.len()
+    }
+
     pub fn at(&self, idx: usize) -> Value<Array0DImpl<T>> {
         Value(Array0DImpl {
             data: self.0.data[idx].clone(),
@@ -561,6 +609,31 @@ fn resolve_range<T: RangeBounds<usize>>(len: usize, range: &T) -> (usize, usize)
         (0, 0)
     } else {
         (start, end)
+    }
+}
+
+impl<T> Value<Array2DImpl<T>> {
+    pub fn shape(&self) -> (usize, usize) {
+        self.0.shape
+    }
+
+    pub fn four_neighbor_indices(&self, idx: (usize, usize)) -> Vec<(usize, usize)> {
+        let (h, w) = self.shape();
+        let (y, x) = idx;
+        let mut ret = vec![];
+        if y > 0 {
+            ret.push((y - 1, x));
+        }
+        if x > 0 {
+            ret.push((y, x - 1));
+        }
+        if y < h - 1 {
+            ret.push((y + 1, x));
+        }
+        if x < w - 1 {
+            ret.push((y, x + 1));
+        }
+        ret
     }
 }
 
@@ -627,6 +700,35 @@ impl<T: Clone> Value<Array2DImpl<T>> {
             shape: slice_shape,
             data: items,
         })
+    }
+
+    pub fn flatten(&self) -> Value<Array1DImpl<T>> {
+        Value(Array1DImpl {
+            data: self.0.data.clone(),
+        })
+    }
+
+    pub fn four_neighbors(&self, idx: (usize, usize)) -> Value<Array1DImpl<T>> {
+        self.select(self.four_neighbor_indices(idx))
+    }
+}
+
+impl Value<Array2DImpl<CSPBoolVar>> {
+    pub fn at_or<T>(&self, idx: (usize, usize), default: T) -> Value<Array0DImpl<CSPBoolExpr>>
+    where
+        T: Convertible<CSPBoolExpr>,
+    {
+        let (h, w) = self.shape();
+        let (y, x) = idx;
+        if y < h && x < w {
+            Value(Array0DImpl {
+                data: self.at(idx).0.data.convert(),
+            })
+        } else {
+            Value(Array0DImpl {
+                data: default.convert(),
+            })
+        }
     }
 }
 
@@ -705,6 +807,21 @@ impl Solver {
         exprs
             .into_iter()
             .for_each(|e| self.solver.add_expr(e.convert()));
+    }
+
+    pub fn add_active_vertices_connected<T>(&mut self, exprs: T, graph: &[(usize, usize)])
+    where
+        T: IntoIterator,
+        <T as IntoIterator>::Item: Convertible<CSPBoolExpr>,
+    {
+        let vertices: Vec<CSPBoolExpr> = exprs.into_iter().map(|x| x.convert()).collect();
+        let n_vertices = vertices.len();
+        for &(u, v) in graph {
+            assert!(u < n_vertices);
+            assert!(v < n_vertices);
+        }
+        self.solver
+            .add_constraint(Stmt::ActiveVerticesConnected(vertices, graph.to_owned()));
     }
 
     pub fn add_answer_key_bool<T>(&mut self, keys: T)
@@ -938,4 +1055,38 @@ impl IrrefutableFacts {
     {
         var.from_irrefutable_facts(self)
     }
+}
+
+pub fn all<X, Y, T>(values: X) -> Value<Array0DImpl<CSPBoolExpr>>
+where
+    X: IntoIterator<Item = Value<Y>>,
+    Y: IntoIterator<Item = T>,
+    T: Convertible<CSPBoolExpr>,
+{
+    let mut terms = vec![];
+    for y in values.into_iter() {
+        for t in y.0.into_iter() {
+            terms.push(Box::new(t.convert()));
+        }
+    }
+    Value(Array0DImpl {
+        data: CSPBoolExpr::And(terms),
+    })
+}
+
+pub fn any<X, Y, T>(values: X) -> Value<Array0DImpl<CSPBoolExpr>>
+where
+    X: IntoIterator<Item = Value<Y>>,
+    Y: IntoIterator<Item = T>,
+    T: Convertible<CSPBoolExpr>,
+{
+    let mut terms = vec![];
+    for y in values.into_iter() {
+        for t in y.0.into_iter() {
+            terms.push(Box::new(t.convert()));
+        }
+    }
+    Value(Array0DImpl {
+        data: CSPBoolExpr::Or(terms),
+    })
 }
