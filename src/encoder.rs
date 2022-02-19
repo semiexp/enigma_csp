@@ -322,7 +322,7 @@ pub fn encode(norm: &mut NormCSP, sat: &mut SAT, map: &mut EncodeMap, config: &C
         for constr in &norm.constraints {
             for lit in &constr.linear_lit {
                 // TODO: use direct encoding for more complex cases
-                let is_simple = (lit.op == CmpOp::Eq || lit.op == CmpOp::Ne) && lit.sum.len() <= 1;
+                let is_simple = (lit.op == CmpOp::Eq || lit.op == CmpOp::Ne) && lit.sum.len() <= 2;
                 if !is_simple {
                     for (v, _) in lit.sum.iter() {
                         direct_encoding_vars.remove(v);
@@ -706,6 +706,27 @@ impl<'a> LinearInfoForDirectEncoding<'a> {
             self.encoding.lits[self.domain_size() - 1 - j]
         }
     }
+
+    /// The literal asserting (x == val), or `None` if `val` is not in the domain.
+    fn equals_val(&self, val: CheckedInt) -> Option<Lit> {
+        let mut left = 0;
+        let mut right = self.domain_size() - 1;
+
+        while left < right {
+            let mid = (left + right) / 2;
+            if val <= self.domain(mid) {
+                right = mid;
+            } else {
+                left = mid + 1;
+            }
+        }
+
+        if self.domain(left) == val {
+            Some(self.equals(left))
+        } else {
+            None
+        }
+    }
 }
 
 enum LinearInfo<'a> {
@@ -861,6 +882,7 @@ fn encode_simple_linear_direct_encoding(env: &mut EncoderEnv, lit: &LinearLit) -
 
     let encoding = env.map.int_map[var].as_ref().unwrap().as_direct_encoding();
     let mut oks = vec![];
+    let mut ngs = vec![];
     for i in 0..encoding.domain.len() {
         let lhs = encoding.domain[i] * coef + lit.sum.constant;
         let isok = match op {
@@ -873,11 +895,15 @@ fn encode_simple_linear_direct_encoding(env: &mut EncoderEnv, lit: &LinearLit) -
         };
         if isok {
             oks.push(encoding.lits[i]);
+        } else {
+            ngs.push(!encoding.lits[i]);
         }
     }
 
     if oks.len() == encoding.domain.len() {
         None
+    } else if ngs.len() == 1 {
+        Some(ngs)
     } else {
         Some(oks)
     }
@@ -1006,6 +1032,27 @@ fn encode_linear_ge_mixed(env: &EncoderEnv, sum: &LinearSum) -> ClauseSet {
     clauses_buf
 }
 
+fn encode_linear_eq_direct_two_terms(
+    info: &[LinearInfoForDirectEncoding],
+    constant: CheckedInt,
+) -> ClauseSet {
+    assert_eq!(info.len(), 2);
+
+    let mut ret = ClauseSet::new();
+
+    for u in 0..2 {
+        let v = u ^ 1;
+
+        for i in 0..info[u].domain_size() {
+            let mut clause = vec![!info[u].equals(i)];
+            clause.extend(info[v].equals_val(constant - info[u].domain(i)));
+            ret.push(&clause);
+        }
+    }
+
+    ret
+}
+
 fn encode_linear_eq_direct(env: &EncoderEnv, sum: &LinearSum) -> ClauseSet {
     let mut info = vec![];
     for (&var, &coef) in sum.iter() {
@@ -1021,6 +1068,10 @@ fn encode_linear_eq_direct(env: &EncoderEnv, sum: &LinearSum) -> ClauseSet {
             .len()
             .cmp(&encoding2.encoding.lits.len())
     });
+
+    if info.len() == 2 {
+        return encode_linear_eq_direct_two_terms(&info, sum.constant);
+    }
 
     fn encode_sub(
         info: &[LinearInfoForDirectEncoding],
