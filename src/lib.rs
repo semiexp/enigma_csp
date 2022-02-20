@@ -18,16 +18,6 @@ mod pyo3_binding;
 pub mod sat;
 mod util;
 
-#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
-pub enum CmpOp {
-    Eq,
-    Ne,
-    Le,
-    Lt,
-    Ge,
-    Gt,
-}
-
 #[cfg(not(target_arch = "wasm32"))]
 pub use pyo3_binding::enigma_csp;
 

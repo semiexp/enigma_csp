@@ -1,6 +1,59 @@
-use std::cmp::{PartialEq, PartialOrd};
+use std::cmp::{Ordering, PartialEq, PartialOrd};
 use std::collections::{btree_map, BTreeMap};
 use std::ops::{Add, AddAssign, BitAnd, BitOr, Mul, MulAssign, Neg, Sub, SubAssign};
+
+/// Comparison operators.
+#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
+pub enum CmpOp {
+    Eq,
+    Ne,
+    Le,
+    Lt,
+    Ge,
+    Gt,
+}
+
+impl CmpOp {
+    pub fn compare<T: Ord>(self, lhs: T, rhs: T) -> bool {
+        let ord = lhs.cmp(&rhs);
+        match self {
+            CmpOp::Eq => ord == Ordering::Equal,
+            CmpOp::Ne => ord != Ordering::Equal,
+            CmpOp::Le => ord != Ordering::Greater,
+            CmpOp::Lt => ord == Ordering::Less,
+            CmpOp::Ge => ord != Ordering::Less,
+            CmpOp::Gt => ord == Ordering::Greater,
+        }
+    }
+
+    pub fn negate(&self) -> CmpOp {
+        match *self {
+            CmpOp::Eq => CmpOp::Ne,
+            CmpOp::Ne => CmpOp::Eq,
+            CmpOp::Le => CmpOp::Gt,
+            CmpOp::Lt => CmpOp::Ge,
+            CmpOp::Ge => CmpOp::Lt,
+            CmpOp::Gt => CmpOp::Le,
+        }
+    }
+}
+
+impl std::fmt::Display for CmpOp {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+        write!(
+            f,
+            "{}",
+            match self {
+                CmpOp::Eq => "==",
+                CmpOp::Ne => "!=",
+                CmpOp::Le => "<=",
+                CmpOp::Lt => "<",
+                CmpOp::Ge => ">=",
+                CmpOp::Gt => ">",
+            }
+        )
+    }
+}
 
 /// Integer type for internal use.
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug, Hash)]

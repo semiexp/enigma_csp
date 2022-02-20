@@ -4,8 +4,7 @@ use std::collections::BTreeMap;
 use std::ops::Not;
 
 use super::csp::Domain;
-use super::CmpOp;
-use crate::arithmetic::{CheckedInt, Range};
+use crate::arithmetic::{CheckedInt, CmpOp, Range};
 use crate::util::{ConvertMapIndex, UpdateStatus};
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug, Hash)]
@@ -134,19 +133,7 @@ impl Constraint {
                 write!(out, "<ni{}>*{}", var.id(), coef.get())?;
             }
 
-            write!(
-                out,
-                "+{}{}0",
-                lit.sum.constant.get(),
-                match lit.op {
-                    CmpOp::Eq => "==",
-                    CmpOp::Ne => "!=",
-                    CmpOp::Le => "<=",
-                    CmpOp::Lt => "<",
-                    CmpOp::Ge => ">=",
-                    CmpOp::Gt => ">",
-                }
-            )?;
+            write!(out, "+{}{}0", lit.sum.constant.get(), lit.op)?;
         }
         write!(out, "]")?;
         Ok(())
@@ -461,14 +448,7 @@ impl Assignment {
                 v = v + self.int_val.get(var).copied().unwrap() * *coef;
             }
 
-            if match l.op {
-                CmpOp::Eq => v == 0,
-                CmpOp::Ne => v != 0,
-                CmpOp::Le => v <= 0,
-                CmpOp::Lt => v < 0,
-                CmpOp::Ge => v >= 0,
-                CmpOp::Gt => v > 0,
-            } {
+            if l.op.compare(v, CheckedInt::new(0)) {
                 return true;
             }
         }

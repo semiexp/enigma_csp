@@ -2,7 +2,7 @@ use crate::util::ConvertMapIndex;
 use std::io::Write;
 use std::ops::{Add, BitAnd, BitOr, BitXor, Mul, Not, Sub};
 
-use super::CmpOp;
+use crate::arithmetic::CmpOp;
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug, Hash)]
 pub struct BoolVar(usize);
@@ -172,18 +172,7 @@ impl BoolExpr {
                 write!(out, ")")?;
             }
             BoolExpr::Cmp(op, e1, e2) => {
-                write!(
-                    out,
-                    "({} ",
-                    match op {
-                        CmpOp::Eq => "==",
-                        CmpOp::Ne => "!=",
-                        CmpOp::Le => "<=",
-                        CmpOp::Lt => "<",
-                        CmpOp::Ge => ">=",
-                        CmpOp::Gt => ">",
-                    }
-                )?;
+                write!(out, "({} ", op)?;
                 e1.pretty_print(out)?;
                 write!(out, " ")?;
                 e2.pretty_print(out)?;

@@ -3,8 +3,6 @@ use crate::util::{ConvertMapIndex, UpdateStatus};
 use std::collections::{btree_map, BTreeMap};
 use std::ops::{Add, BitOr, Index, IndexMut, Mul};
 
-use super::CmpOp;
-
 pub use super::csp_repr::{BoolExpr, BoolVar, IntExpr, IntVar, Stmt};
 
 #[derive(Clone, PartialEq, Eq, Debug)]
@@ -630,14 +628,7 @@ impl Assignment {
             BoolExpr::Cmp(op, e1, e2) => {
                 let v1 = self.eval_int_expr(e1);
                 let v2 = self.eval_int_expr(e2);
-                match *op {
-                    CmpOp::Eq => v1 == v2,
-                    CmpOp::Ne => v1 != v2,
-                    CmpOp::Le => v1 <= v2,
-                    CmpOp::Lt => v1 < v2,
-                    CmpOp::Ge => v1 >= v2,
-                    CmpOp::Gt => v1 > v2,
-                }
+                op.compare(v1, v2)
             }
         }
     }

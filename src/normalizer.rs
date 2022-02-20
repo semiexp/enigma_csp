@@ -5,10 +5,8 @@ use super::csp::{BoolExpr, BoolVar, CSPVars, IntExpr, IntVar, Stmt, CSP};
 use super::norm_csp::BoolLit as NBoolLit;
 use super::norm_csp::IntVar as NIntVar;
 use super::norm_csp::{Constraint, ExtraConstraint, LinearLit, LinearSum, NormCSP};
-use crate::arithmetic::CheckedInt;
+use crate::arithmetic::{CheckedInt, CmpOp};
 use crate::util::ConvertMap;
-
-use super::CmpOp;
 
 pub struct NormalizeMap {
     bool_map: ConvertMap<BoolVar, NBoolLit>,
@@ -334,18 +332,7 @@ fn normalize_bool_expr(env: &mut NormalizerEnv, expr: &BoolExpr, neg: bool) -> V
             normalize_conjunction(constrs)
         }
         (BoolExpr::Cmp(op, e1, e2), _) => {
-            let op = if neg {
-                match op {
-                    CmpOp::Eq => CmpOp::Ne,
-                    CmpOp::Ne => CmpOp::Eq,
-                    CmpOp::Le => CmpOp::Gt,
-                    CmpOp::Lt => CmpOp::Ge,
-                    CmpOp::Ge => CmpOp::Lt,
-                    CmpOp::Gt => CmpOp::Le,
-                }
-            } else {
-                *op
-            };
+            let op = if neg { op.negate() } else { *op };
 
             let v1 = normalize_int_expr(env, e1);
             let v2 = normalize_int_expr(env, e2);

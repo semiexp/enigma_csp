@@ -8,8 +8,7 @@ use super::norm_csp::{
     LinearSum, NormCSP, NormCSPVars,
 };
 use super::sat::{Lit, SATModel, SAT};
-use super::CmpOp;
-use crate::arithmetic::{CheckedInt, Range};
+use crate::arithmetic::{CheckedInt, CmpOp, Range};
 use crate::util::ConvertMap;
 
 struct ClauseSet {
@@ -885,15 +884,7 @@ fn encode_simple_linear_direct_encoding(env: &mut EncoderEnv, lit: &LinearLit) -
     let mut ngs = vec![];
     for i in 0..encoding.domain.len() {
         let lhs = encoding.domain[i] * coef + lit.sum.constant;
-        let isok = match op {
-            CmpOp::Eq => lhs == 0,
-            CmpOp::Ne => lhs != 0,
-            CmpOp::Le => lhs <= 0,
-            CmpOp::Lt => lhs < 0,
-            CmpOp::Ge => lhs >= 0,
-            CmpOp::Gt => lhs > 0,
-        };
-        if isok {
+        if op.compare(lhs, CheckedInt::new(0)) {
             oks.push(encoding.lits[i]);
         } else {
             ngs.push(!encoding.lits[i]);
@@ -1403,15 +1394,7 @@ mod tests {
                             let idx = int_vars.iter().position(|&v| v == var).unwrap();
                             value += assignment[idx] * coef;
                         }
-                        let isok = match lit.op {
-                            CmpOp::Eq => value == 0,
-                            CmpOp::Ne => value != 0,
-                            CmpOp::Le => value <= 0,
-                            CmpOp::Lt => value < 0,
-                            CmpOp::Ge => value >= 0,
-                            CmpOp::Gt => value > 0,
-                        };
-                        if !isok {
+                        if !lit.op.compare(value, CheckedInt::new(0)) {
                             return false;
                         }
                     }
