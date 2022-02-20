@@ -1293,3 +1293,264 @@ fn encode_linear_ne_direct(env: &EncoderEnv, sum: &LinearSum) -> ClauseSet {
 }
 
 // TODO: add tests for ClauseSet
+#[cfg(test)]
+mod tests {
+    use super::super::{
+        config::Config, csp::Domain, norm_csp::IntVarRepresentation, norm_csp::NormCSPVars,
+        sat::SAT,
+    };
+    use super::*;
+
+    struct EncoderTester {
+        norm_vars: NormCSPVars,
+        sat: SAT,
+        map: EncodeMap,
+        config: Config,
+    }
+
+    impl EncoderTester {
+        fn new() -> EncoderTester {
+            EncoderTester {
+                norm_vars: NormCSPVars::new(),
+                sat: SAT::new(),
+                map: EncodeMap::new(),
+                config: Config::default(),
+            }
+        }
+
+        fn env(&mut self) -> EncoderEnv {
+            EncoderEnv {
+                norm_vars: &mut self.norm_vars,
+                sat: &mut self.sat,
+                map: &mut self.map,
+                config: &self.config,
+            }
+        }
+
+        fn add_clause(&mut self, clause: &[Lit]) {
+            self.sat.add_clause(clause);
+        }
+
+        fn add_clause_set(&mut self, clause_set: ClauseSet) {
+            for i in 0..clause_set.len() {
+                self.sat.add_clause(&clause_set[i]);
+            }
+        }
+
+        fn add_int_var(&mut self, domain: Domain, is_direct_encoding: bool) -> IntVar {
+            let v = self
+                .norm_vars
+                .new_int_var(IntVarRepresentation::Domain(domain));
+
+            if is_direct_encoding {
+                self.map
+                    .convert_int_var_direct_encoding(&self.norm_vars, &mut self.sat, v);
+            } else {
+                self.map
+                    .convert_int_var_order_encoding(&self.norm_vars, &mut self.sat, v);
+            }
+
+            v
+        }
+
+        fn enumerate_valid_assignments_by_sat(&mut self) -> Vec<Vec<CheckedInt>> {
+            let sat = &mut self.sat;
+            let map = &self.map;
+            let norm_vars = &self.norm_vars;
+
+            let int_vars = norm_vars.int_vars_iter().collect::<Vec<_>>();
+            let sat_vars = sat.all_vars();
+
+            let mut ret = vec![];
+            while let Some(model) = sat.solve() {
+                let values = int_vars
+                    .iter()
+                    .map(|&v| map.get_int_value_checked(&model, v).unwrap())
+                    .collect::<Vec<_>>();
+                ret.push(values);
+
+                let refutation_clause = sat_vars
+                    .iter()
+                    .map(|&v| v.as_lit(model.assignment(v)))
+                    .collect::<Vec<_>>();
+                sat.add_clause(&refutation_clause);
+            }
+
+            ret
+        }
+
+        fn enumerate_valid_assignments_by_literals(
+            &self,
+            lits: &[LinearLit],
+        ) -> Vec<Vec<CheckedInt>> {
+            let int_vars = self.norm_vars.int_vars_iter().collect::<Vec<_>>();
+            let domains = int_vars
+                .iter()
+                .map(|&v| match self.norm_vars.int_var(v) {
+                    IntVarRepresentation::Domain(domain) => domain.enumerate(),
+                    IntVarRepresentation::Binary(_, t, f) => vec![*t, *f],
+                })
+                .collect::<Vec<_>>();
+
+            let all_assignments = crate::util::product_multi(&domains);
+            let valid_assignments = all_assignments
+                .into_iter()
+                .filter(|assignment| {
+                    for lit in lits {
+                        let sum = &lit.sum;
+                        let mut value = sum.constant;
+                        for (&var, &coef) in sum.iter() {
+                            let idx = int_vars.iter().position(|&v| v == var).unwrap();
+                            value += assignment[idx] * coef;
+                        }
+                        let isok = match lit.op {
+                            CmpOp::Eq => value == 0,
+                            CmpOp::Ne => value != 0,
+                            CmpOp::Le => value <= 0,
+                            CmpOp::Lt => value < 0,
+                            CmpOp::Ge => value >= 0,
+                            CmpOp::Gt => value > 0,
+                        };
+                        if !isok {
+                            return false;
+                        }
+                    }
+                    true
+                })
+                .collect();
+            valid_assignments
+        }
+
+        fn run_check(mut self, lits: &[LinearLit]) {
+            let mut result_by_literals = self.enumerate_valid_assignments_by_literals(lits);
+            result_by_literals.sort();
+            let mut result_by_sat = self.enumerate_valid_assignments_by_sat();
+            result_by_sat.sort();
+
+            assert_eq!(result_by_literals, result_by_sat);
+        }
+    }
+
+    fn linear_sum(terms: &[(IntVar, i32)], constant: i32) -> LinearSum {
+        let mut ret = LinearSum::constant(CheckedInt::new(constant));
+        for &(var, coef) in terms {
+            ret.add_coef(var, CheckedInt::new(coef));
+        }
+        ret
+    }
+
+    #[test]
+    fn test_encode_simple_linear_direct_encoding() {
+        for op in [
+            CmpOp::Eq,
+            CmpOp::Ne,
+            CmpOp::Le,
+            CmpOp::Lt,
+            CmpOp::Ge,
+            CmpOp::Gt,
+        ] {
+            let mut tester = EncoderTester::new();
+
+            let x = tester.add_int_var(Domain::range(-2, 5), true);
+            let lits = [LinearLit::new(linear_sum(&[(x, 1)], 1), op)];
+            {
+                let clause = encode_simple_linear_direct_encoding(&mut tester.env(), &lits[0]);
+                if let Some(clause) = clause {
+                    tester.add_clause(&clause);
+                }
+            }
+            tester.run_check(&lits);
+        }
+    }
+
+    #[test]
+    fn test_encode_linear_eq_direct_two_terms() {
+        let mut tester = EncoderTester::new();
+
+        let x = tester.add_int_var(Domain::range(0, 5), true);
+        let y = tester.add_int_var(Domain::range(2, 6), true);
+
+        let lits = [LinearLit::new(linear_sum(&[(x, 2), (y, -1)], 1), CmpOp::Eq)];
+        {
+            let clause_set = encode_linear_eq_direct(&tester.env(), &lits[0].sum);
+            tester.add_clause_set(clause_set);
+        }
+        tester.run_check(&lits);
+    }
+
+    #[test]
+    fn test_encode_linear_eq_direct() {
+        let mut tester = EncoderTester::new();
+
+        let x = tester.add_int_var(Domain::range(0, 5), true);
+        let y = tester.add_int_var(Domain::range(2, 6), true);
+        let z = tester.add_int_var(Domain::range(-1, 4), true);
+
+        let lits = [LinearLit::new(
+            linear_sum(&[(x, 1), (y, -1), (z, 2)], -1),
+            CmpOp::Eq,
+        )];
+        {
+            let clause_set = encode_linear_eq_direct(&tester.env(), &lits[0].sum);
+            tester.add_clause_set(clause_set);
+        }
+        tester.run_check(&lits);
+    }
+
+    #[test]
+    fn test_encode_linear_ne_direct() {
+        let mut tester = EncoderTester::new();
+
+        let x = tester.add_int_var(Domain::range(0, 5), true);
+        let y = tester.add_int_var(Domain::range(2, 6), true);
+        let z = tester.add_int_var(Domain::range(-1, 4), true);
+
+        let lits = [LinearLit::new(
+            linear_sum(&[(x, 1), (y, -1), (z, 2)], -1),
+            CmpOp::Ne,
+        )];
+        {
+            let clause_set = encode_linear_ne_direct(&tester.env(), &lits[0].sum);
+            tester.add_clause_set(clause_set);
+        }
+        tester.run_check(&lits);
+    }
+
+    #[test]
+    fn test_encode_linear_ge_mixed() {
+        for mask in 0..8 {
+            let mut tester = EncoderTester::new();
+
+            let x = tester.add_int_var(Domain::range(0, 5), (mask & 4) != 0);
+            let y = tester.add_int_var(Domain::range(2, 6), (mask & 2) != 0);
+            let z = tester.add_int_var(Domain::range(-1, 4), (mask & 1) != 0);
+
+            let lits = [LinearLit::new(
+                linear_sum(&[(x, 3), (y, -4), (z, 2)], -1),
+                CmpOp::Ge,
+            )];
+            {
+                let clause_set = encode_linear_ge_mixed(&tester.env(), &lits[0].sum);
+                tester.add_clause_set(clause_set);
+            }
+            tester.run_check(&lits);
+        }
+    }
+
+    #[test]
+    fn test_encode_linear_ge_order_encoding_native() {
+        let mut tester = EncoderTester::new();
+
+        let x = tester.add_int_var(Domain::range(0, 5), false);
+        let y = tester.add_int_var(Domain::range(2, 6), false);
+        let z = tester.add_int_var(Domain::range(-1, 4), false);
+
+        let lits = [LinearLit::new(
+            linear_sum(&[(x, 3), (y, -4), (z, 2)], -1),
+            CmpOp::Ge,
+        )];
+        encode_linear_ge_order_encoding_native(&mut tester.env(), &lits[0].sum);
+
+        tester.run_check(&lits);
+    }
+}

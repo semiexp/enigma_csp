@@ -50,6 +50,14 @@ impl SAT {
         }
     }
 
+    pub fn num_var(&self) -> usize {
+        self.solver.num_var() as usize
+    }
+
+    pub fn all_vars(&self) -> Vec<Var> {
+        self.solver.all_vars().into_iter().map(|v| Var(v)).collect()
+    }
+
     pub fn new_var(&mut self) -> Var {
         Var(self.solver.new_var())
     }

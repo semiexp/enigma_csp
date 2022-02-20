@@ -83,6 +83,10 @@ impl Solver {
         unsafe { Glucose_NumVar(self.ptr) }
     }
 
+    pub fn all_vars(&self) -> Vec<Var> {
+        (0..self.num_var()).map(|i| Var(i)).collect()
+    }
+
     pub fn add_clause(&mut self, clause: &[Lit]) -> bool {
         assert!(clause.len() <= i32::max_value() as usize);
         let res = unsafe { Glucose_AddClause(self.ptr, clause.as_ptr(), clause.len() as i32) };

@@ -196,6 +196,14 @@ pub(super) struct NormCSPVars {
 }
 
 impl NormCSPVars {
+    #[allow(dead_code)]
+    pub(super) fn new() -> NormCSPVars {
+        NormCSPVars {
+            num_bool_var: 0,
+            int_var: vec![],
+        }
+    }
+
     pub(super) fn bool_vars_iter(&self) -> impl Iterator<Item = BoolVar> {
         (0..self.num_bool_var).map(|i| BoolVar(i))
     }
