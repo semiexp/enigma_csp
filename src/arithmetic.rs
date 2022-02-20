@@ -413,6 +413,28 @@ mod tests {
     use super::*;
 
     #[test]
+    fn test_cmp_op_compare() {
+        assert!(!CmpOp::Eq.compare(4, 2));
+        assert!(CmpOp::Eq.compare(3, 3));
+        assert!(!CmpOp::Eq.compare(2, 4));
+        assert!(CmpOp::Ne.compare(4, 2));
+        assert!(!CmpOp::Ne.compare(3, 3));
+        assert!(CmpOp::Ne.compare(2, 4));
+        assert!(!CmpOp::Le.compare(4, 2));
+        assert!(CmpOp::Le.compare(3, 3));
+        assert!(CmpOp::Le.compare(2, 4));
+        assert!(!CmpOp::Lt.compare(4, 2));
+        assert!(!CmpOp::Lt.compare(3, 3));
+        assert!(CmpOp::Lt.compare(2, 4));
+        assert!(CmpOp::Ge.compare(4, 2));
+        assert!(CmpOp::Ge.compare(3, 3));
+        assert!(!CmpOp::Ge.compare(2, 4));
+        assert!(CmpOp::Gt.compare(4, 2));
+        assert!(!CmpOp::Gt.compare(3, 3));
+        assert!(!CmpOp::Gt.compare(2, 4));
+    }
+
+    #[test]
     fn test_div_floor() {
         assert_eq!(CheckedInt::new(12).div_floor(CheckedInt::new(4)), 3);
         assert_eq!(CheckedInt::new(10).div_floor(CheckedInt::new(3)), 3);
