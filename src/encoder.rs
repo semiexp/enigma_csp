@@ -1126,7 +1126,6 @@ fn encode_linear_eq_direct(env: &EncoderEnv, sum: &LinearSum) -> ClauseSet {
                 possible_cand.push(direct_encoding.equals(i));
             }
 
-            assert!(!possible_cand.is_empty());
             if possible_cand.len() == direct_encoding.domain_size() {
                 return;
             }
