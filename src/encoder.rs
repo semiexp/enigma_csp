@@ -1045,7 +1045,7 @@ fn encode_linear_eq_direct_two_terms(
 
         for i in 0..info[u].domain_size() {
             let mut clause = vec![!info[u].equals(i)];
-            clause.extend(info[v].equals_val(constant - info[u].domain(i)));
+            clause.extend(info[v].equals_val(-constant - info[u].domain(i)));
             ret.push(&clause);
         }
     }
