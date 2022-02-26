@@ -1,6 +1,8 @@
 use std::ops::Index;
 
-use super::solver::{Array2DImpl, CSPBoolExpr, Convertible, Solver, Value};
+use super::solver::{
+    Array0DImpl, Array2DImpl, CSPBoolExpr, Operand, Solver,
+};
 
 pub struct Graph {
     n_vertices: usize,
@@ -57,17 +59,16 @@ fn infer_graph_from_2d_array(shape: (usize, usize)) -> Graph {
 pub fn active_vertices_connected<T>(solver: &mut Solver, is_active: T, graph: &Graph)
 where
     T: IntoIterator,
-    <T as IntoIterator>::Item: Convertible<CSPBoolExpr>,
+    <T as IntoIterator>::Item: Operand<Output = Array0DImpl<CSPBoolExpr>>,
 {
     solver.add_active_vertices_connected(is_active, &graph.edges);
 }
 
-pub fn active_vertices_connected_2d<X, T>(solver: &mut Solver, is_active: X)
+pub fn active_vertices_connected_2d<T>(solver: &mut Solver, is_active: T)
 where
-    X: std::borrow::Borrow<Value<Array2DImpl<T>>>,
-    T: Clone + Convertible<CSPBoolExpr>,
+    T: Operand<Output = Array2DImpl<CSPBoolExpr>>,
 {
-    let is_active = is_active.borrow();
+    let is_active = is_active.as_expr_array_value();
     let graph = infer_graph_from_2d_array(is_active.shape());
     active_vertices_connected(solver, is_active, &graph)
 }

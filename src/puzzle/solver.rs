@@ -8,67 +8,12 @@ pub use crate::csp_repr::IntVar as CSPIntVar;
 use crate::integration::IntegratedSolver;
 use crate::integration::Model as IntegratedModel;
 
-pub trait Convertible<T> {
-    fn convert(self) -> T;
-}
-
-impl<T> Convertible<T> for T {
-    fn convert(self) -> T {
-        self
-    }
-}
-
-impl<T: Clone> Convertible<T> for &T {
-    fn convert(self) -> T {
-        self.clone()
-    }
-}
-
-impl Convertible<CSPBoolExpr> for bool {
-    fn convert(self) -> CSPBoolExpr {
-        CSPBoolExpr::Const(self)
-    }
-}
-
-impl Convertible<CSPBoolExpr> for CSPBoolVar {
-    fn convert(self) -> CSPBoolExpr {
-        self.expr()
-    }
-}
-
-impl Convertible<CSPBoolExpr> for &CSPBoolVar {
-    fn convert(self) -> CSPBoolExpr {
-        self.expr()
-    }
-}
-
-impl Convertible<CSPIntExpr> for i32 {
-    fn convert(self) -> CSPIntExpr {
-        CSPIntExpr::Const(self)
-    }
-}
-
-impl Convertible<CSPIntExpr> for CSPIntVar {
-    fn convert(self) -> CSPIntExpr {
-        self.expr()
-    }
-}
-
-impl Convertible<CSPIntExpr> for &CSPIntVar {
-    fn convert(self) -> CSPIntExpr {
-        self.expr()
-    }
-}
+#[derive(Clone)]
+pub struct Value<T>(T);
 
 #[derive(Clone)]
 pub struct Array0DImpl<T> {
     data: T,
-}
-
-impl<T> Convertible<T> for Array0DImpl<T> {
-    fn convert(self) -> T {
-        self.data.convert()
-    }
 }
 
 #[derive(Clone)]
@@ -81,6 +26,10 @@ pub struct Array2DImpl<T> {
     shape: (usize, usize),
     data: Vec<T>,
 }
+
+// ==========
+// IntoIter
+// ==========
 
 impl<T> IntoIterator for Array0DImpl<T> {
     type Item = T;
@@ -109,478 +58,33 @@ impl<T> IntoIterator for Array2DImpl<T> {
     }
 }
 
-pub trait Unary<X, T> {
-    type Output;
-
-    fn generate<F>(self, func: F) -> Self::Output
-    where
-        F: Fn(X) -> T;
-}
-
-impl<A, X, T> Unary<X, T> for Array0DImpl<A>
-where
-    A: Convertible<X>,
-{
-    type Output = Array0DImpl<T>;
-
-    fn generate<F>(self, func: F) -> Self::Output
-    where
-        F: Fn(X) -> T,
-    {
-        Array0DImpl {
-            data: func(self.data.convert()),
-        }
-    }
-}
-
-impl<A, X, T> Unary<X, T> for Array1DImpl<A>
-where
-    A: Convertible<X>,
-{
-    type Output = Array1DImpl<T>;
-
-    fn generate<F>(self, func: F) -> Self::Output
-    where
-        F: Fn(X) -> T,
-    {
-        Array1DImpl {
-            data: self.data.into_iter().map(|x| func(x.convert())).collect(),
-        }
-    }
-}
-
-impl<A, X, T> Unary<X, T> for Array2DImpl<A>
-where
-    A: Convertible<X>,
-{
-    type Output = Array2DImpl<T>;
-
-    fn generate<F>(self, func: F) -> Self::Output
-    where
-        F: Fn(X) -> T,
-    {
-        Array2DImpl {
-            shape: self.shape,
-            data: self.data.into_iter().map(|x| func(x.convert())).collect(),
-        }
-    }
-}
-
-pub trait PropagateBinary<X, Y, T> {
-    type Output;
-
-    fn generate<F>(self, func: F) -> Self::Output
-    where
-        F: Fn(X, Y) -> T;
-}
-
-impl<A, B, X, Y, T> PropagateBinary<X, Y, T> for (Array0DImpl<A>, Array0DImpl<B>)
-where
-    A: Convertible<X>,
-    B: Convertible<Y>,
-{
-    type Output = Array0DImpl<T>;
-
-    fn generate<F>(self, func: F) -> Self::Output
-    where
-        F: Fn(X, Y) -> T,
-    {
-        Array0DImpl {
-            data: func(self.0.data.convert(), self.1.data.convert()),
-        }
-    }
-}
-
-impl<A, B, X, Y, T> PropagateBinary<X, Y, T> for (Array1DImpl<A>, Array0DImpl<B>)
-where
-    A: Convertible<X>,
-    B: Convertible<Y>,
-    Y: Clone,
-{
-    type Output = Array1DImpl<T>;
-
-    fn generate<F>(self, func: F) -> Self::Output
-    where
-        F: Fn(X, Y) -> T,
-    {
-        let rhs = self.1.data.convert();
-        Array1DImpl {
-            data: self
-                .0
-                .data
-                .into_iter()
-                .map(|lhs| func(lhs.convert(), rhs.clone()))
-                .collect(),
-        }
-    }
-}
-
-impl<A, B, X, Y, T> PropagateBinary<X, Y, T> for (Array0DImpl<A>, Array1DImpl<B>)
-where
-    A: Convertible<X>,
-    B: Convertible<Y>,
-    X: Clone,
-{
-    type Output = Array1DImpl<T>;
-
-    fn generate<F>(self, func: F) -> Self::Output
-    where
-        F: Fn(X, Y) -> T,
-    {
-        let lhs = self.0.data.convert();
-        Array1DImpl {
-            data: self
-                .1
-                .data
-                .into_iter()
-                .map(|rhs| func(lhs.clone(), rhs.convert()))
-                .collect(),
-        }
-    }
-}
-
-impl<A, B, X, Y, T> PropagateBinary<X, Y, T> for (Array1DImpl<A>, Array1DImpl<B>)
-where
-    A: Convertible<X>,
-    B: Convertible<Y>,
-{
-    type Output = Array1DImpl<T>;
-
-    fn generate<F>(self, func: F) -> Self::Output
-    where
-        F: Fn(X, Y) -> T,
-    {
-        Array1DImpl {
-            data: self
-                .0
-                .data
-                .into_iter()
-                .zip(self.1.data.into_iter())
-                .map(|(lhs, rhs)| func(lhs.convert(), rhs.convert()))
-                .collect(),
-        }
-    }
-}
-
-impl<A, B, X, Y, T> PropagateBinary<X, Y, T> for (Array2DImpl<A>, Array0DImpl<B>)
-where
-    A: Convertible<X>,
-    B: Convertible<Y>,
-    Y: Clone,
-{
-    type Output = Array2DImpl<T>;
-
-    fn generate<F>(self, func: F) -> Self::Output
-    where
-        F: Fn(X, Y) -> T,
-    {
-        let rhs = self.1.data.convert();
-        Array2DImpl {
-            shape: self.0.shape,
-            data: self
-                .0
-                .data
-                .into_iter()
-                .map(|lhs| func(lhs.convert(), rhs.clone()))
-                .collect(),
-        }
-    }
-}
-
-impl<A, B, X, Y, T> PropagateBinary<X, Y, T> for (Array0DImpl<A>, Array2DImpl<B>)
-where
-    A: Convertible<X>,
-    B: Convertible<Y>,
-    X: Clone,
-{
-    type Output = Array2DImpl<T>;
-
-    fn generate<F>(self, func: F) -> Self::Output
-    where
-        F: Fn(X, Y) -> T,
-    {
-        let lhs = self.0.data.convert();
-        Array2DImpl {
-            shape: self.1.shape,
-            data: self
-                .1
-                .data
-                .into_iter()
-                .map(|rhs| func(lhs.clone(), rhs.convert()))
-                .collect(),
-        }
-    }
-}
-
-impl<A, B, X, Y, T> PropagateBinary<X, Y, T> for (Array2DImpl<A>, Array2DImpl<B>)
-where
-    A: Convertible<X>,
-    B: Convertible<Y>,
-{
-    type Output = Array2DImpl<T>;
-
-    fn generate<F>(self, func: F) -> Self::Output
-    where
-        F: Fn(X, Y) -> T,
-    {
-        assert_eq!(self.0.shape, self.1.shape);
-        Array2DImpl {
-            shape: self.0.shape,
-            data: self
-                .0
-                .data
-                .into_iter()
-                .zip(self.1.data.into_iter())
-                .map(|(lhs, rhs)| func(lhs.convert(), rhs.convert()))
-                .collect(),
-        }
-    }
-}
-
-#[derive(Clone)]
-pub struct Value<T>(T);
-
 impl<T> IntoIterator for Value<T>
 where
     T: IntoIterator,
 {
-    type Item = <T as IntoIterator>::Item;
-    type IntoIter = <T as IntoIterator>::IntoIter;
+    type Item = Value<Array0DImpl<T::Item>>;
+    type IntoIter = std::iter::Map<T::IntoIter, fn(<T as IntoIterator>::Item) -> Self::Item>;
 
     fn into_iter(self) -> Self::IntoIter {
-        self.0.into_iter()
+        self.0.into_iter().map(|x| Value(Array0DImpl { data: x }))
     }
 }
 
 impl<T> IntoIterator for &Value<T>
 where
-    T: Clone + IntoIterator,
+    Value<T>: Clone + IntoIterator,
 {
-    type Item = <T as IntoIterator>::Item;
-    type IntoIter = <T as IntoIterator>::IntoIter;
+    type Item = <Value<T> as IntoIterator>::Item;
+    type IntoIter = <Value<T> as IntoIterator>::IntoIter;
 
     fn into_iter(self) -> Self::IntoIter {
-        self.0.clone().into_iter()
+        self.clone().into_iter()
     }
 }
 
-pub trait IntoValue {
-    type Output;
-
-    fn into_value(self) -> Value<Self::Output>;
-}
-
-impl<T> IntoValue for Value<T> {
-    type Output = T;
-
-    fn into_value(self) -> Value<Self::Output> {
-        self
-    }
-}
-
-impl IntoValue for i32 {
-    type Output = Array0DImpl<CSPIntExpr>;
-
-    fn into_value(self) -> Value<Self::Output> {
-        Value(Array0DImpl {
-            data: self.convert(),
-        })
-    }
-}
-
-impl<X> Not for Value<X>
-where
-    X: Unary<CSPBoolExpr, CSPBoolExpr>,
-{
-    type Output = Value<<X as Unary<CSPBoolExpr, CSPBoolExpr>>::Output>;
-
-    fn not(self) -> Self::Output {
-        Value(self.0.generate(|x| !x))
-    }
-}
-
-impl<X> Not for &Value<X>
-where
-    X: Clone + Unary<CSPBoolExpr, CSPBoolExpr>,
-{
-    type Output = Value<<X as Unary<CSPBoolExpr, CSPBoolExpr>>::Output>;
-
-    fn not(self) -> Self::Output {
-        Value(self.0.clone().generate(|x| !x))
-    }
-}
-
-impl<X: Clone> Value<X> {
-    pub fn imp<Y, Z>(
-        &self,
-        rhs: Z,
-    ) -> Value<<(X, Y) as PropagateBinary<CSPBoolExpr, CSPBoolExpr, CSPBoolExpr>>::Output>
-    where
-        Y: Clone,
-        Z: std::borrow::Borrow<Value<Y>>,
-        (X, Y): PropagateBinary<CSPBoolExpr, CSPBoolExpr, CSPBoolExpr>,
-    {
-        let rhs = rhs.borrow();
-        Value((self.0.clone(), rhs.0.clone()).generate(|x, y| x.imp(y)))
-    }
-}
-
-macro_rules! binary_op {
-    ($trait_name:ident, $trait_func:ident, $input_type:ty, $output_type:ty, $gen:expr) => {
-        impl<X, Y> $trait_name<Value<Y>> for Value<X>
-        where
-            (X, Y): PropagateBinary<$input_type, $input_type, $output_type>,
-        {
-            type Output =
-                Value<<(X, Y) as PropagateBinary<$input_type, $input_type, $output_type>>::Output>;
-
-            fn $trait_func(self, rhs: Value<Y>) -> Self::Output {
-                Value((self.0, rhs.0).generate($gen))
-            }
-        }
-
-        impl<X, Y> $trait_name<Value<Y>> for &Value<X>
-        where
-            (X, Y): PropagateBinary<$input_type, $input_type, $output_type>,
-            X: Clone,
-        {
-            type Output =
-                Value<<(X, Y) as PropagateBinary<$input_type, $input_type, $output_type>>::Output>;
-
-            fn $trait_func(self, rhs: Value<Y>) -> Self::Output {
-                Value((self.0.clone(), rhs.0).generate($gen))
-            }
-        }
-
-        impl<X, Y> $trait_name<&Value<Y>> for Value<X>
-        where
-            (X, Y): PropagateBinary<$input_type, $input_type, $output_type>,
-            Y: Clone,
-        {
-            type Output =
-                Value<<(X, Y) as PropagateBinary<$input_type, $input_type, $output_type>>::Output>;
-
-            fn $trait_func(self, rhs: &Value<Y>) -> Self::Output {
-                Value((self.0, rhs.0.clone()).generate($gen))
-            }
-        }
-
-        impl<X, Y> $trait_name<&Value<Y>> for &Value<X>
-        where
-            (X, Y): PropagateBinary<$input_type, $input_type, $output_type>,
-            X: Clone,
-            Y: Clone,
-        {
-            type Output =
-                Value<<(X, Y) as PropagateBinary<$input_type, $input_type, $output_type>>::Output>;
-
-            fn $trait_func(self, rhs: &Value<Y>) -> Self::Output {
-                Value((self.0.clone(), rhs.0.clone()).generate($gen))
-            }
-        }
-    };
-}
-
-binary_op!(BitAnd, bitand, CSPBoolExpr, CSPBoolExpr, |x, y| x & y);
-binary_op!(BitOr, bitor, CSPBoolExpr, CSPBoolExpr, |x, y| x | y);
-binary_op!(BitXor, bitxor, CSPBoolExpr, CSPBoolExpr, |x, y| x ^ y);
-binary_op!(Add, add, CSPIntExpr, CSPIntExpr, |x, y| x + y);
-binary_op!(Sub, sub, CSPIntExpr, CSPIntExpr, |x, y| x - y);
-
-macro_rules! comparator {
-    ($func_name:ident) => {
-        impl<X> Value<X> {
-            pub fn $func_name<Y>(
-                self,
-                rhs: Y,
-            ) -> Value<
-                <(X, <Y as IntoValue>::Output) as PropagateBinary<
-                    CSPIntExpr,
-                    CSPIntExpr,
-                    CSPBoolExpr,
-                >>::Output,
-            >
-            where
-                Y: IntoValue,
-                (X, <Y as IntoValue>::Output): PropagateBinary<CSPIntExpr, CSPIntExpr, CSPBoolExpr>,
-            {
-                Value((self.0, rhs.into_value().0).generate(|x, y| x.$func_name(y)))
-            }
-        }
-    };
-}
-
-comparator!(eq);
-comparator!(ne);
-comparator!(ge);
-comparator!(gt);
-comparator!(le);
-comparator!(lt);
-
-impl<T> Value<T>
-where
-    T: Clone + IntoIterator,
-    <T as IntoIterator>::Item: Convertible<CSPBoolExpr>,
-{
-    pub fn count_true(&self) -> Value<Array0DImpl<CSPIntExpr>> {
-        let terms = self
-            .0
-            .clone()
-            .into_iter()
-            .map(|e| {
-                (
-                    Box::new(e.convert().ite(CSPIntExpr::Const(1), CSPIntExpr::Const(0))),
-                    1,
-                )
-            })
-            .collect::<Vec<_>>();
-        Value(Array0DImpl {
-            data: CSPIntExpr::Linear(terms),
-        })
-    }
-
-    pub fn all(&self) -> Value<Array0DImpl<CSPBoolExpr>> {
-        let terms = self
-            .0
-            .clone()
-            .into_iter()
-            .map(|e| Box::new(e.convert()))
-            .collect::<Vec<_>>();
-        Value(Array0DImpl {
-            data: CSPBoolExpr::And(terms),
-        })
-    }
-
-    pub fn any(&self) -> Value<Array0DImpl<CSPBoolExpr>> {
-        let terms = self
-            .0
-            .clone()
-            .into_iter()
-            .map(|e| Box::new(e.convert()))
-            .collect::<Vec<_>>();
-        Value(Array0DImpl {
-            data: CSPBoolExpr::Or(terms),
-        })
-    }
-}
-
-impl<T> Value<T>
-where
-    T: Clone + IntoIterator,
-    <T as IntoIterator>::Item: Convertible<CSPIntExpr>,
-{
-    pub fn sum(&self) -> Value<Array0DImpl<CSPIntExpr>> {
-        let terms = self
-            .0
-            .clone()
-            .into_iter()
-            .map(|e| (Box::new(e.convert()), 1))
-            .collect::<Vec<_>>();
-        Value(Array0DImpl {
-            data: CSPIntExpr::Linear(terms),
-        })
-    }
-}
+// ==========
+// Accessors
+// ==========
 
 impl<T: Clone> Value<Array1DImpl<T>> {
     pub fn len(&self) -> usize {
@@ -713,24 +217,537 @@ impl<T: Clone> Value<Array2DImpl<T>> {
     }
 }
 
-impl Value<Array2DImpl<CSPBoolVar>> {
-    pub fn at_or<T>(&self, idx: (usize, usize), default: T) -> Value<Array0DImpl<CSPBoolExpr>>
+// ==========
+// Operators for Value<T>
+// ==========
+
+pub trait Operand {
+    type Output;
+
+    fn as_expr_array(self) -> Self::Output;
+    fn as_expr_array_value(self) -> Value<Self::Output>
     where
-        T: Convertible<CSPBoolExpr>,
+        Self: Sized,
     {
-        let (h, w) = self.shape();
-        let (y, x) = idx;
-        if y < h && x < w {
-            Value(Array0DImpl {
-                data: self.at(idx).0.data.convert(),
-            })
-        } else {
-            Value(Array0DImpl {
-                data: default.convert(),
-            })
+        Value(self.as_expr_array())
+    }
+}
+
+impl Operand for bool {
+    type Output = Array0DImpl<CSPBoolExpr>;
+
+    fn as_expr_array(self) -> Self::Output {
+        Array0DImpl {
+            data: CSPBoolExpr::Const(self),
         }
     }
 }
+
+impl Operand for &bool {
+    type Output = Array0DImpl<CSPBoolExpr>;
+
+    fn as_expr_array(self) -> Self::Output {
+        Array0DImpl {
+            data: CSPBoolExpr::Const(*self),
+        }
+    }
+}
+
+impl Operand for i32 {
+    type Output = Array0DImpl<CSPIntExpr>;
+
+    fn as_expr_array(self) -> Self::Output {
+        Array0DImpl {
+            data: CSPIntExpr::Const(self),
+        }
+    }
+}
+
+impl Operand for &i32 {
+    type Output = Array0DImpl<CSPIntExpr>;
+
+    fn as_expr_array(self) -> Self::Output {
+        Array0DImpl {
+            data: CSPIntExpr::Const(*self),
+        }
+    }
+}
+
+macro_rules! operand_as_is {
+    ($value_type:ty) => {
+        impl Operand for Value<$value_type> {
+            type Output = $value_type;
+
+            fn as_expr_array(self) -> Self::Output {
+                self.0
+            }
+        }
+    };
+}
+
+operand_as_is!(Array0DImpl<CSPBoolExpr>);
+operand_as_is!(Array1DImpl<CSPBoolExpr>);
+operand_as_is!(Array2DImpl<CSPBoolExpr>);
+operand_as_is!(Array0DImpl<CSPIntExpr>);
+operand_as_is!(Array1DImpl<CSPIntExpr>);
+operand_as_is!(Array2DImpl<CSPIntExpr>);
+
+impl Operand for Value<Array0DImpl<CSPBoolVar>> {
+    type Output = Array0DImpl<CSPBoolExpr>;
+
+    fn as_expr_array(self) -> Self::Output {
+        Array0DImpl {
+            data: CSPBoolExpr::Var(self.0.data),
+        }
+    }
+}
+
+impl Operand for Value<Array1DImpl<CSPBoolVar>> {
+    type Output = Array1DImpl<CSPBoolExpr>;
+
+    fn as_expr_array(self) -> Self::Output {
+        Array1DImpl {
+            data: self.0.data.into_iter().map(CSPBoolExpr::Var).collect(),
+        }
+    }
+}
+
+impl Operand for Value<Array2DImpl<CSPBoolVar>> {
+    type Output = Array2DImpl<CSPBoolExpr>;
+
+    fn as_expr_array(self) -> Self::Output {
+        Array2DImpl {
+            data: self.0.data.into_iter().map(CSPBoolExpr::Var).collect(),
+            shape: self.0.shape,
+        }
+    }
+}
+
+impl Operand for Value<Array0DImpl<CSPIntVar>> {
+    type Output = Array0DImpl<CSPIntExpr>;
+
+    fn as_expr_array(self) -> Self::Output {
+        Array0DImpl {
+            data: CSPIntExpr::Var(self.0.data),
+        }
+    }
+}
+
+impl Operand for Value<Array1DImpl<CSPIntVar>> {
+    type Output = Array1DImpl<CSPIntExpr>;
+
+    fn as_expr_array(self) -> Self::Output {
+        Array1DImpl {
+            data: self.0.data.into_iter().map(CSPIntExpr::Var).collect(),
+        }
+    }
+}
+
+impl Operand for Value<Array2DImpl<CSPIntVar>> {
+    type Output = Array2DImpl<CSPIntExpr>;
+
+    fn as_expr_array(self) -> Self::Output {
+        Array2DImpl {
+            data: self.0.data.into_iter().map(CSPIntExpr::Var).collect(),
+            shape: self.0.shape,
+        }
+    }
+}
+
+impl<T> Operand for &Value<T>
+where
+    T: Clone,
+    Value<T>: Operand,
+{
+    type Output = <Value<T> as Operand>::Output;
+
+    fn as_expr_array(self) -> Self::Output {
+        self.clone().as_expr_array()
+    }
+}
+
+impl<T> Operand for &&Value<T>
+where
+    T: Clone,
+    Value<T>: Operand,
+{
+    type Output = <Value<T> as Operand>::Output;
+
+    fn as_expr_array(self) -> Self::Output {
+        self.clone().as_expr_array()
+    }
+}
+
+pub trait PropagateBinary<X, Y, T> {
+    type Output;
+
+    fn generate<F>(self, func: F) -> Self::Output
+    where
+        F: Fn(X, Y) -> T;
+}
+
+impl<X, Y, T> PropagateBinary<X, Y, T> for (Array0DImpl<X>, Array0DImpl<Y>) {
+    type Output = Array0DImpl<T>;
+
+    fn generate<F>(self, func: F) -> Self::Output
+    where
+        F: Fn(X, Y) -> T,
+    {
+        Array0DImpl {
+            data: func(self.0.data, self.1.data),
+        }
+    }
+}
+
+impl<X, Y: Clone, T> PropagateBinary<X, Y, T> for (Array1DImpl<X>, Array0DImpl<Y>) {
+    type Output = Array1DImpl<T>;
+
+    fn generate<F>(self, func: F) -> Self::Output
+    where
+        F: Fn(X, Y) -> T,
+    {
+        let rhs = self.1.data;
+        Array1DImpl {
+            data: self
+                .0
+                .data
+                .into_iter()
+                .map(|lhs| func(lhs, rhs.clone()))
+                .collect(),
+        }
+    }
+}
+
+impl<X: Clone, Y, T> PropagateBinary<X, Y, T> for (Array0DImpl<X>, Array1DImpl<Y>) {
+    type Output = Array1DImpl<T>;
+
+    fn generate<F>(self, func: F) -> Self::Output
+    where
+        F: Fn(X, Y) -> T,
+    {
+        let lhs = self.0.data;
+        Array1DImpl {
+            data: self
+                .1
+                .data
+                .into_iter()
+                .map(|rhs| func(lhs.clone(), rhs))
+                .collect(),
+        }
+    }
+}
+
+impl<X, Y, T> PropagateBinary<X, Y, T> for (Array1DImpl<X>, Array1DImpl<Y>) {
+    type Output = Array1DImpl<T>;
+
+    fn generate<F>(self, func: F) -> Self::Output
+    where
+        F: Fn(X, Y) -> T,
+    {
+        Array1DImpl {
+            data: self
+                .0
+                .data
+                .into_iter()
+                .zip(self.1.data.into_iter())
+                .map(|(lhs, rhs)| func(lhs, rhs))
+                .collect(),
+        }
+    }
+}
+
+impl<X, Y: Clone, T> PropagateBinary<X, Y, T> for (Array2DImpl<X>, Array0DImpl<Y>) {
+    type Output = Array2DImpl<T>;
+
+    fn generate<F>(self, func: F) -> Self::Output
+    where
+        F: Fn(X, Y) -> T,
+    {
+        let rhs = self.1.data;
+        Array2DImpl {
+            shape: self.0.shape,
+            data: self
+                .0
+                .data
+                .into_iter()
+                .map(|lhs| func(lhs, rhs.clone()))
+                .collect(),
+        }
+    }
+}
+
+impl<X: Clone, Y, T> PropagateBinary<X, Y, T> for (Array0DImpl<X>, Array2DImpl<Y>) {
+    type Output = Array2DImpl<T>;
+
+    fn generate<F>(self, func: F) -> Self::Output
+    where
+        F: Fn(X, Y) -> T,
+    {
+        let lhs = self.0.data;
+        Array2DImpl {
+            shape: self.1.shape,
+            data: self
+                .1
+                .data
+                .into_iter()
+                .map(|rhs| func(lhs.clone(), rhs))
+                .collect(),
+        }
+    }
+}
+
+impl<X, Y, T> PropagateBinary<X, Y, T> for (Array2DImpl<X>, Array2DImpl<Y>) {
+    type Output = Array2DImpl<T>;
+
+    fn generate<F>(self, func: F) -> Self::Output
+    where
+        F: Fn(X, Y) -> T,
+    {
+        assert_eq!(self.0.shape, self.1.shape);
+        Array2DImpl {
+            shape: self.0.shape,
+            data: self
+                .0
+                .data
+                .into_iter()
+                .zip(self.1.data.into_iter())
+                .map(|(lhs, rhs)| func(lhs, rhs))
+                .collect(),
+        }
+    }
+}
+
+pub trait PropagateBinaryGeneric<X, Y, T> {
+    type Output;
+
+    fn generate<F>(self, func: F) -> Self::Output
+    where
+        F: Fn(X, Y) -> T;
+}
+
+impl<A, B, X, Y, T> PropagateBinaryGeneric<X, Y, T> for (A, B)
+where
+    A: Operand,
+    B: Operand,
+    (<A as Operand>::Output, <B as Operand>::Output): PropagateBinary<X, Y, T>,
+{
+    type Output =
+        <(<A as Operand>::Output, <B as Operand>::Output) as PropagateBinary<X, Y, T>>::Output;
+
+    fn generate<F>(self, func: F) -> Self::Output
+    where
+        F: Fn(X, Y) -> T,
+    {
+        let (a, b) = self;
+        (a.as_expr_array(), b.as_expr_array()).generate(func)
+    }
+}
+
+macro_rules! binary_op {
+    ($trait_name:ident, $trait_func:ident, $input_type:ty, $output_type:ty, $gen:expr) => {
+        impl<X, Y> $trait_name<Y> for Value<X>
+        where
+            (Value<X>, Y): PropagateBinaryGeneric<$input_type, $input_type, $output_type>,
+        {
+            type Output =
+                Value<
+                    <(Value<X>, Y) as PropagateBinaryGeneric<
+                        $input_type,
+                        $input_type,
+                        $output_type,
+                    >>::Output,
+                >;
+
+            fn $trait_func(self, rhs: Y) -> Self::Output {
+                Value((self, rhs).generate($gen))
+            }
+        }
+
+        impl<'a, X, Y> $trait_name<Y> for &'a Value<X>
+        where
+            (&'a Value<X>, Y): PropagateBinaryGeneric<$input_type, $input_type, $output_type>,
+        {
+            type Output = Value<
+                <(&'a Value<X>, Y) as PropagateBinaryGeneric<
+                    $input_type,
+                    $input_type,
+                    $output_type,
+                >>::Output,
+            >;
+
+            fn $trait_func(self, rhs: Y) -> Self::Output {
+                Value((self, rhs).generate($gen))
+            }
+        }
+    };
+}
+
+binary_op!(BitAnd, bitand, CSPBoolExpr, CSPBoolExpr, |x, y| x & y);
+binary_op!(BitOr, bitor, CSPBoolExpr, CSPBoolExpr, |x, y| x | y);
+binary_op!(BitXor, bitxor, CSPBoolExpr, CSPBoolExpr, |x, y| x ^ y);
+binary_op!(Add, add, CSPIntExpr, CSPIntExpr, |x, y| x + y);
+binary_op!(Sub, sub, CSPIntExpr, CSPIntExpr, |x, y| x - y);
+
+impl<X> Not for Value<X>
+where
+    (Value<X>, bool): PropagateBinaryGeneric<CSPBoolExpr, CSPBoolExpr, CSPBoolExpr>,
+{
+    type Output = Value<
+        <(Value<X>, bool) as PropagateBinaryGeneric<CSPBoolExpr, CSPBoolExpr, CSPBoolExpr>>::Output,
+    >;
+
+    fn not(self) -> Self::Output {
+        Value((self, false).generate(|x, _| !x))
+    }
+}
+
+impl<'a, X> Not for &'a Value<X>
+where
+    (&'a Value<X>, bool): PropagateBinaryGeneric<CSPBoolExpr, CSPBoolExpr, CSPBoolExpr>,
+{
+    type Output =
+        Value<
+            <(&'a Value<X>, bool) as PropagateBinaryGeneric<
+                CSPBoolExpr,
+                CSPBoolExpr,
+                CSPBoolExpr,
+            >>::Output,
+        >;
+
+    fn not(self) -> Self::Output {
+        Value((self, false).generate(|x, _| !x))
+    }
+}
+
+macro_rules! comparator {
+    ($func_name:ident) => {
+        impl<X> Value<X> {
+            pub fn $func_name<'a, Y>(&'a self, rhs: Y) -> Value<<(&'a Self, Y) as PropagateBinaryGeneric<CSPIntExpr, CSPIntExpr, CSPBoolExpr>>::Output> where
+            (&'a Self, Y): PropagateBinaryGeneric<CSPIntExpr, CSPIntExpr, CSPBoolExpr>
+            {
+                Value((self, rhs).generate(|x, y| x.$func_name(y)))
+            }
+        }
+    }
+}
+
+comparator!(eq);
+comparator!(ne);
+comparator!(ge);
+comparator!(gt);
+comparator!(le);
+comparator!(lt);
+
+impl<X> Value<X> {
+    pub fn imp<'a, Y>(
+        &'a self,
+        rhs: Y,
+    ) -> Value<
+        <(&'a Self, Y) as PropagateBinaryGeneric<CSPBoolExpr, CSPBoolExpr, CSPBoolExpr>>::Output,
+    >
+    where
+        (&'a Self, Y): PropagateBinaryGeneric<CSPBoolExpr, CSPBoolExpr, CSPBoolExpr>,
+    {
+        Value((self, rhs).generate(|x, y| x.imp(y)))
+    }
+}
+
+pub fn count_true<T>(values: T) -> Value<Array0DImpl<CSPIntExpr>>
+where
+    T: IntoIterator,
+    T::Item: Operand<Output = Array0DImpl<CSPBoolExpr>>,
+{
+    let terms = values
+        .into_iter()
+        .map(|x| {
+            (
+                Box::new(
+                    x.as_expr_array()
+                        .data
+                        .ite(CSPIntExpr::Const(1), CSPIntExpr::Const(0)),
+                ),
+                1,
+            )
+        })
+        .collect();
+    Value(Array0DImpl {
+        data: CSPIntExpr::Linear(terms),
+    })
+}
+
+pub fn any<T>(values: T) -> Value<Array0DImpl<CSPBoolExpr>>
+where
+    T: IntoIterator,
+    T::Item: Operand<Output = Array0DImpl<CSPBoolExpr>>,
+{
+    let terms = values
+        .into_iter()
+        .map(|x| Box::new(x.as_expr_array().data))
+        .collect();
+    Value(Array0DImpl {
+        data: CSPBoolExpr::Or(terms),
+    })
+}
+
+pub fn all<T>(values: T) -> Value<Array0DImpl<CSPBoolExpr>>
+where
+    T: IntoIterator,
+    T::Item: Operand<Output = Array0DImpl<CSPBoolExpr>>,
+{
+    let terms = values
+        .into_iter()
+        .map(|x| Box::new(x.as_expr_array().data))
+        .collect();
+    Value(Array0DImpl {
+        data: CSPBoolExpr::And(terms),
+    })
+}
+
+pub fn sum<T>(values: T) -> Value<Array0DImpl<CSPIntExpr>>
+where
+    T: IntoIterator,
+    T::Item: Operand<Output = Array0DImpl<CSPIntExpr>>,
+{
+    let terms = values
+        .into_iter()
+        .map(|x| (Box::new(x.as_expr_array().data), 1))
+        .collect();
+    Value(Array0DImpl {
+        data: CSPIntExpr::Linear(terms),
+    })
+}
+
+impl<T> Value<T>
+where
+    Value<T>: IntoIterator + Clone,
+    <Value<T> as IntoIterator>::Item: Operand<Output = Array0DImpl<CSPBoolExpr>>,
+{
+    pub fn count_true(&self) -> Value<Array0DImpl<CSPIntExpr>> {
+        count_true(self.clone())
+    }
+
+    pub fn any(&self) -> Value<Array0DImpl<CSPBoolExpr>> {
+        any(self.clone())
+    }
+
+    pub fn all(&self) -> Value<Array0DImpl<CSPBoolExpr>> {
+        all(self.clone())
+    }
+}
+
+impl<T> Value<T>
+where
+    Value<T>: IntoIterator + Clone,
+    <Value<T> as IntoIterator>::Item: Operand<Output = Array0DImpl<CSPIntExpr>>,
+{
+    pub fn sum(&self) -> Value<Array0DImpl<CSPIntExpr>> {
+        sum(self.clone())
+    }
+}
+
+// ==========
+// Solver
+// ==========
 
 pub type BoolVar = Value<Array0DImpl<CSPBoolVar>>;
 pub type BoolVarArray1D = Value<Array1DImpl<CSPBoolVar>>;
@@ -739,6 +756,43 @@ pub type BoolExpr = Value<Array0DImpl<CSPBoolExpr>>;
 pub type IntVar = Value<Array0DImpl<CSPIntVar>>;
 pub type IntVarArray1D = Value<Array1DImpl<CSPIntVar>>;
 pub type IntVarArray2D = Value<Array2DImpl<CSPIntVar>>;
+
+pub trait DerefVar {
+    type Var;
+
+    fn deref_var(self) -> Self::Var;
+}
+
+macro_rules! impl_deref_var {
+    ($type_name:ty) => {
+        impl DerefVar for Value<Array0DImpl<$type_name>> {
+            type Var = Value<Array0DImpl<$type_name>>;
+
+            fn deref_var(self) -> Self::Var {
+                self
+            }
+        }
+
+        impl DerefVar for &Value<Array0DImpl<$type_name>> {
+            type Var = Value<Array0DImpl<$type_name>>;
+
+            fn deref_var(self) -> Self::Var {
+                self.clone()
+            }
+        }
+
+        impl DerefVar for &&Value<Array0DImpl<$type_name>> {
+            type Var = Value<Array0DImpl<$type_name>>;
+
+            fn deref_var(self) -> Self::Var {
+                self.clone().clone()
+            }
+        }
+    };
+}
+
+impl_deref_var!(CSPBoolVar);
+impl_deref_var!(CSPIntVar);
 
 pub struct Solver {
     solver: IntegratedSolver,
@@ -802,19 +856,20 @@ impl Solver {
     pub fn add_expr<T>(&mut self, exprs: T)
     where
         T: IntoIterator,
-        <T as IntoIterator>::Item: Convertible<CSPBoolExpr>,
+        <T as IntoIterator>::Item: Operand<Output = Array0DImpl<CSPBoolExpr>>,
     {
         exprs
             .into_iter()
-            .for_each(|e| self.solver.add_expr(e.convert()));
+            .for_each(|e| self.solver.add_expr(e.as_expr_array().data));
     }
 
     pub fn add_active_vertices_connected<T>(&mut self, exprs: T, graph: &[(usize, usize)])
     where
         T: IntoIterator,
-        <T as IntoIterator>::Item: Convertible<CSPBoolExpr>,
+        <T as IntoIterator>::Item: Operand<Output = Array0DImpl<CSPBoolExpr>>,
     {
-        let vertices: Vec<CSPBoolExpr> = exprs.into_iter().map(|x| x.convert()).collect();
+        let vertices: Vec<CSPBoolExpr> =
+            exprs.into_iter().map(|x| x.as_expr_array().data).collect();
         let n_vertices = vertices.len();
         for &(u, v) in graph {
             assert!(u < n_vertices);
@@ -827,19 +882,19 @@ impl Solver {
     pub fn add_answer_key_bool<T>(&mut self, keys: T)
     where
         T: IntoIterator,
-        <T as IntoIterator>::Item: Convertible<CSPBoolVar>,
+        <T as IntoIterator>::Item: DerefVar<Var = Value<Array0DImpl<CSPBoolVar>>>,
     {
         self.answer_key_bool
-            .extend(keys.into_iter().map(|x| x.convert()))
+            .extend(keys.into_iter().map(|x| x.deref_var().0.data))
     }
 
     pub fn add_answer_key_int<T>(&mut self, keys: T)
     where
         T: IntoIterator,
-        <T as IntoIterator>::Item: Convertible<CSPIntVar>,
+        <T as IntoIterator>::Item: DerefVar<Var = Value<Array0DImpl<CSPIntVar>>>,
     {
         self.answer_key_int
-            .extend(keys.into_iter().map(|x| x.convert()))
+            .extend(keys.into_iter().map(|x| x.deref_var().0.data))
     }
 
     pub fn solve<'a>(&'a mut self) -> Option<Model<'a>> {
@@ -1057,36 +1112,72 @@ impl IrrefutableFacts {
     }
 }
 
-pub fn all<X, Y, T>(values: X) -> Value<Array0DImpl<CSPBoolExpr>>
-where
-    X: IntoIterator<Item = Value<Y>>,
-    Y: IntoIterator<Item = T>,
-    T: Convertible<CSPBoolExpr>,
-{
-    let mut terms = vec![];
-    for y in values.into_iter() {
-        for t in y.0.into_iter() {
-            terms.push(Box::new(t.convert()));
-        }
-    }
-    Value(Array0DImpl {
-        data: CSPBoolExpr::And(terms),
-    })
-}
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-pub fn any<X, Y, T>(values: X) -> Value<Array0DImpl<CSPBoolExpr>>
-where
-    X: IntoIterator<Item = Value<Y>>,
-    Y: IntoIterator<Item = T>,
-    T: Convertible<CSPBoolExpr>,
-{
-    let mut terms = vec![];
-    for y in values.into_iter() {
-        for t in y.0.into_iter() {
-            terms.push(Box::new(t.convert()));
-        }
+    #[test]
+    fn test_binary_operators_bool() {
+        let mut solver = Solver::new();
+        let b0d = &solver.bool_var();
+        let b1d = &solver.bool_var_1d(7);
+        let b2d = &solver.bool_var_2d((3, 5));
+
+        let _ = b0d ^ ((b0d | b0d) & b0d);
+        let _ = b1d ^ ((b0d | b1d) & b0d);
+        let _ = b1d ^ ((b1d | b0d) & b0d);
+        let _ = b1d | b1d;
+        let _ = b2d ^ ((b0d | b2d) & b0d);
+        let _ = b2d ^ ((b2d | b0d) & b0d);
+        let _ = b2d | b2d;
+
+        let _ = !b0d;
+        let _ = !(b0d ^ b0d);
+        let _ = !b1d;
+        let _ = !(b1d ^ b1d);
+        let _ = !b2d;
+        let _ = !(b2d ^ b2d);
     }
-    Value(Array0DImpl {
-        data: CSPBoolExpr::Or(terms),
-    })
+
+    #[test]
+    fn test_count_true() {
+        let mut solver = Solver::new();
+        let b0d = &solver.bool_var();
+        let b1d = &solver.bool_var_1d(5);
+        let b2d = &solver.bool_var_2d((3, 7));
+
+        let _ = count_true(b0d);
+        let _ = count_true([b0d, b0d]);
+        let _ = count_true(&[b0d, b0d]);
+        let _ = count_true(vec![b0d, b0d]);
+        let _ = count_true(&vec![b0d, b0d]);
+        let _ = count_true(b1d);
+        let _ = count_true(b2d);
+        let _ = b0d.count_true();
+        let _ = b1d.count_true();
+        let _ = b2d.count_true();
+    }
+
+    #[test]
+    fn test_solver_interface() {
+        let mut solver = Solver::new();
+        let b0d = &solver.bool_var();
+        let b1d = &solver.bool_var_1d(5);
+        let b2d = &solver.bool_var_2d((3, 7));
+
+        solver.add_expr(b0d);
+        solver.add_expr([b0d, b0d]);
+        solver.add_expr(&[b0d, b0d]);
+        solver.add_expr(vec![b0d, b0d]);
+        solver.add_expr(&vec![b0d, b0d]);
+        solver.add_expr([b0d | b0d, b0d & b0d]);
+        solver.add_expr(b1d);
+        solver.add_expr(b1d | b1d);
+        solver.add_expr(b2d);
+        solver.add_expr(b2d | b2d);
+
+        solver.add_answer_key_bool(b0d);
+        solver.add_answer_key_bool([b0d]);
+        solver.add_answer_key_bool(&[b0d]);
+    }
 }

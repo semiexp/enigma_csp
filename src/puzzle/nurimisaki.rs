@@ -47,16 +47,24 @@ pub fn solve_nurimisaki(clues: &[Vec<Option<i32>>]) -> Option<Vec<Vec<Option<boo
                         }
                     }
                     if h - y >= n {
-                        dirs.push(
-                            is_white.slice_fixed_x(((y + 1)..(y + n), x)).all()
-                                & !is_white.at_or((y + n, x), false),
-                        );
+                        if y == h - n {
+                            dirs.push(is_white.slice_fixed_x(((y + 1)..(y + n), x)).all());
+                        } else {
+                            dirs.push(
+                                is_white.slice_fixed_x(((y + 1)..(y + n), x)).all()
+                                    & !is_white.at((y + n, x)),
+                            );
+                        }
                     }
                     if w - x >= n {
-                        dirs.push(
-                            is_white.slice_fixed_y((y, (x + 1)..(x + n))).all()
-                                & !is_white.at_or((y, x + n), false),
-                        );
+                        if x == w - n {
+                            dirs.push(is_white.slice_fixed_y((y, (x + 1)..(x + n))).all());
+                        } else {
+                            dirs.push(
+                                is_white.slice_fixed_y((y, (x + 1)..(x + n))).all()
+                                    & !is_white.at((y, x + n)),
+                            );
+                        }
                     }
                     solver.add_expr(any(dirs));
                 }
