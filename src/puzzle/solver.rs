@@ -543,6 +543,69 @@ where
     }
 }
 
+pub trait PropagateTernary<X, Y, Z, T> {
+    type Output;
+
+    fn generate<F>(self, func: F) -> Self::Output
+    where
+        F: Fn(X, Y, Z) -> T;
+}
+
+impl<A, B, C, X, Y, Z, T> PropagateTernary<X, Y, Z, T> for (A, B, C)
+where
+    (A, B): PropagateBinary<X, Y, (X, Y)>,
+    (<(A, B) as PropagateBinary<X, Y, (X, Y)>>::Output, C): PropagateBinary<(X, Y), Z, T>,
+{
+    type Output = <(<(A, B) as PropagateBinary<X, Y, (X, Y)>>::Output, C) as PropagateBinary<
+        (X, Y),
+        Z,
+        T,
+    >>::Output;
+
+    fn generate<F>(self, func: F) -> Self::Output
+    where
+        F: Fn(X, Y, Z) -> T,
+    {
+        let (a, b, c) = self;
+        let ab = (a, b).generate(|x, y| (x, y));
+        (ab, c).generate(|(x, y), z| func(x, y, z))
+    }
+}
+
+pub trait PropagateTernaryGeneric<X, Y, Z, T> {
+    type Output;
+
+    fn generate<F>(self, func: F) -> Self::Output
+    where
+        F: Fn(X, Y, Z) -> T;
+}
+
+impl<A, B, C, X, Y, Z, T> PropagateTernaryGeneric<X, Y, Z, T> for (A, B, C)
+where
+    A: Operand,
+    B: Operand,
+    C: Operand,
+    (
+        <A as Operand>::Output,
+        <B as Operand>::Output,
+        <C as Operand>::Output,
+    ): PropagateTernary<X, Y, Z, T>,
+{
+    type Output = <(
+        <A as Operand>::Output,
+        <B as Operand>::Output,
+        <C as Operand>::Output,
+    ) as PropagateTernary<X, Y, Z, T>>::Output;
+
+    fn generate<F>(self, func: F) -> Self::Output
+    where
+        F: Fn(X, Y, Z) -> T,
+    {
+        let (a, b, c) = self;
+        (a.as_expr_array(), b.as_expr_array(), c.as_expr_array()).generate(func)
+    }
+}
+
 macro_rules! binary_op {
     ($trait_name:ident, $trait_func:ident, $input_type:ty, $output_type:ty, $gen:expr) => {
         impl<X, Y> $trait_name<Y> for Value<X>
@@ -649,6 +712,24 @@ impl<X> Value<X> {
         (&'a Self, Y): PropagateBinaryGeneric<CSPBoolExpr, CSPBoolExpr, CSPBoolExpr>,
     {
         Value((self, rhs).generate(|x, y| x.imp(y)))
+    }
+
+    pub fn ite<'a, Y, Z>(
+        &'a self,
+        if_true: Y,
+        if_false: Z,
+    ) -> Value<
+        <(&'a Self, Y, Z) as PropagateTernaryGeneric<
+            CSPBoolExpr,
+            CSPIntExpr,
+            CSPIntExpr,
+            CSPIntExpr,
+        >>::Output,
+    >
+    where
+        (&'a Self, Y, Z): PropagateTernaryGeneric<CSPBoolExpr, CSPIntExpr, CSPIntExpr, CSPIntExpr>,
+    {
+        Value((self, if_true, if_false).generate(|x, y, z| x.ite(y, z)))
     }
 }
 
@@ -1137,6 +1218,34 @@ mod tests {
         let _ = !(b1d ^ b1d);
         let _ = !b2d;
         let _ = !(b2d ^ b2d);
+    }
+
+    #[test]
+    fn test_ite() {
+        let mut solver = Solver::new();
+
+        let b0d = &solver.bool_var();
+        let b1d = &solver.bool_var_1d(7);
+        let b2d = &solver.bool_var_2d((3, 5));
+        let i0d = &solver.int_var(0, 2);
+        let i1d = &solver.int_var_1d(7, 0, 2);
+        let i2d = &solver.int_var_2d((3, 5), 0, 2);
+
+        let _ = b0d.ite(i0d, i0d);
+        let _ = b0d.ite(i0d, i1d);
+        let _ = b0d.ite(i0d, i2d);
+        let _ = b0d.ite(i1d, i0d);
+        let _ = b0d.ite(i1d, i1d);
+        let _ = b0d.ite(i2d, i0d);
+        let _ = b0d.ite(i2d, i2d);
+        let _ = b1d.ite(i0d, i0d);
+        let _ = b1d.ite(i0d, i1d);
+        let _ = b1d.ite(i1d, i1d);
+        let _ = b1d.ite(i1d, i1d);
+        let _ = b2d.ite(i0d, i0d);
+        let _ = b2d.ite(i0d, i2d);
+        let _ = b2d.ite(i2d, i2d);
+        let _ = b2d.ite(i2d, i2d);
     }
 
     #[test]

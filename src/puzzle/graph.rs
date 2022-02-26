@@ -1,8 +1,6 @@
 use std::ops::Index;
 
-use super::solver::{
-    Array0DImpl, Array2DImpl, CSPBoolExpr, Operand, Solver,
-};
+use super::solver::{Array0DImpl, Array2DImpl, CSPBoolExpr, Operand, Solver};
 
 pub struct Graph {
     n_vertices: usize,
