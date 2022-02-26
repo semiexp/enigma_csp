@@ -83,6 +83,33 @@ where
 }
 
 // ==========
+// Builders
+// ==========
+
+impl<T> Value<Array1DImpl<T>> {
+    pub fn new<I>(data: I) -> Value<Array1DImpl<T>>
+    where
+        I: IntoIterator<Item = Value<Array0DImpl<T>>>,
+    {
+        Value(Array1DImpl {
+            data: data.into_iter().map(|x| x.0.data).collect(),
+        })
+    }
+}
+
+impl<T> Value<Array2DImpl<T>> {
+    pub fn new<I>(shape: (usize, usize), data: I) -> Value<Array2DImpl<T>>
+    where
+        I: IntoIterator<Item = Value<Array0DImpl<T>>>,
+    {
+        let (height, width) = shape;
+        let data: Vec<T> = data.into_iter().map(|x| x.0.data).collect();
+        assert_eq!(height * width, data.len());
+        Value(Array2DImpl { shape, data })
+    }
+}
+
+// ==========
 // Accessors
 // ==========
 
