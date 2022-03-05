@@ -199,7 +199,9 @@ where
     is_passed
 }
 
-pub fn single_cycle_grid_frame(solver: &mut Solver, grid_frame: &BoolGridFrame) {
+pub fn single_cycle_grid_frame(solver: &mut Solver, grid_frame: &BoolGridFrame) -> BoolVarArray2D {
     let (edges, graph) = grid_frame.representation();
-    active_edges_single_cycle(solver, edges, &graph);
+    let is_passed_flat = active_edges_single_cycle(solver, edges, &graph);
+    let (height, width) = grid_frame.base_shape();
+    is_passed_flat.reshape_as_2d((height + 1, width + 1))
 }

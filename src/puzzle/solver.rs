@@ -143,6 +143,17 @@ fn resolve_range<T: RangeBounds<usize>>(len: usize, range: &T) -> (usize, usize)
     }
 }
 
+impl<T: Clone> Value<Array1DImpl<T>> {
+    pub fn reshape_as_2d(&self, shape: (usize, usize)) -> Value<Array2DImpl<T>> {
+        let (height, width) = shape;
+        assert_eq!(height * width, self.0.data.len());
+        Value(Array2DImpl {
+            shape,
+            data: self.0.data.clone(),
+        })
+    }
+}
+
 impl<T> Value<Array2DImpl<T>> {
     pub fn shape(&self) -> (usize, usize) {
         self.0.shape
@@ -235,6 +246,15 @@ impl<T: Clone> Value<Array2DImpl<T>> {
 
     pub fn flatten(&self) -> Value<Array1DImpl<T>> {
         Value(Array1DImpl {
+            data: self.0.data.clone(),
+        })
+    }
+
+    pub fn reshape(&self, shape: (usize, usize)) -> Value<Array2DImpl<T>> {
+        let (height, width) = shape;
+        assert_eq!(height * width, self.0.data.len());
+        Value(Array2DImpl {
+            shape,
             data: self.0.data.clone(),
         })
     }
@@ -739,6 +759,18 @@ impl<X> Value<X> {
         (&'a Self, Y): PropagateBinaryGeneric<CSPBoolExpr, CSPBoolExpr, CSPBoolExpr>,
     {
         Value((self, rhs).generate(|x, y| x.imp(y)))
+    }
+
+    pub fn iff<'a, Y>(
+        &'a self,
+        rhs: Y,
+    ) -> Value<
+        <(&'a Self, Y) as PropagateBinaryGeneric<CSPBoolExpr, CSPBoolExpr, CSPBoolExpr>>::Output,
+    >
+    where
+        (&'a Self, Y): PropagateBinaryGeneric<CSPBoolExpr, CSPBoolExpr, CSPBoolExpr>,
+    {
+        Value((self, rhs).generate(|x, y| x.iff(y)))
     }
 
     pub fn ite<'a, Y, Z>(
