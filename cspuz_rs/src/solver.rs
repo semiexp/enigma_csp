@@ -1,10 +1,10 @@
 use std::ops::{Add, BitAnd, BitOr, BitXor, Bound, Not, RangeBounds, Sub};
 
-use enigma_csp::csp::{Assignment, Domain, Stmt};
 pub use enigma_csp::csp::BoolExpr as CSPBoolExpr;
 pub use enigma_csp::csp::BoolVar as CSPBoolVar;
 pub use enigma_csp::csp::IntExpr as CSPIntExpr;
 pub use enigma_csp::csp::IntVar as CSPIntVar;
+use enigma_csp::csp::{Assignment, Domain, Stmt};
 use enigma_csp::integration::IntegratedSolver;
 use enigma_csp::integration::Model as IntegratedModel;
 
