@@ -1,5 +1,5 @@
-use super::graph;
-use super::solver::{any, Solver};
+use crate::graph;
+use crate::solver::{any, Solver};
 
 pub fn solve_nurimisaki(clues: &[Vec<Option<i32>>]) -> Option<Vec<Vec<Option<bool>>>> {
     let h = clues.len();

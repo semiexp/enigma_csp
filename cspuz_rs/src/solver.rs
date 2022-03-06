@@ -1,12 +1,12 @@
 use std::ops::{Add, BitAnd, BitOr, BitXor, Bound, Not, RangeBounds, Sub};
 
-use crate::csp::{Assignment, Domain, Stmt};
-pub use crate::csp_repr::BoolExpr as CSPBoolExpr;
-pub use crate::csp_repr::BoolVar as CSPBoolVar;
-pub use crate::csp_repr::IntExpr as CSPIntExpr;
-pub use crate::csp_repr::IntVar as CSPIntVar;
-use crate::integration::IntegratedSolver;
-use crate::integration::Model as IntegratedModel;
+use enigma_csp::csp::{Assignment, Domain, Stmt};
+pub use enigma_csp::csp::BoolExpr as CSPBoolExpr;
+pub use enigma_csp::csp::BoolVar as CSPBoolVar;
+pub use enigma_csp::csp::IntExpr as CSPIntExpr;
+pub use enigma_csp::csp::IntVar as CSPIntVar;
+use enigma_csp::integration::IntegratedSolver;
+use enigma_csp::integration::Model as IntegratedModel;
 
 #[derive(Clone)]
 pub struct Value<T>(T);

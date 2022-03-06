@@ -1,4 +1,4 @@
-use super::solver::Solver;
+use crate::solver::Solver;
 
 pub fn solve_star_battle(
     n: usize,

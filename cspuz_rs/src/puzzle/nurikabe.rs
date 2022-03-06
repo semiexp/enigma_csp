@@ -1,5 +1,5 @@
-use super::graph;
-use super::solver::Solver;
+use crate::graph;
+use crate::solver::Solver;
 
 pub fn solve_nurikabe(clues: &[Vec<Option<i32>>]) -> Option<Vec<Vec<Option<bool>>>> {
     let h = clues.len();

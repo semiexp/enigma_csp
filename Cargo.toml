@@ -1,20 +1,6 @@
-[package]
-name = "enigma_csp"
-version = "0.1.0"
-edition = "2018"
+[workspace]
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
-
-[lib]
-name = "enigma_csp"
-crate-type = ["cdylib", "lib"]
-
-[dependencies]
-getopts = "0.2"
-nom = "7.0.0"
-
-[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
-pyo3 = { version = "0.14.5", features = ["extension-module"] }
-
-[build-dependencies]
-cc = "1.0"
+members = [
+    "enigma_csp",
+    "cspuz_rs",
+]

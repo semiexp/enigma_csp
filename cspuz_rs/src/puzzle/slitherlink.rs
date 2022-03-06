@@ -1,5 +1,5 @@
-use super::graph;
-use super::solver::Solver;
+use crate::graph;
+use crate::solver::Solver;
 
 pub fn solve_slitherlink(
     clues: &[Vec<Option<i32>>],

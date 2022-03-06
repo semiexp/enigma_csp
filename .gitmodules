@@ -1,3 +1,3 @@
 [submodule "lib/glucose"]
-	path = lib/glucose
+	path = enigma_csp/lib/glucose
 	url = https://github.com/semiexp/glucose.git
