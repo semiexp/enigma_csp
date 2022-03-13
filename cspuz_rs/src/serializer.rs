@@ -331,7 +331,7 @@ where
 
         let mut ofs = 0;
         let mut ret = vec![];
-        for _ in 0..self.count {
+        while ofs < self.count {
             let (n_read, part) = self.base_serializer.serialize(&data[ofs..])?;
             ofs += n_read;
             ret.extend(part);
@@ -455,7 +455,7 @@ where
     let prefix = String::from("https://puzz.link/p?");
     String::from_utf8(body)
         .ok()
-        .map(|body| prefix + puzzle_kind + &body)
+        .map(|body| prefix + puzzle_kind + "/" + &body)
 }
 
 pub fn url_to_problem<T, C>(combinator: C, puzzle_kinds: &[&str], serialized: &str) -> Option<T>

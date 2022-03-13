@@ -1,4 +1,7 @@
 use crate::graph;
+use crate::serializer::{
+    problem_to_url, url_to_problem, Choice, Combinator, Grid, HexInt, Optionalize, Spaces,
+};
 use crate::solver::Solver;
 
 pub fn solve_nurikabe(clues: &[Vec<Option<i32>>]) -> Option<Vec<Vec<Option<bool>>>> {
@@ -56,6 +59,23 @@ pub fn solve_nurikabe(clues: &[Vec<Option<i32>>]) -> Option<Vec<Vec<Option<bool>
     solver.irrefutable_facts().map(|f| f.get(is_black))
 }
 
+type Problem = Vec<Vec<Option<i32>>>;
+
+fn combinator() -> impl Combinator<Problem> {
+    Grid::new(Choice::new(vec![
+        Box::new(Optionalize::new(HexInt)),
+        Box::new(Spaces::new(None, 'g')),
+    ]))
+}
+
+pub fn serialize_problem(problem: &Problem) -> Option<String> {
+    problem_to_url(combinator(), "nurikabe", problem.clone())
+}
+
+pub fn deserialize_problem(url: &str) -> Option<Problem> {
+    url_to_problem(combinator(), &["nurikabe"], url)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -71,11 +91,22 @@ mod tests {
             [0, 0, 0, 0, 0, 0],
             [0, 0, 0, 0, 0, 0],
         ];
-        let problem = problem_base.map(|row| {
-            row.iter()
-                .map(|&n| if n == 0 { None } else { Some(n) })
-                .collect::<Vec<_>>()
-        });
+        let problem = problem_base
+            .iter()
+            .map(|row| {
+                row.iter()
+                    .map(|&n| if n == 0 { None } else { Some(n) })
+                    .collect::<Vec<_>>()
+            })
+            .collect::<Vec<_>>();
+        assert_eq!(
+            serialize_problem(&problem),
+            Some(String::from("https://puzz.link/p?nurikabe/6/6/m8n8i9u"))
+        );
+        assert_eq!(
+            deserialize_problem("https://puzz.link/p?nurikabe/6/6/m8n8i9u"),
+            Some(problem.clone())
+        );
         let ans = solve_nurikabe(&problem);
         assert!(ans.is_some());
         let ans = ans.unwrap();
