@@ -1,5 +1,3 @@
-use std::ops::Index;
-
 fn is_dec(c: u8) -> bool {
     return '0' as u8 <= c && c <= '9' as u8;
 }
