@@ -3,4 +3,5 @@
 members = [
     "enigma_csp",
     "cspuz_rs",
+    "cspuz_solver_backend",
 ]

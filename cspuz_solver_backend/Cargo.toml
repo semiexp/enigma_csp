@@ -1,0 +1,11 @@
+[package]
+name = "cspuz_solver_backend"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+name = "cspuz_solver_backend"
+crate-type = ["cdylib", "lib"]
+
+[dependencies]
+cspuz_rs = { path = "../cspuz_rs" }
