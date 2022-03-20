@@ -6,9 +6,18 @@ static mut SHARED_ARRAY: Vec<u8> = vec![];
 
 #[allow(unused)]
 enum ItemKind {
-    Dot, Block, Fill, Circle,
-    SideArrowUp, SideArrowDown, SideArrowLeft, SideArrowRight,
-    Cross, Line, Wall, BoldWall,
+    Dot,
+    Block,
+    Fill,
+    Circle,
+    SideArrowUp,
+    SideArrowDown,
+    SideArrowLeft,
+    SideArrowRight,
+    Cross,
+    Line,
+    Wall,
+    BoldWall,
     Text(&'static str),
     Num(i32),
 }
@@ -46,18 +55,26 @@ impl Item {
         Item {
             y: cell_y * 2 + 1,
             x: cell_x * 2 + 1,
-            color, kind,
+            color,
+            kind,
         }
     }
 
     fn to_json(&self) -> String {
-        format!("{{\"y\":{},\"x\":{},\"color\":\"{}\",\"item\":{}}}", self.y, self.x, self.color, self.kind.to_json())
+        format!(
+            "{{\"y\":{},\"x\":{},\"color\":\"{}\",\"item\":{}}}",
+            self.y,
+            self.x,
+            self.color,
+            self.kind.to_json()
+        )
     }
 }
 
 #[allow(unused)]
 enum BoardKind {
-    Grid, DotGrid,
+    Grid,
+    DotGrid,
 }
 
 struct Board {
@@ -76,8 +93,16 @@ impl Board {
             BoardKind::Grid => "grid",
             BoardKind::DotGrid => "dots",
         };
-        let data = self.data.iter().map(|item| item.to_json()).collect::<Vec<_>>().join(",");
-        format!("{{\"kind\":\"{}\",\"height\":{},\"width\":{},\"defaultStyle\":\"{}\",\"data\":[{}]}}", kind, height, width, default_style, data)
+        let data = self
+            .data
+            .iter()
+            .map(|item| item.to_json())
+            .collect::<Vec<_>>()
+            .join(",");
+        format!(
+            "{{\"kind\":\"{}\",\"height\":{},\"width\":{},\"defaultStyle\":\"{}\",\"data\":[{}]}}",
+            kind, height, width, default_style, data
+        )
     }
 }
 
@@ -93,12 +118,22 @@ fn solve_nurikabe(url: &str) -> Result<Board, &'static str> {
             if let Some(clue) = problem[y][x] {
                 data.push(Item::cell(y, x, "black", ItemKind::Num(clue)));
             } else if let Some(a) = ans[y][x] {
-                data.push(Item::cell(y, x, "green", if a { ItemKind::Block } else { ItemKind::Dot }));
+                data.push(Item::cell(
+                    y,
+                    x,
+                    "green",
+                    if a { ItemKind::Block } else { ItemKind::Dot },
+                ));
             }
         }
     }
 
-    Ok(Board { kind: BoardKind::Grid, height, width, data })
+    Ok(Board {
+        kind: BoardKind::Grid,
+        height,
+        width,
+        data,
+    })
 }
 
 fn decode_and_solve(url: &[u8]) -> Result<Board, &'static str> {
@@ -110,7 +145,7 @@ fn decode_and_solve(url: &[u8]) -> Result<Board, &'static str> {
 
 #[no_mangle]
 fn solve_problem(url: *const u8, len: usize) -> *const u8 {
-    let url = unsafe { std::slice::from_raw_parts(url, len)};
+    let url = unsafe { std::slice::from_raw_parts(url, len) };
     let result = decode_and_solve(url);
 
     let ret_string = match result {
