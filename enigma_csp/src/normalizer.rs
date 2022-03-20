@@ -1,5 +1,3 @@
-use std::collections::HashMap;
-
 use super::config::Config;
 use super::csp::{BoolExpr, BoolVar, CSPVars, IntExpr, IntVar, Stmt, CSP};
 use super::norm_csp::BoolLit as NBoolLit;
@@ -7,6 +5,37 @@ use super::norm_csp::IntVar as NIntVar;
 use super::norm_csp::{Constraint, ExtraConstraint, LinearLit, LinearSum, NormCSP};
 use crate::arithmetic::{CheckedInt, CmpOp};
 use crate::util::ConvertMap;
+
+#[cfg(not(target_arch = "wasm32"))]
+use std::collections::HashMap;
+
+#[cfg(not(target_arch = "wasm32"))]
+fn new_hash_map<K, V>() -> HashMap<K, V> {
+    HashMap::new()
+}
+
+#[cfg(target_arch = "wasm32")]
+mod deterministic_hash_map {
+    pub struct DetState;
+
+    impl std::hash::BuildHasher for DetState {
+        type Hasher = std::collections::hash_map::DefaultHasher;
+
+        fn build_hasher(&self) -> Self::Hasher {
+            std::collections::hash_map::DefaultHasher::new()
+        }
+    }
+
+    pub fn new_hash_map<K, V>() -> std::collections::HashMap<K, V, DetState> {
+        std::collections::HashMap::with_hasher(DetState)
+    }
+}
+
+#[cfg(target_arch = "wasm32")]
+type HashMap<K, V> = std::collections::HashMap<K, V, deterministic_hash_map::DetState>;
+
+#[cfg(target_arch = "wasm32")]
+use deterministic_hash_map::new_hash_map;
 
 pub struct NormalizeMap {
     bool_map: ConvertMap<BoolVar, NBoolLit>,
@@ -19,7 +48,7 @@ impl NormalizeMap {
         NormalizeMap {
             bool_map: ConvertMap::new(),
             int_map: ConvertMap::new(),
-            int_expr_equivalence: HashMap::new(),
+            int_expr_equivalence: new_hash_map(),
         }
     }
 
