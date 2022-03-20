@@ -18,6 +18,7 @@ fn main() {
             .include("lib/glucose")
             .flag("-std=c++17")
             .flag("-DGLUCOSE_FIX_OPTIONS")
+            .flag("-DGLUCOSE_UNUSE_STDIO")
             .warnings(false)
             .compile("calc");
     } else {
