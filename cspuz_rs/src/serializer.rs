@@ -289,6 +289,69 @@ impl Combinator<i32> for DecInt {
     }
 }
 
+pub struct MultiDigit {
+    base: i32,
+    num_digits: usize,
+    max_num: i32,
+}
+
+impl MultiDigit {
+    pub fn new(base: i32, num_digits: usize) -> MultiDigit {
+        assert!(2 <= base);
+        assert!(1 <= num_digits);
+        let max_num = base.pow(num_digits as u32);
+        assert!(max_num <= 36);
+        MultiDigit {
+            base,
+            num_digits,
+            max_num,
+        }
+    }
+}
+
+impl Combinator<i32> for MultiDigit {
+    fn serialize(&self, input: &[i32]) -> Option<(usize, Vec<u8>)> {
+        if input.len() == 0 {
+            return None;
+        }
+        let mut v = 0;
+        let mut n_read = 0;
+        for i in 0..self.num_digits {
+            if i >= input.len() || !(0 <= input[i] && input[i] < self.base) {
+                break;
+            }
+            n_read += 1;
+            v += input[i] * self.base.pow((self.num_digits - 1 - i) as u32);
+        }
+        if n_read == 0 {
+            None
+        } else {
+            Some((n_read, vec![to_base36(v)]))
+        }
+    }
+
+    fn deserialize(&self, input: &[u8]) -> Option<(usize, Vec<i32>)> {
+        if input.len() == 0 {
+            return None;
+        }
+        let v = input[0];
+        if !is_base36(v) {
+            return None;
+        }
+        let mut v = from_base36(v);
+        if v >= self.max_num {
+            return None;
+        }
+        let mut ret = vec![];
+        for _ in 0..self.num_digits {
+            ret.push(v % self.base);
+            v /= self.base;
+        }
+        ret.reverse();
+        Some((1, ret))
+    }
+}
+
 pub struct Map<C, F, G> {
     base_serializer: C,
     a_to_b: F,
@@ -640,6 +703,32 @@ mod tests {
             combinator.deserialize("!!c".as_bytes()),
             Some((3, vec![12]))
         );
+    }
+
+    #[test]
+    fn test_multi_digit() {
+        let combinator = MultiDigit::new(3, 3usize);
+
+        assert_eq!(combinator.serialize(&[]), None);
+        assert_eq!(combinator.serialize(&[1, 0, 2]), Some((3, Vec::from("b"))));
+        assert_eq!(combinator.serialize(&[2, 0]), Some((2, Vec::from("i"))));
+        assert_eq!(combinator.serialize(&[1, 0, 3]), Some((2, Vec::from("9"))));
+        assert_eq!(combinator.serialize(&[3, 1, 0]), None);
+
+        assert_eq!(combinator.deserialize("".as_bytes()), None);
+        assert_eq!(
+            combinator.deserialize("0".as_bytes()),
+            Some((1, vec![0, 0, 0]))
+        );
+        assert_eq!(
+            combinator.deserialize("b".as_bytes()),
+            Some((1, vec![1, 0, 2]))
+        );
+        assert_eq!(
+            combinator.deserialize("q".as_bytes()),
+            Some((1, vec![2, 2, 2]))
+        );
+        assert_eq!(combinator.deserialize("r".as_bytes()), None);
     }
 
     #[test]
