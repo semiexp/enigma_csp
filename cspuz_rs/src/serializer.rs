@@ -80,6 +80,41 @@ impl<T> Combinator<T> for Choice<T> {
     }
 }
 
+pub struct Dict<T> {
+    before: T,
+    after: Vec<u8>,
+}
+
+impl<T: Clone + PartialEq> Dict<T> {
+    pub fn new<'a, A>(before: T, after: A) -> Dict<T>
+    where
+        Vec<u8>: From<A>,
+    {
+        Dict {
+            before,
+            after: Vec::<u8>::from(after),
+        }
+    }
+}
+
+impl<T: Clone + PartialEq> Combinator<T> for Dict<T> {
+    fn serialize(&self, input: &[T]) -> Option<(usize, Vec<u8>)> {
+        if input.len() > 0 && input[0] == self.before {
+            Some((1, self.after.clone()))
+        } else {
+            None
+        }
+    }
+
+    fn deserialize(&self, input: &[u8]) -> Option<(usize, Vec<T>)> {
+        if input.len() >= self.after.len() && input[..self.after.len()] == self.after {
+            Some((self.after.len(), vec![self.before.clone()]))
+        } else {
+            None
+        }
+    }
+}
+
 pub struct Spaces<T: Clone + PartialEq> {
     space: T,
     minimum: u8,
@@ -482,6 +517,21 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_dict() {
+        let combinator = Dict::new(42, "ab");
+
+        assert_eq!(combinator.serialize(&[]), None);
+        assert_eq!(combinator.serialize(&[42, 0]), Some((1, Vec::from("ab"))));
+
+        assert_eq!(combinator.deserialize("".as_bytes()), None);
+        assert_eq!(combinator.deserialize("aaa".as_bytes()), None);
+        assert_eq!(
+            combinator.deserialize("aba".as_bytes()),
+            Some((2, vec![42]))
+        );
+    }
 
     #[test]
     fn test_spaces() {

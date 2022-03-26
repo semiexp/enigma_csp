@@ -116,7 +116,11 @@ fn solve_nurikabe(url: &str) -> Result<Board, &'static str> {
     for y in 0..height {
         for x in 0..width {
             if let Some(clue) = problem[y][x] {
-                data.push(Item::cell(y, x, "black", ItemKind::Num(clue)));
+                if clue > 0 {
+                    data.push(Item::cell(y, x, "black", ItemKind::Num(clue)));
+                } else {
+                    data.push(Item::cell(y, x, "black", ItemKind::Text("?")));
+                }
             } else if let Some(a) = ans[y][x] {
                 data.push(Item::cell(
                     y,

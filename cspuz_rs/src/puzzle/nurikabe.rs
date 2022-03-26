@@ -1,6 +1,6 @@
 use crate::graph;
 use crate::serializer::{
-    problem_to_url, url_to_problem, Choice, Combinator, Grid, HexInt, Optionalize, Spaces,
+    problem_to_url, url_to_problem, Choice, Combinator, Dict, Grid, HexInt, Optionalize, Spaces,
 };
 use crate::solver::Solver;
 
@@ -53,7 +53,9 @@ pub fn solve_nurikabe(clues: &[Vec<Option<i32>>]) -> Option<Vec<Vec<Option<bool>
 
     for (i, &(y, x, n)) in clue_pos.iter().enumerate() {
         solver.add_expr(group_id.at((y, x)).eq((i + 1) as i32));
-        solver.add_expr(group_id.eq((i + 1) as i32).count_true().eq(n));
+        if n > 0 {
+            solver.add_expr(group_id.eq((i + 1) as i32).count_true().eq(n));
+        }
     }
 
     solver.irrefutable_facts().map(|f| f.get(is_black))
@@ -65,6 +67,7 @@ fn combinator() -> impl Combinator<Problem> {
     Grid::new(Choice::new(vec![
         Box::new(Optionalize::new(HexInt)),
         Box::new(Spaces::new(None, 'g')),
+        Box::new(Dict::new(Some(-1), ".")),
     ]))
 }
 
