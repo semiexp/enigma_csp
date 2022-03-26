@@ -57,7 +57,7 @@ fn infer_graph_from_2d_array(shape: (usize, usize)) -> Graph {
     graph
 }
 
-#[derive(PartialEq, Eq, Debug)]
+#[derive(PartialEq, Eq, Clone, Debug)]
 pub struct GridFrame<T> {
     pub horizontal: T,
     pub vertical: T,

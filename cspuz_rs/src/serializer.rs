@@ -1,3 +1,5 @@
+use crate::graph::GridFrame;
+
 pub fn is_dec(c: u8) -> bool {
     return '0' as u8 <= c && c <= '9' as u8;
 }
@@ -113,6 +115,16 @@ impl<'a> Sequencer<'a, u8> {
         } else {
             None
         }
+    }
+
+    pub fn deserialize_one_elem<T, C: Combinator<T>>(
+        &mut self,
+        ctx: &Context,
+        combinator: C,
+    ) -> Option<T> {
+        let t = self.deserialize(ctx, combinator)?;
+        assert_eq!(t.len(), 1);
+        t.into_iter().next()
     }
 }
 
@@ -658,6 +670,194 @@ where
     }
 }
 
+fn map_2d<'a, A, B, F>(input: &'a Vec<Vec<A>>, func: F) -> Vec<Vec<B>>
+where
+    F: Fn(&'a A) -> B,
+{
+    input
+        .iter()
+        .map(|row| row.iter().map(|x| func(x)).collect())
+        .collect()
+}
+
+pub struct Rooms;
+
+impl Combinator<GridFrame<Vec<Vec<bool>>>> for Rooms {
+    fn serialize(
+        &self,
+        ctx: &Context,
+        input: &[GridFrame<Vec<Vec<bool>>>],
+    ) -> Option<(usize, Vec<u8>)> {
+        if input.len() == 0 {
+            return None;
+        }
+        let height = ctx.height.unwrap();
+        let width = ctx.width.unwrap();
+
+        let vertical_i32 = map_2d(&input[0].vertical, |&b| if b { 1 } else { 0 });
+        let horizontal_i32 = map_2d(&input[0].horizontal, |&b| if b { 1 } else { 0 });
+
+        let ctx_grid = ContextBasedGrid::new(MultiDigit::new(2, 5));
+        let mut ret = vec![];
+        let (_, app) = ctx_grid.serialize(
+            &Context {
+                height: Some(height),
+                width: Some(width - 1),
+                ..*ctx
+            },
+            &vec![vertical_i32],
+        )?;
+        ret.extend(app);
+        let (_, app) = ctx_grid.serialize(
+            &Context {
+                height: Some(height - 1),
+                width: Some(width),
+                ..*ctx
+            },
+            &vec![horizontal_i32],
+        )?;
+        ret.extend(app);
+
+        Some((1, ret))
+    }
+
+    fn deserialize(
+        &self,
+        ctx: &Context,
+        input: &[u8],
+    ) -> Option<(usize, Vec<GridFrame<Vec<Vec<bool>>>>)> {
+        let height = ctx.height.unwrap();
+        let width = ctx.width.unwrap();
+        let mut sequencer = Sequencer::new(input);
+        let ctx_grid = ContextBasedGrid::new(MultiDigit::new(2, 5));
+
+        let vertical_i32 = sequencer.deserialize_one_elem(
+            &Context {
+                height: Some(height),
+                width: Some(width - 1),
+                ..*ctx
+            },
+            &ctx_grid,
+        )?;
+        let horizontal_i32 = sequencer.deserialize_one_elem(
+            &Context {
+                height: Some(height - 1),
+                width: Some(width),
+                ..*ctx
+            },
+            &ctx_grid,
+        )?;
+
+        let vertical = map_2d(&vertical_i32, |&n| n == 1);
+        let horizontal = map_2d(&horizontal_i32, |&n| n == 1);
+
+        Some((
+            sequencer.n_read(),
+            vec![GridFrame {
+                vertical,
+                horizontal,
+            }],
+        ))
+    }
+}
+
+pub struct RoomsWithValues<C> {
+    value_combinator: C,
+}
+
+impl<C> RoomsWithValues<C> {
+    pub fn new(value_combinator: C) -> RoomsWithValues<C> {
+        RoomsWithValues { value_combinator }
+    }
+}
+
+pub fn borders_to_rooms(borders: &GridFrame<Vec<Vec<bool>>>) -> Vec<Vec<(usize, usize)>> {
+    fn visit(
+        y: usize,
+        x: usize,
+        borders: &GridFrame<Vec<Vec<bool>>>,
+        visited: &mut Vec<Vec<bool>>,
+        room: &mut Vec<(usize, usize)>,
+    ) {
+        if visited[y][x] {
+            return;
+        }
+        visited[y][x] = true;
+        room.push((y, x));
+        if y > 0 && !borders.horizontal[y - 1][x] {
+            visit(y - 1, x, borders, visited, room);
+        }
+        if y < borders.horizontal.len() && !borders.horizontal[y][x] {
+            visit(y + 1, x, borders, visited, room);
+        }
+        if x > 0 && !borders.vertical[y][x - 1] {
+            visit(y, x - 1, borders, visited, room);
+        }
+        if x < borders.vertical[0].len() && !borders.vertical[y][x] {
+            visit(y, x + 1, borders, visited, room);
+        }
+    }
+
+    let height = borders.vertical.len();
+    let width = borders.vertical[0].len() + 1;
+
+    let mut visited = vec![vec![false; width]; height];
+    let mut ret = vec![];
+    for y in 0..height {
+        for x in 0..width {
+            if visited[y][x] {
+                continue;
+            }
+            let mut room = vec![];
+            visit(y, x, borders, &mut visited, &mut room);
+            println!("{:?}", room);
+            ret.push(room);
+        }
+    }
+
+    ret
+}
+
+impl<T, C> Combinator<(GridFrame<Vec<Vec<bool>>>, Vec<T>)> for RoomsWithValues<C>
+where
+    T: Clone,
+    C: Combinator<T>,
+{
+    fn serialize(
+        &self,
+        ctx: &Context,
+        input: &[(GridFrame<Vec<Vec<bool>>>, Vec<T>)],
+    ) -> Option<(usize, Vec<u8>)> {
+        if input.len() == 0 {
+            return None;
+        }
+        let (borders, seq) = &input[0];
+
+        let mut ret = vec![];
+        let (_, app) = Rooms.serialize(ctx, &[borders.clone()])?;
+        ret.extend(app);
+        let n_rooms = borders_to_rooms(borders).len();
+        let (_, app) = Seq::new(&self.value_combinator, n_rooms).serialize(ctx, &[seq.clone()])?;
+        ret.extend(app);
+
+        Some((1, ret))
+    }
+
+    fn deserialize(
+        &self,
+        ctx: &Context,
+        input: &[u8],
+    ) -> Option<(usize, Vec<(GridFrame<Vec<Vec<bool>>>, Vec<T>)>)> {
+        let mut sequencer = Sequencer::new(input);
+
+        let borders = sequencer.deserialize_one_elem(ctx, Rooms)?;
+        let n_rooms = borders_to_rooms(&borders).len();
+        let seq = sequencer.deserialize_one_elem(ctx, Seq::new(&self.value_combinator, n_rooms))?;
+
+        Some((sequencer.n_read(), vec![(borders, seq)]))
+    }
+}
+
 pub struct Grid<S> {
     base_serializer: S,
 }
@@ -996,5 +1196,53 @@ mod tests {
             Some((12, vec![vec![vec![2, 3, 1], vec![42, 1, 0],],]))
         );
         assert_eq!(combinator.deserialize(ctx, "3/3/231-2a10".as_bytes()), None);
+    }
+
+    #[test]
+    fn test_rooms_with_values() {
+        let ctx = &Context::sized(3, 4);
+        let combinator = RoomsWithValues::new(HexInt);
+
+        assert_eq!(
+            combinator.serialize(
+                ctx,
+                &[(
+                    GridFrame {
+                        vertical: vec![
+                            vec![true, false, true],
+                            vec![true, false, true],
+                            vec![false, true, false],
+                        ],
+                        horizontal: vec![
+                            vec![false, true, true, false],
+                            vec![true, false, true, false],
+                        ],
+                    },
+                    vec![1, 0, 1, 2]
+                )]
+            ),
+            Some((1, Vec::from("mkd81012")))
+        );
+
+        assert_eq!(
+            combinator.deserialize(ctx, "mkd81012".as_bytes()),
+            Some((
+                8,
+                vec![(
+                    GridFrame {
+                        vertical: vec![
+                            vec![true, false, true],
+                            vec![true, false, true],
+                            vec![false, true, false],
+                        ],
+                        horizontal: vec![
+                            vec![false, true, true, false],
+                            vec![true, false, true, false],
+                        ],
+                    },
+                    vec![1, 0, 1, 2]
+                )]
+            ))
+        );
     }
 }
