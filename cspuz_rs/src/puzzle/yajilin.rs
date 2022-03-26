@@ -1,7 +1,7 @@
 use crate::graph;
 use crate::serializer::{
-    from_base16, is_hex, problem_to_url, to_base16, url_to_problem, Choice, Combinator, Grid,
-    MaybeSkip, Optionalize, Spaces,
+    from_base16, is_hex, problem_to_url, to_base16, url_to_problem, Choice, Combinator, Context,
+    Grid, MaybeSkip, Optionalize, Spaces,
 };
 use crate::solver::Solver;
 
@@ -83,7 +83,7 @@ pub fn solve_yajilin(
 struct YajilinClueCombinator;
 
 impl Combinator<YajilinClue> for YajilinClueCombinator {
-    fn serialize(&self, input: &[YajilinClue]) -> Option<(usize, Vec<u8>)> {
+    fn serialize(&self, _: &Context, input: &[YajilinClue]) -> Option<(usize, Vec<u8>)> {
         if input.len() == 0 {
             return None;
         }
@@ -108,7 +108,7 @@ impl Combinator<YajilinClue> for YajilinClueCombinator {
         }
     }
 
-    fn deserialize(&self, input: &[u8]) -> Option<(usize, Vec<YajilinClue>)> {
+    fn deserialize(&self, _: &Context, input: &[u8]) -> Option<(usize, Vec<YajilinClue>)> {
         if input.len() < 2 {
             return None;
         }
@@ -228,41 +228,42 @@ mod tests {
 
     #[test]
     fn test_yajilin_clue_combinator() {
+        let ctx = &Context::new();
         let combinator = YajilinClueCombinator;
 
-        assert_eq!(combinator.serialize(&[]), None);
+        assert_eq!(combinator.serialize(ctx, &[]), None);
         assert_eq!(
-            combinator.serialize(&[YajilinClue::Up(0)]),
+            combinator.serialize(ctx, &[YajilinClue::Up(0)]),
             Some((1, Vec::from("10")))
         );
         assert_eq!(
-            combinator.serialize(&[YajilinClue::Down(3)]),
+            combinator.serialize(ctx, &[YajilinClue::Down(3)]),
             Some((1, Vec::from("23")))
         );
         assert_eq!(
-            combinator.serialize(&[YajilinClue::Left(-1)]),
+            combinator.serialize(ctx, &[YajilinClue::Left(-1)]),
             Some((1, Vec::from("3.")))
         );
         assert_eq!(
-            combinator.serialize(&[YajilinClue::Right(63)]),
+            combinator.serialize(ctx, &[YajilinClue::Right(63)]),
             Some((1, Vec::from("93f")))
         );
 
-        assert_eq!(combinator.deserialize("".as_bytes()), None);
+        assert_eq!(combinator.deserialize(ctx, "".as_bytes()), None);
         assert_eq!(
-            combinator.deserialize("105".as_bytes()),
+            combinator.deserialize(ctx, "105".as_bytes()),
             Some((2, vec![YajilinClue::Up(0)]))
         );
         assert_eq!(
-            combinator.deserialize("23".as_bytes()),
+            combinator.deserialize(ctx, "23".as_bytes()),
             Some((2, vec![YajilinClue::Down(3)]))
         );
         assert_eq!(
-            combinator.deserialize("3.".as_bytes()),
+            combinator.deserialize(ctx, "3.".as_bytes()),
             Some((2, vec![YajilinClue::Left(-1)]))
         );
         assert_eq!(
-            combinator.deserialize("93f".as_bytes()),
+            combinator.deserialize(ctx, "93f".as_bytes()),
             Some((3, vec![YajilinClue::Right(63)]))
         );
     }
