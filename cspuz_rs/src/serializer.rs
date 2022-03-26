@@ -50,6 +50,13 @@ impl Context {
             width: None,
         }
     }
+
+    pub fn sized(height: usize, width: usize) -> Context {
+        Context {
+            height: Some(height),
+            width: Some(width),
+        }
+    }
 }
 
 pub trait Combinator<T> {
@@ -495,17 +502,17 @@ where
     }
 }
 
-pub struct Grid<S> {
+pub struct ContextBasedGrid<S> {
     base_serializer: S,
 }
 
-impl<S> Grid<S> {
-    pub fn new(base_serializer: S) -> Grid<S> {
-        Grid { base_serializer }
+impl<S> ContextBasedGrid<S> {
+    pub fn new(base_serializer: S) -> ContextBasedGrid<S> {
+        ContextBasedGrid { base_serializer }
     }
 }
 
-impl<S, T> Combinator<Vec<Vec<T>>> for Grid<S>
+impl<S, T> Combinator<Vec<Vec<T>>> for ContextBasedGrid<S>
 where
     S: Combinator<T>,
     T: Clone,
@@ -516,12 +523,68 @@ where
         }
 
         let data = &input[0];
-        let height = data.len();
-        assert!(height > 0);
-        let width = data[0].len();
-        for i in 1..height {
+        let height = ctx.height.unwrap();
+        assert_eq!(data.len(), height);
+        let width = ctx.width.unwrap();
+        for i in 0..height {
             assert_eq!(data[i].len(), width);
         }
+
+        let mut input_flat = vec![];
+        for row in data {
+            input_flat.extend(row.clone());
+        }
+
+        let seq_combinator = Seq::new(&self.base_serializer, height * width);
+        let (n_read, ret) = seq_combinator.serialize(ctx, &[input_flat])?;
+        if n_read == 1 {
+            Some((1, ret))
+        } else {
+            None
+        }
+    }
+
+    fn deserialize(&self, ctx: &Context, input: &[u8]) -> Option<(usize, Vec<Vec<Vec<T>>>)> {
+        let height = ctx.height.unwrap();
+        let width = ctx.width.unwrap();
+
+        let seq_combinator = Seq::new(&self.base_serializer, height * width);
+        let (n_read, ret_flat) = seq_combinator.deserialize(ctx, input)?;
+        assert_eq!(ret_flat.len(), 1);
+        let ret_flat = ret_flat.into_iter().next().unwrap();
+        if ret_flat.len() != height * width {
+            return None;
+        }
+        let mut ret = vec![];
+        for i in 0..height {
+            ret.push(
+                ret_flat[(i * width)..((i + 1) * width)]
+                    .iter()
+                    .cloned()
+                    .collect::<Vec<_>>(),
+            );
+        }
+        Some((n_read, vec![ret]))
+    }
+}
+
+pub struct Size<S> {
+    base_serializer: S,
+}
+
+impl<S> Size<S> {
+    pub fn new(base_serializer: S) -> Size<S> {
+        Size { base_serializer }
+    }
+}
+
+impl<S, T> Combinator<T> for Size<S>
+where
+    S: Combinator<T>,
+{
+    fn serialize(&self, ctx: &Context, input: &[T]) -> Option<(usize, Vec<u8>)> {
+        let height = ctx.height.unwrap();
+        let width = ctx.width.unwrap();
 
         let mut ret = vec![];
         let (_, app) = DecInt.serialize(ctx, &[width as i32])?;
@@ -531,22 +594,13 @@ where
         ret.extend(app);
         ret.push('/' as u8);
 
-        let mut input_flat = vec![];
-        for row in data {
-            input_flat.extend(row.clone());
-        }
+        let (n_read, app) = self.base_serializer.serialize(ctx, input)?;
+        ret.extend(app);
 
-        let seq_combinator = Seq::new(&self.base_serializer, height * width);
-        let (n_read, app) = seq_combinator.serialize(ctx, &[input_flat])?;
-        if n_read == 1 {
-            ret.extend(app);
-            Some((1, ret))
-        } else {
-            None
-        }
+        Some((n_read, ret))
     }
 
-    fn deserialize(&self, ctx: &Context, input: &[u8]) -> Option<(usize, Vec<Vec<Vec<T>>>)> {
+    fn deserialize(&self, ctx: &Context, input: &[u8]) -> Option<(usize, Vec<T>)> {
         let mut n_read_total = 0;
 
         let (n_read, width) = DecInt.deserialize(ctx, input)?;
@@ -567,24 +621,53 @@ where
         }
         n_read_total += 1;
 
-        let seq_combinator = Seq::new(&self.base_serializer, height * width);
-        let (n_read, ret_flat) = seq_combinator.deserialize(ctx, &input[n_read_total..])?;
-        assert_eq!(ret_flat.len(), 1);
-        let ret_flat = ret_flat.into_iter().next().unwrap();
-        if ret_flat.len() != height * width {
+        let ctx = Context {
+            height: Some(height),
+            width: Some(width),
+            ..*ctx
+        };
+        let (n_read, ret) = self
+            .base_serializer
+            .deserialize(&ctx, &input[n_read_total..])?;
+        Some((n_read_total + n_read, ret))
+    }
+}
+
+pub struct Grid<S> {
+    base_serializer: S,
+}
+
+impl<S> Grid<S> {
+    pub fn new(base_serializer: S) -> Grid<S> {
+        Grid { base_serializer }
+    }
+}
+
+impl<S, T> Combinator<Vec<Vec<T>>> for Grid<S>
+where
+    S: Combinator<T>,
+    T: Clone,
+{
+    fn serialize(&self, ctx: &Context, input: &[Vec<Vec<T>>]) -> Option<(usize, Vec<u8>)> {
+        if input.len() == 0 {
             return None;
         }
-        n_read_total += n_read;
-        let mut ret = vec![];
-        for i in 0..height {
-            ret.push(
-                ret_flat[(i * width)..((i + 1) * width)]
-                    .iter()
-                    .cloned()
-                    .collect::<Vec<_>>(),
-            );
-        }
-        Some((n_read_total, vec![ret]))
+
+        let height = input[0].len();
+        assert!(height > 0);
+        let width = input[0][0].len();
+
+        let ctx = Context {
+            height: Some(height),
+            width: Some(width),
+            ..*ctx
+        };
+
+        Size::new(ContextBasedGrid::new(&self.base_serializer)).serialize(&ctx, input)
+    }
+
+    fn deserialize(&self, ctx: &Context, input: &[u8]) -> Option<(usize, Vec<Vec<Vec<T>>>)> {
+        Size::new(ContextBasedGrid::new(&self.base_serializer)).deserialize(&ctx, input)
     }
 }
 
