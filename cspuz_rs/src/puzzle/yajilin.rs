@@ -1,7 +1,11 @@
 use crate::graph;
+use crate::serializer::{
+    from_base16, is_hex, problem_to_url, to_base16, url_to_problem, Choice, Combinator, Grid,
+    Optionalize, Spaces,
+};
 use crate::solver::Solver;
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum YajilinClue {
     Unspecified(i32),
     Up(i32),
@@ -35,7 +39,11 @@ pub fn solve_yajilin(
                 solver.add_expr(!is_black.at((y, x)));
 
                 match clue {
-                    YajilinClue::Unspecified(_) => unimplemented!(),
+                    YajilinClue::Unspecified(n) => {
+                        if n >= 0 {
+                            unimplemented!();
+                        }
+                    }
                     YajilinClue::Up(n) => {
                         if n >= 0 {
                             solver.add_expr(is_black.slice_fixed_x((..y, x)).count_true().eq(n));
@@ -72,6 +80,95 @@ pub fn solve_yajilin(
         .map(|f| (f.get(is_line), f.get(is_black)))
 }
 
+struct YajilinClueCombinator;
+
+impl Combinator<YajilinClue> for YajilinClueCombinator {
+    fn serialize(&self, input: &[YajilinClue]) -> Option<(usize, Vec<u8>)> {
+        if input.len() == 0 {
+            return None;
+        }
+        let (dir, n) = match input[0] {
+            YajilinClue::Unspecified(n) => (0, n),
+            YajilinClue::Up(n) => (1, n),
+            YajilinClue::Down(n) => (2, n),
+            YajilinClue::Left(n) => (3, n),
+            YajilinClue::Right(n) => (4, n),
+        };
+        if n == -1 {
+            Some((1, vec![dir + ('0' as u8), '.' as u8]))
+        } else if 0 <= n && n < 16 {
+            Some((1, vec![dir + ('0' as u8), to_base16(n)]))
+        } else if 16 <= n && n < 256 {
+            Some((
+                1,
+                vec![dir + ('5' as u8), to_base16(n >> 4), to_base16(n & 15)],
+            ))
+        } else {
+            None
+        }
+    }
+
+    fn deserialize(&self, input: &[u8]) -> Option<(usize, Vec<YajilinClue>)> {
+        if input.len() < 2 {
+            return None;
+        }
+        let dir = input[0];
+        if !('0' as u8 <= dir && dir <= '9' as u8) {
+            return None;
+        }
+        let dir = dir - '0' as u8;
+        let n;
+        let n_read;
+        {
+            if dir < 5 {
+                if input[1] == '.' as u8 {
+                    n = -1;
+                } else {
+                    if !is_hex(input[1]) {
+                        return None;
+                    }
+                    n = from_base16(input[1]);
+                }
+                n_read = 2;
+            } else {
+                if input.len() < 3 || !is_hex(input[1]) || !is_hex(input[2]) {
+                    return None;
+                }
+                n = (from_base16(input[1]) << 4) | from_base16(input[2]);
+                n_read = 3;
+            }
+        }
+        Some((
+            n_read,
+            vec![match dir % 5 {
+                0 => YajilinClue::Unspecified(n),
+                1 => YajilinClue::Up(n),
+                2 => YajilinClue::Down(n),
+                3 => YajilinClue::Left(n),
+                4 => YajilinClue::Right(n),
+                _ => unreachable!(),
+            }],
+        ))
+    }
+}
+
+type Problem = Vec<Vec<Option<YajilinClue>>>;
+
+fn combinator() -> impl Combinator<Problem> {
+    Grid::new(Choice::new(vec![
+        Box::new(Optionalize::new(YajilinClueCombinator)),
+        Box::new(Spaces::new(None, 'a')),
+    ]))
+}
+
+pub fn serialize_problem(problem: &Problem) -> Option<String> {
+    problem_to_url(combinator(), "yajilin", problem.clone())
+}
+
+pub fn deserialize_problem(url: &str) -> Option<Problem> {
+    url_to_problem(combinator(), &["yajilin", "yajirin"], url)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -92,6 +189,19 @@ mod tests {
         problem[8][7] = Some(YajilinClue::Down(0));
         problem[9][2] = Some(YajilinClue::Left(0));
 
+        assert_eq!(
+            serialize_problem(&problem),
+            Some(String::from(
+                "https://puzz.link/p?yajilin/10/10/w32a41b21a21l22e30m21a12b11r20d30g"
+            ))
+        );
+        assert_eq!(
+            deserialize_problem(
+                "https://puzz.link/p?yajilin/10/10/w32a41b21a21l22e30m21a12b11r20d30g"
+            ),
+            Some(problem.clone())
+        );
+
         let ans = solve_yajilin(&problem);
         assert!(ans.is_some());
         let (_, is_black) = ans.unwrap();
@@ -111,5 +221,46 @@ mod tests {
         let expected =
             expected_base.map(|row| row.iter().map(|&n| Some(n == 1)).collect::<Vec<_>>());
         assert_eq!(is_black, expected);
+    }
+
+    #[test]
+    fn test_yajilin_clue_combinator() {
+        let combinator = YajilinClueCombinator;
+
+        assert_eq!(combinator.serialize(&[]), None);
+        assert_eq!(
+            combinator.serialize(&[YajilinClue::Up(0)]),
+            Some((1, Vec::from("10")))
+        );
+        assert_eq!(
+            combinator.serialize(&[YajilinClue::Down(3)]),
+            Some((1, Vec::from("23")))
+        );
+        assert_eq!(
+            combinator.serialize(&[YajilinClue::Left(-1)]),
+            Some((1, Vec::from("3.")))
+        );
+        assert_eq!(
+            combinator.serialize(&[YajilinClue::Right(63)]),
+            Some((1, Vec::from("93f")))
+        );
+
+        assert_eq!(combinator.deserialize("".as_bytes()), None);
+        assert_eq!(
+            combinator.deserialize("105".as_bytes()),
+            Some((2, vec![YajilinClue::Up(0)]))
+        );
+        assert_eq!(
+            combinator.deserialize("23".as_bytes()),
+            Some((2, vec![YajilinClue::Down(3)]))
+        );
+        assert_eq!(
+            combinator.deserialize("3.".as_bytes()),
+            Some((2, vec![YajilinClue::Left(-1)]))
+        );
+        assert_eq!(
+            combinator.deserialize("93f".as_bytes()),
+            Some((3, vec![YajilinClue::Right(63)]))
+        );
     }
 }

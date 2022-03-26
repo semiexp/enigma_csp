@@ -1,16 +1,16 @@
-fn is_dec(c: u8) -> bool {
+pub fn is_dec(c: u8) -> bool {
     return '0' as u8 <= c && c <= '9' as u8;
 }
 
-fn is_hex(c: u8) -> bool {
+pub fn is_hex(c: u8) -> bool {
     return ('0' as u8 <= c && c <= '9' as u8) || ('a' as u8 <= c && c <= 'f' as u8);
 }
 
-fn is_base36(c: u8) -> bool {
+pub fn is_base36(c: u8) -> bool {
     return ('0' as u8 <= c && c <= '9' as u8) || ('a' as u8 <= c && c <= 'z' as u8);
 }
 
-fn to_base36(n: i32) -> u8 {
+pub fn to_base36(n: i32) -> u8 {
     assert!(0 <= n && n < 36);
     if n <= 9 {
         n as u8 + '0' as u8
@@ -19,7 +19,7 @@ fn to_base36(n: i32) -> u8 {
     }
 }
 
-fn from_base36(c: u8) -> i32 {
+pub fn from_base36(c: u8) -> i32 {
     assert!(is_base36(c));
     if '0' as u8 <= c && c <= '9' as u8 {
         (c - '0' as u8) as i32
@@ -28,12 +28,12 @@ fn from_base36(c: u8) -> i32 {
     }
 }
 
-fn to_base16(n: i32) -> u8 {
+pub fn to_base16(n: i32) -> u8 {
     assert!(0 <= n && n < 16);
     to_base36(n)
 }
 
-fn from_base16(c: u8) -> i32 {
+pub fn from_base16(c: u8) -> i32 {
     assert!(is_hex(c));
     from_base36(c)
 }
