@@ -77,6 +77,45 @@ where
     }
 }
 
+pub struct Sequencer<'a, T> {
+    input: &'a [T],
+    n_read: usize,
+}
+
+impl<'a, T> Sequencer<'a, T> {
+    pub fn new(input: &'a [T]) -> Sequencer<'a, T> {
+        Sequencer { input, n_read: 0 }
+    }
+
+    pub fn n_read(&self) -> usize {
+        self.n_read
+    }
+
+    pub fn serialize<C: Combinator<T>>(&mut self, ctx: &Context, combinator: C) -> Option<Vec<u8>> {
+        if let Some((n, res)) = combinator.serialize(ctx, &self.input[self.n_read..]) {
+            self.n_read += n;
+            Some(res)
+        } else {
+            None
+        }
+    }
+}
+
+impl<'a> Sequencer<'a, u8> {
+    pub fn deserialize<T, C: Combinator<T>>(
+        &mut self,
+        ctx: &Context,
+        combinator: C,
+    ) -> Option<Vec<T>> {
+        if let Some((n, res)) = combinator.deserialize(ctx, &self.input[self.n_read..]) {
+            self.n_read += n;
+            Some(res)
+        } else {
+            None
+        }
+    }
+}
+
 pub struct Choice<T> {
     choices: Vec<Box<dyn Combinator<T>>>,
 }
@@ -475,13 +514,10 @@ where
             return None;
         }
 
-        let data = &input[0];
-
-        let mut ofs = 0;
+        let mut sequencer = Sequencer::new(&input[0]);
         let mut ret = vec![];
-        while ofs < self.count {
-            let (n_read, part) = self.base_serializer.serialize(ctx, &data[ofs..])?;
-            ofs += n_read;
+        while sequencer.n_read() < self.count {
+            let part = sequencer.serialize(ctx, &self.base_serializer)?;
             ret.extend(part);
         }
 
@@ -489,16 +525,15 @@ where
     }
 
     fn deserialize(&self, ctx: &Context, input: &[u8]) -> Option<(usize, Vec<Vec<T>>)> {
-        let mut ofs = 0;
+        let mut sequencer = Sequencer::new(input);
         let mut ret = vec![];
         while ret.len() < self.count {
-            let (n_read, part) = self.base_serializer.deserialize(ctx, &input[ofs..])?;
-            ofs += n_read;
+            let part = sequencer.deserialize(ctx, &self.base_serializer)?;
             ret.extend(part);
         }
 
         ret.truncate(self.count);
-        Some((ofs, vec![ret]))
+        Some((sequencer.n_read(), vec![ret]))
     }
 }
 
@@ -601,35 +636,25 @@ where
     }
 
     fn deserialize(&self, ctx: &Context, input: &[u8]) -> Option<(usize, Vec<T>)> {
-        let mut n_read_total = 0;
+        let mut sequencer = Sequencer::new(input);
 
-        let (n_read, width) = DecInt.deserialize(ctx, input)?;
+        let width = sequencer.deserialize(ctx, DecInt)?;
         assert_eq!(width.len(), 1);
-        n_read_total += n_read;
         let width = width[0] as usize;
-        if input.len() == n_read_total || input[n_read_total] != '/' as u8 {
-            return None;
-        }
-        n_read_total += 1;
+        sequencer.deserialize(ctx, Dict::new((), "/"))?;
 
-        let (n_read, height) = DecInt.deserialize(ctx, &input[n_read_total..])?;
+        let height = sequencer.deserialize(ctx, DecInt)?;
         assert_eq!(height.len(), 1);
-        n_read_total += n_read;
         let height = height[0] as usize;
-        if input.len() == n_read_total || input[n_read_total] != '/' as u8 {
-            return None;
-        }
-        n_read_total += 1;
+        sequencer.deserialize(ctx, Dict::new((), "/"))?;
 
         let ctx = Context {
             height: Some(height),
             width: Some(width),
             ..*ctx
         };
-        let (n_read, ret) = self
-            .base_serializer
-            .deserialize(&ctx, &input[n_read_total..])?;
-        Some((n_read_total + n_read, ret))
+        let ret = sequencer.deserialize(&ctx, &self.base_serializer)?;
+        Some((sequencer.n_read(), ret))
     }
 }
 
