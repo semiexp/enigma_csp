@@ -493,6 +493,18 @@ where
         .map(|body| prefix + puzzle_kind + "/" + &body)
 }
 
+pub fn url_to_puzzle_kind(serialized: &str) -> Option<String> {
+    let serialized = serialized
+        .strip_prefix("http://")
+        .or(serialized.strip_prefix("https://"))?;
+    let serialized = serialized
+        .strip_prefix("puzz.link/p?")
+        .or(serialized.strip_prefix("pzv.jp/p.html?"))?;
+    let pos = serialized.find('/')?;
+    let kind = &serialized[0..pos];
+    Some(String::from(kind))
+}
+
 pub fn url_to_problem<T, C>(combinator: C, puzzle_kinds: &[&str], serialized: &str) -> Option<T>
 where
     C: Combinator<T>,
