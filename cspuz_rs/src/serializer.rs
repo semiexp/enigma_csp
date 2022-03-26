@@ -115,6 +115,35 @@ impl<T: Clone + PartialEq> Combinator<T> for Dict<T> {
     }
 }
 
+pub struct MaybeSkip<C>(Vec<u8>, C);
+
+impl<C> MaybeSkip<C> {
+    pub fn new<A>(s: A, combinator: C) -> MaybeSkip<C>
+    where
+        Vec<u8>: From<A>,
+    {
+        MaybeSkip(Vec::<u8>::from(s), combinator)
+    }
+}
+
+impl<T, C> Combinator<T> for MaybeSkip<C>
+where
+    C: Combinator<T>,
+{
+    fn serialize(&self, input: &[T]) -> Option<(usize, Vec<u8>)> {
+        self.1.serialize(input)
+    }
+
+    fn deserialize(&self, input: &[u8]) -> Option<(usize, Vec<T>)> {
+        if input.len() >= self.0.len() && input[..self.0.len()] == self.0 {
+            let (n_read, res) = self.1.deserialize(&input[self.0.len()..])?;
+            Some((n_read + self.0.len(), res))
+        } else {
+            self.1.deserialize(input)
+        }
+    }
+}
+
 pub struct Spaces<T: Clone + PartialEq> {
     space: T,
     minimum: u8,
@@ -594,6 +623,22 @@ mod tests {
         assert_eq!(
             combinator.deserialize("+3e85".as_bytes()),
             Some((4, vec![1000]))
+        );
+    }
+
+    #[test]
+    fn test_maybe_skip() {
+        let combinator = MaybeSkip::new("!!", HexInt);
+
+        assert_eq!(combinator.serialize(&[]), None);
+        assert_eq!(combinator.serialize(&[42]), Some((1, Vec::from("-2a"))));
+        assert_eq!(combinator.deserialize("".as_bytes()), None);
+        assert_eq!(combinator.deserialize("c".as_bytes()), Some((1, vec![12])));
+        assert_eq!(combinator.deserialize("!!".as_bytes()), None);
+        assert_eq!(combinator.deserialize("!c".as_bytes()), None);
+        assert_eq!(
+            combinator.deserialize("!!c".as_bytes()),
+            Some((3, vec![12]))
         );
     }
 

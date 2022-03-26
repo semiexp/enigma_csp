@@ -1,7 +1,7 @@
 use crate::graph;
 use crate::serializer::{
     from_base16, is_hex, problem_to_url, to_base16, url_to_problem, Choice, Combinator, Grid,
-    Optionalize, Spaces,
+    MaybeSkip, Optionalize, Spaces,
 };
 use crate::solver::Solver;
 
@@ -155,10 +155,13 @@ impl Combinator<YajilinClue> for YajilinClueCombinator {
 type Problem = Vec<Vec<Option<YajilinClue>>>;
 
 fn combinator() -> impl Combinator<Problem> {
-    Grid::new(Choice::new(vec![
-        Box::new(Optionalize::new(YajilinClueCombinator)),
-        Box::new(Spaces::new(None, 'a')),
-    ]))
+    MaybeSkip::new(
+        "b/",
+        Grid::new(Choice::new(vec![
+            Box::new(Optionalize::new(YajilinClueCombinator)),
+            Box::new(Spaces::new(None, 'a')),
+        ])),
+    )
 }
 
 pub fn serialize_problem(problem: &Problem) -> Option<String> {
