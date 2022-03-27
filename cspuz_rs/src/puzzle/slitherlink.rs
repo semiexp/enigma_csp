@@ -1,4 +1,8 @@
 use crate::graph;
+use crate::serializer::{
+    from_base16, is_hex, problem_to_url, to_base16, url_to_problem, Choice, Combinator, Context,
+    Grid, Spaces,
+};
 use crate::solver::Solver;
 
 pub fn solve_slitherlink(
@@ -26,6 +30,60 @@ pub fn solve_slitherlink(
     solver.irrefutable_facts().map(|f| f.get(is_line))
 }
 
+struct SlitherlinkClueCombinator;
+
+impl Combinator<Option<i32>> for SlitherlinkClueCombinator {
+    fn serialize(&self, _: &Context, input: &[Option<i32>]) -> Option<(usize, Vec<u8>)> {
+        if input.len() == 0 {
+            return None;
+        }
+        let n = input[0]?;
+        let mut n_spaces = 0;
+        while n_spaces < 2 && 1 + n_spaces < input.len() && input[1 + n_spaces].is_none() {
+            n_spaces += 1;
+        }
+        Some((1 + n_spaces, vec![to_base16(n + n_spaces as i32 * 5)]))
+    }
+
+    fn deserialize(&self, _: &Context, input: &[u8]) -> Option<(usize, Vec<Option<i32>>)> {
+        if input.len() == 0 {
+            return None;
+        }
+        let c = input[0];
+        if !is_hex(c) {
+            return None;
+        }
+        let c = from_base16(c);
+        if c == 15 {
+            return None;
+        }
+        let n = c % 5;
+        let spaces = c / 5;
+        let mut ret = vec![Some(n)];
+        for _ in 0..spaces {
+            ret.push(None);
+        }
+        Some((1, ret))
+    }
+}
+
+type Problem = Vec<Vec<Option<i32>>>;
+
+fn combinator() -> impl Combinator<Problem> {
+    Grid::new(Choice::new(vec![
+        Box::new(SlitherlinkClueCombinator),
+        Box::new(Spaces::new(None, 'g')),
+    ]))
+}
+
+pub fn serialize_problem(problem: &Problem) -> Option<String> {
+    problem_to_url(combinator(), "slither", problem.clone())
+}
+
+pub fn deserialize_problem(url: &str) -> Option<Problem> {
+    url_to_problem(combinator(), &["slither", "slitherlink"], url)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -34,12 +92,14 @@ mod tests {
     #[rustfmt::skip]
     fn test_slitherlink_problem() {
         // original example: http://pzv.jp/p.html?slither/4/4/dgdh2c7b
-        let problem = [
+        let problem = vec![
             vec![Some(3), None, None, None],
             vec![Some(3), None, None, None],
             vec![None, Some(2), Some(2), None],
             vec![None, Some(2), None, Some(1)],
         ];
+        assert_eq!(serialize_problem(&problem), Some(String::from("https://puzz.link/p?slither/4/4/dgdh2c71")));
+        assert_eq!(problem, deserialize_problem("https://puzz.link/p?slither/4/4/dgdh2c71").unwrap());
         let ans = solve_slitherlink(&problem);
         assert!(ans.is_some());
         let ans = ans.unwrap();
