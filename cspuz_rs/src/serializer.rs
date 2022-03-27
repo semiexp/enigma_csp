@@ -1,4 +1,4 @@
-use crate::graph::GridFrame;
+use crate::graph::{borders_to_rooms, GridFrame};
 
 pub fn is_dec(c: u8) -> bool {
     return '0' as u8 <= c && c <= '9' as u8;
@@ -771,53 +771,6 @@ impl<C> RoomsWithValues<C> {
     }
 }
 
-pub fn borders_to_rooms(borders: &GridFrame<Vec<Vec<bool>>>) -> Vec<Vec<(usize, usize)>> {
-    fn visit(
-        y: usize,
-        x: usize,
-        borders: &GridFrame<Vec<Vec<bool>>>,
-        visited: &mut Vec<Vec<bool>>,
-        room: &mut Vec<(usize, usize)>,
-    ) {
-        if visited[y][x] {
-            return;
-        }
-        visited[y][x] = true;
-        room.push((y, x));
-        if y > 0 && !borders.horizontal[y - 1][x] {
-            visit(y - 1, x, borders, visited, room);
-        }
-        if y < borders.horizontal.len() && !borders.horizontal[y][x] {
-            visit(y + 1, x, borders, visited, room);
-        }
-        if x > 0 && !borders.vertical[y][x - 1] {
-            visit(y, x - 1, borders, visited, room);
-        }
-        if x < borders.vertical[0].len() && !borders.vertical[y][x] {
-            visit(y, x + 1, borders, visited, room);
-        }
-    }
-
-    let height = borders.vertical.len();
-    let width = borders.vertical[0].len() + 1;
-
-    let mut visited = vec![vec![false; width]; height];
-    let mut ret = vec![];
-    for y in 0..height {
-        for x in 0..width {
-            if visited[y][x] {
-                continue;
-            }
-            let mut room = vec![];
-            visit(y, x, borders, &mut visited, &mut room);
-            println!("{:?}", room);
-            ret.push(room);
-        }
-    }
-
-    ret
-}
-
 impl<T, C> Combinator<(GridFrame<Vec<Vec<bool>>>, Vec<T>)> for RoomsWithValues<C>
 where
     T: Clone,
@@ -896,15 +849,27 @@ where
     }
 }
 
-pub fn problem_to_url<T, C>(combinator: C, puzzle_kind: &str, problem: T) -> Option<String>
+pub fn problem_to_url_with_context<T, C>(
+    combinator: C,
+    puzzle_kind: &str,
+    problem: T,
+    ctx: &Context,
+) -> Option<String>
 where
     C: Combinator<T>,
 {
-    let (_, body) = combinator.serialize(&Context::new(), &[problem])?;
+    let (_, body) = combinator.serialize(ctx, &[problem])?;
     let prefix = String::from("https://puzz.link/p?");
     String::from_utf8(body)
         .ok()
         .map(|body| prefix + puzzle_kind + "/" + &body)
+}
+
+pub fn problem_to_url<T, C>(combinator: C, puzzle_kind: &str, problem: T) -> Option<String>
+where
+    C: Combinator<T>,
+{
+    problem_to_url_with_context(combinator, puzzle_kind, problem, &Context::new())
 }
 
 pub fn url_to_puzzle_kind(serialized: &str) -> Option<String> {

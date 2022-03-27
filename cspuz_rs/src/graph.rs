@@ -63,6 +63,52 @@ pub struct GridFrame<T> {
     pub vertical: T,
 }
 
+pub fn borders_to_rooms(borders: &GridFrame<Vec<Vec<bool>>>) -> Vec<Vec<(usize, usize)>> {
+    fn visit(
+        y: usize,
+        x: usize,
+        borders: &GridFrame<Vec<Vec<bool>>>,
+        visited: &mut Vec<Vec<bool>>,
+        room: &mut Vec<(usize, usize)>,
+    ) {
+        if visited[y][x] {
+            return;
+        }
+        visited[y][x] = true;
+        room.push((y, x));
+        if y > 0 && !borders.horizontal[y - 1][x] {
+            visit(y - 1, x, borders, visited, room);
+        }
+        if y < borders.horizontal.len() && !borders.horizontal[y][x] {
+            visit(y + 1, x, borders, visited, room);
+        }
+        if x > 0 && !borders.vertical[y][x - 1] {
+            visit(y, x - 1, borders, visited, room);
+        }
+        if x < borders.vertical[0].len() && !borders.vertical[y][x] {
+            visit(y, x + 1, borders, visited, room);
+        }
+    }
+
+    let height = borders.vertical.len();
+    let width = borders.vertical[0].len() + 1;
+
+    let mut visited = vec![vec![false; width]; height];
+    let mut ret = vec![];
+    for y in 0..height {
+        for x in 0..width {
+            if visited[y][x] {
+                continue;
+            }
+            let mut room = vec![];
+            visit(y, x, borders, &mut visited, &mut room);
+            ret.push(room);
+        }
+    }
+
+    ret
+}
+
 pub type BoolGridFrame = GridFrame<BoolVarArray2D>;
 pub type BoolGridFrameModel = GridFrame<Vec<Vec<bool>>>;
 pub type BoolGridFrameIrrefutableFacts = GridFrame<Vec<Vec<Option<bool>>>>;

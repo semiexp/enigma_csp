@@ -1,3 +1,4 @@
+pub mod heyawake;
 pub mod nurikabe;
 pub mod nurimisaki;
 pub mod slitherlink;
