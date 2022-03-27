@@ -1,6 +1,7 @@
 extern crate cspuz_rs;
 
-use cspuz_rs::puzzle::{nurikabe, yajilin};
+use cspuz_rs::graph;
+use cspuz_rs::puzzle::{heyawake, nurikabe, yajilin};
 use cspuz_rs::serializer::url_to_puzzle_kind;
 
 static mut SHARED_ARRAY: Vec<u8> = vec![];
@@ -225,6 +226,63 @@ fn solve_yajilin(url: &str) -> Result<Board, &'static str> {
     })
 }
 
+fn solve_heyawake(url: &str) -> Result<Board, &'static str> {
+    let (borders, clues) = heyawake::deserialize_problem(url).ok_or("invalid url")?;
+    let is_black = heyawake::solve_heyawake(&borders, &clues).ok_or("no answer")?;
+
+    let height = is_black.len();
+    let width = is_black[0].len();
+    let mut data = vec![];
+
+    for y in 0..height {
+        for x in 0..width {
+            if y < height - 1 && borders.horizontal[y][x] {
+                data.push(Item {
+                    y: y * 2 + 2,
+                    x: x * 2 + 1,
+                    color: "black",
+                    kind: ItemKind::BoldWall,
+                });
+            }
+            if x < width - 1 && borders.vertical[y][x] {
+                data.push(Item {
+                    y: y * 2 + 1,
+                    x: x * 2 + 2,
+                    color: "black",
+                    kind: ItemKind::BoldWall,
+                });
+            }
+        }
+    }
+    for y in 0..height {
+        for x in 0..width {
+            if let Some(b) = is_black[y][x] {
+                data.push(Item::cell(
+                    y,
+                    x,
+                    "green",
+                    if b { ItemKind::Block } else { ItemKind::Dot },
+                ));
+            }
+        }
+    }
+    let rooms = graph::borders_to_rooms(&borders);
+    assert_eq!(rooms.len(), clues.len());
+    for i in 0..rooms.len() {
+        if let Some(n) = clues[i] {
+            let (y, x) = rooms[i][0];
+            data.push(Item::cell(y, x, "black", ItemKind::Num(n)));
+        }
+    }
+
+    Ok(Board {
+        kind: BoardKind::Grid,
+        height,
+        width,
+        data,
+    })
+}
+
 fn decode_and_solve(url: &[u8]) -> Result<Board, &'static str> {
     let url = std::str::from_utf8(url).map_err(|_| "failed to decode URL as UTF-8")?;
 
@@ -234,6 +292,8 @@ fn decode_and_solve(url: &[u8]) -> Result<Board, &'static str> {
         solve_nurikabe(url)
     } else if puzzle_kind == "yajilin" || puzzle_kind == "yajirin" {
         solve_yajilin(url)
+    } else if puzzle_kind == "heyawake" {
+        solve_heyawake(url)
     } else {
         Err("unknown puzzle type")
     }
