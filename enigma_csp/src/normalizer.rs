@@ -178,9 +178,12 @@ fn normalize_stmt(env: &mut NormalizerEnv, stmt: Stmt) {
         Stmt::ActiveVerticesConnected(vertices, edges) => {
             let mut vertices_converted = vec![];
             for e in vertices {
-                // TODO: support Not(Var(_)), Const
                 let simplified = match &e {
                     BoolExpr::Var(v) => Some(env.convert_bool_var(*v)),
+                    BoolExpr::Not(e) => match e.as_ref() {
+                        BoolExpr::Var(v) => Some(!env.convert_bool_var(*v)),
+                        _ => None,
+                    },
                     _ => None,
                 };
                 if let Some(l) = simplified {
