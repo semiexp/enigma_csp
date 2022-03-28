@@ -127,6 +127,15 @@ impl BoolGridFrame {
         (horizontal_shape.0 - 1, horizontal_shape.1)
     }
 
+    pub fn at(&self, pos: (usize, usize)) -> BoolVar {
+        let (y, x) = pos;
+        match (y % 2, x % 2) {
+            (0, 1) => self.horizontal.at((y / 2, x / 2)),
+            (1, 0) => self.vertical.at((y / 2, x / 2)),
+            _ => panic!(),
+        }
+    }
+
     pub fn representation(&self) -> (Vec<BoolVar>, Graph) {
         let (height, width) = self.base_shape();
 
