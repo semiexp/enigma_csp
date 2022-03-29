@@ -128,6 +128,45 @@ impl<'a> Sequencer<'a, u8> {
     }
 }
 
+pub struct Tuple2<A, B> {
+    a: A,
+    b: B,
+}
+
+impl<A, B> Tuple2<A, B> {
+    pub fn new(a: A, b: B) -> Tuple2<A, B> {
+        Tuple2 { a, b }
+    }
+}
+
+impl<A, B, P, Q> Combinator<(P, Q)> for Tuple2<A, B>
+where
+    A: Combinator<P>,
+    B: Combinator<Q>,
+    P: Clone,
+    Q: Clone,
+{
+    fn serialize(&self, ctx: &Context, input: &[(P, Q)]) -> Option<(usize, Vec<u8>)> {
+        if input.len() == 0 {
+            return None;
+        }
+        let (p, q) = input[0].clone();
+        let mut ret = vec![];
+        let (_, app) = self.a.serialize(ctx, &[p])?;
+        ret.extend(app);
+        let (_, app) = self.b.serialize(ctx, &[q])?;
+        ret.extend(app);
+        Some((1, ret))
+    }
+
+    fn deserialize(&self, ctx: &Context, input: &[u8]) -> Option<(usize, Vec<(P, Q)>)> {
+        let mut sequencer = Sequencer::new(input);
+        let p = sequencer.deserialize_one_elem(ctx, &self.a)?;
+        let q = sequencer.deserialize_one_elem(ctx, &self.b)?;
+        Some((sequencer.n_read(), vec![(p, q)]))
+    }
+}
+
 pub struct Choice<T> {
     choices: Vec<Box<dyn Combinator<T>>>,
 }
