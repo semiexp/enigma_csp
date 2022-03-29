@@ -269,6 +269,57 @@ impl<T: Clone + PartialEq> Combinator<T> for Spaces<T> {
     }
 }
 
+pub struct FixedLengthHexInt(usize);
+
+impl FixedLengthHexInt {
+    pub fn new(len: usize) -> FixedLengthHexInt {
+        assert!(1 <= len && len <= 7);
+        FixedLengthHexInt(len)
+    }
+}
+
+impl Combinator<i32> for FixedLengthHexInt {
+    fn serialize(&self, _: &Context, input: &[i32]) -> Option<(usize, Vec<u8>)> {
+        if input.len() == 0 {
+            return None;
+        }
+        let v = input[0];
+        let len = self.0;
+        let lo = if len == 1 { 0 } else { 1i32 << ((len - 1) * 4) };
+        let hi = (1i32 << (len * 4)) - 1;
+        if lo <= v && v <= hi {
+            let mut ret = vec![];
+            for i in 0..len {
+                ret.push(to_base16((v >> (4 * (len - 1 - i))) & 15));
+            }
+            Some((1, ret))
+        } else {
+            None
+        }
+    }
+
+    fn deserialize(&self, _: &Context, input: &[u8]) -> Option<(usize, Vec<i32>)> {
+        let len = self.0;
+        if input.len() < len {
+            return None;
+        }
+        let mut ret = 0;
+        for i in 0..len {
+            if !is_hex(input[i]) {
+                return None;
+            }
+            ret = (ret << 4) | from_base16(input[i]);
+        }
+        let lo = if len == 1 { 0 } else { 1i32 << ((len - 1) * 4) };
+        let hi = (1i32 << (len * 4)) - 1;
+        if lo <= ret && ret <= hi {
+            Some((len, vec![ret]))
+        } else {
+            None
+        }
+    }
+}
+
 pub struct HexInt;
 
 impl Combinator<i32> for HexInt {
@@ -970,6 +1021,34 @@ mod tests {
         assert_eq!(
             combinator.deserialize(ctx, "b".as_bytes()),
             Some((1, vec![0, 0, 0]))
+        );
+    }
+
+    #[test]
+    fn test_fixed_hexint() {
+        let ctx = &Context::new();
+
+        let combinator = FixedLengthHexInt::new(1);
+
+        assert_eq!(combinator.serialize(ctx, &[]), None);
+        assert_eq!(
+            combinator.serialize(ctx, &[12, 3]),
+            Some((1, Vec::from("c")))
+        );
+        assert_eq!(
+            combinator.serialize(ctx, &[0, 5]),
+            Some((1, Vec::from("0")))
+        );
+        assert_eq!(combinator.serialize(ctx, &[-1, 5]), None);
+        assert_eq!(combinator.serialize(ctx, &[42]), None);
+        assert_eq!(combinator.deserialize(ctx, "".as_bytes()), None);
+        assert_eq!(
+            combinator.deserialize(ctx, "c".as_bytes()),
+            Some((1, vec![12]))
+        );
+        assert_eq!(
+            combinator.deserialize(ctx, "0".as_bytes()),
+            Some((1, vec![0]))
         );
     }
 
