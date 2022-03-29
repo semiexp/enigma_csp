@@ -218,16 +218,16 @@ where
 
 pub struct Spaces<T: Clone + PartialEq> {
     space: T,
-    minimum: u8,
-    maximum: u8,
+    minimum: i32,
+    maximum: i32,
 }
 
 impl<T: Clone + PartialEq> Spaces<T> {
     pub fn new(space: T, minimum: char) -> Spaces<T> {
         Spaces {
             space,
-            minimum: minimum as u8,
-            maximum: 'z' as u8,
+            minimum: from_base36(minimum as u8),
+            maximum: from_base36('z' as u8),
         }
     }
 }
@@ -242,7 +242,10 @@ impl<T: Clone + PartialEq> Combinator<T> for Spaces<T> {
         if n_spaces == 0 {
             None
         } else {
-            Some((n_spaces, vec![self.minimum + (n_spaces - 1) as u8]))
+            Some((
+                n_spaces,
+                vec![to_base36(self.minimum + (n_spaces as i32 - 1))],
+            ))
         }
     }
 
@@ -251,6 +254,10 @@ impl<T: Clone + PartialEq> Combinator<T> for Spaces<T> {
             return None;
         }
         let v = input[0];
+        if !is_base36(v) {
+            return None;
+        }
+        let v = from_base36(v);
         if !(self.minimum <= v && v <= self.maximum) {
             return None;
         }
@@ -953,6 +960,16 @@ mod tests {
         assert_eq!(
             combinator.deserialize(ctx, "zz".as_bytes()),
             Some((1, vec![0, 0, 0, 0]))
+        );
+
+        let combinator = Spaces::new(0i32, '9');
+        assert_eq!(
+            combinator.serialize(ctx, &[0, 0]),
+            Some((2, Vec::from("a")))
+        );
+        assert_eq!(
+            combinator.deserialize(ctx, "b".as_bytes()),
+            Some((1, vec![0, 0, 0]))
         );
     }
 
