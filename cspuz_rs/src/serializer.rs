@@ -4,14 +4,6 @@ pub fn is_dec(c: u8) -> bool {
     return '0' as u8 <= c && c <= '9' as u8;
 }
 
-pub fn is_hex(c: u8) -> bool {
-    return ('0' as u8 <= c && c <= '9' as u8) || ('a' as u8 <= c && c <= 'f' as u8);
-}
-
-pub fn is_base36(c: u8) -> bool {
-    return ('0' as u8 <= c && c <= '9' as u8) || ('a' as u8 <= c && c <= 'z' as u8);
-}
-
 pub fn to_base36(n: i32) -> u8 {
     assert!(0 <= n && n < 36);
     if n <= 9 {
@@ -21,12 +13,13 @@ pub fn to_base36(n: i32) -> u8 {
     }
 }
 
-pub fn from_base36(c: u8) -> i32 {
-    assert!(is_base36(c));
+pub fn from_base36(c: u8) -> Option<i32> {
     if '0' as u8 <= c && c <= '9' as u8 {
-        (c - '0' as u8) as i32
+        Some((c - '0' as u8) as i32)
+    } else if 'a' as u8 <= c && c <= 'z' as u8 {
+        Some((c - 'a' as u8) as i32 + 10)
     } else {
-        (c - 'a' as u8) as i32 + 10
+        None
     }
 }
 
@@ -35,9 +28,14 @@ pub fn to_base16(n: i32) -> u8 {
     to_base36(n)
 }
 
-pub fn from_base16(c: u8) -> i32 {
-    assert!(is_hex(c));
-    from_base36(c)
+pub fn from_base16(c: u8) -> Option<i32> {
+    if '0' as u8 <= c && c <= '9' as u8 {
+        Some((c - '0' as u8) as i32)
+    } else if 'a' as u8 <= c && c <= 'f' as u8 {
+        Some((c - 'a' as u8) as i32 + 10)
+    } else {
+        None
+    }
 }
 
 pub struct Context {
@@ -265,8 +263,8 @@ impl<T: Clone + PartialEq> Spaces<T> {
     pub fn new(space: T, minimum: char) -> Spaces<T> {
         Spaces {
             space,
-            minimum: from_base36(minimum as u8),
-            maximum: from_base36('z' as u8),
+            minimum: from_base36(minimum as u8).unwrap(),
+            maximum: from_base36('z' as u8).unwrap(),
         }
     }
 }
@@ -292,11 +290,7 @@ impl<T: Clone + PartialEq> Combinator<T> for Spaces<T> {
         if input.len() == 0 {
             return None;
         }
-        let v = input[0];
-        if !is_base36(v) {
-            return None;
-        }
-        let v = from_base36(v);
+        let v = from_base36(input[0])?;
         if !(self.minimum <= v && v <= self.maximum) {
             return None;
         }
@@ -344,10 +338,7 @@ impl Combinator<i32> for FixedLengthHexInt {
         }
         let mut ret = 0;
         for i in 0..len {
-            if !is_hex(input[i]) {
-                return None;
-            }
-            ret = (ret << 4) | from_base16(input[i]);
+            ret = (ret << 4) | from_base16(input[i])?;
         }
         let lo = if len == 1 { 0 } else { 1i32 << ((len - 1) * 4) };
         let hi = (1i32 << (len * 4)) - 1;
@@ -391,27 +382,27 @@ impl Combinator<i32> for HexInt {
             return None;
         }
         let v = input[0];
-        if is_hex(v) {
-            Some((1, vec![from_base16(v)]))
+        if let Some(n) = from_base16(v) {
+            Some((1, vec![n]))
         } else if v == '-' as u8 {
-            if !(input.len() >= 3 && is_hex(input[1]) && is_hex(input[2])) {
+            if input.len() < 3 {
                 None
             } else {
                 Some((
                     3,
-                    vec![(from_base16(input[1]) << 4) | from_base16(input[2])],
+                    vec![(from_base16(input[1])? << 4) | from_base16(input[2])?],
                 ))
             }
         } else if v == '+' as u8 {
-            if !(input.len() >= 4 && is_hex(input[1]) && is_hex(input[2]) && is_hex(input[3])) {
+            if input.len() < 4 {
                 None
             } else {
                 Some((
                     4,
                     vec![
-                        (from_base16(input[1]) << 8)
-                            | (from_base16(input[2]) << 4)
-                            | from_base16(input[3]),
+                        (from_base16(input[1])? << 8)
+                            | (from_base16(input[2])? << 4)
+                            | from_base16(input[3])?,
                     ],
                 ))
             }
@@ -503,11 +494,7 @@ impl Combinator<i32> for MultiDigit {
         if input.len() == 0 {
             return None;
         }
-        let v = input[0];
-        if !is_base36(v) {
-            return None;
-        }
-        let mut v = from_base36(v);
+        let mut v = from_base36(input[0])?;
         if v >= self.max_num {
             return None;
         }

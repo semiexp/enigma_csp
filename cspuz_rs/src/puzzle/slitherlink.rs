@@ -1,7 +1,7 @@
 use crate::graph;
 use crate::serializer::{
-    from_base16, is_hex, problem_to_url, to_base16, url_to_problem, Choice, Combinator, Context,
-    Grid, Spaces,
+    from_base16, problem_to_url, to_base16, url_to_problem, Choice, Combinator, Context, Grid,
+    Spaces,
 };
 use crate::solver::Solver;
 
@@ -49,11 +49,7 @@ impl Combinator<Option<i32>> for SlitherlinkClueCombinator {
         if input.len() == 0 {
             return None;
         }
-        let c = input[0];
-        if !is_hex(c) {
-            return None;
-        }
-        let c = from_base16(c);
+        let c = from_base16(input[0])?;
         if c == 15 {
             return None;
         }

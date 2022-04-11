@@ -1,7 +1,7 @@
 use crate::graph;
 use crate::serializer::{
-    from_base16, is_hex, problem_to_url, to_base16, url_to_problem, Choice, Combinator, Context,
-    Grid, MaybeSkip, Optionalize, Spaces,
+    from_base16, problem_to_url, to_base16, url_to_problem, Choice, Combinator, Context, Grid,
+    MaybeSkip, Optionalize, Spaces,
 };
 use crate::solver::Solver;
 
@@ -124,17 +124,14 @@ impl Combinator<YajilinClue> for YajilinClueCombinator {
                 if input[1] == '.' as u8 {
                     n = -1;
                 } else {
-                    if !is_hex(input[1]) {
-                        return None;
-                    }
-                    n = from_base16(input[1]);
+                    n = from_base16(input[1])?;
                 }
                 n_read = 2;
             } else {
-                if input.len() < 3 || !is_hex(input[1]) || !is_hex(input[2]) {
+                if input.len() < 3 {
                     return None;
                 }
-                n = (from_base16(input[1]) << 4) | from_base16(input[2]);
+                n = (from_base16(input[1])? << 4) | from_base16(input[2])?;
                 n_read = 3;
             }
         }
