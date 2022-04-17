@@ -129,7 +129,7 @@ impl IntegratedSolver {
 
     /// Enumerate all the valid assignments of the CSP problem.
     /// Since this function may modify the problem instance, this consumes `self` to avoid further operations.
-    pub fn enumerate_valid_assignments(mut self) -> Vec<Assignment> {
+    pub fn enumerate_valid_assignments(self) -> Vec<Assignment> {
         let mut bool_vars = vec![];
         for v in self.csp.vars.bool_vars_iter() {
             bool_vars.push(v);
@@ -139,37 +139,7 @@ impl IntegratedSolver {
             int_vars.push(v);
         }
 
-        let mut ret = vec![];
-        loop {
-            let refutation_expr;
-
-            match self.solve() {
-                Some(model) => {
-                    let mut refutation = vec![];
-                    let mut assignment = Assignment::new();
-                    for &var in &bool_vars {
-                        let val = model.get_bool(var);
-                        assignment.set_bool(var, val);
-                        if val {
-                            refutation.push(Box::new(!var.expr()));
-                        } else {
-                            refutation.push(Box::new(var.expr()));
-                        }
-                    }
-                    for &var in &int_vars {
-                        let val = model.get_int(var);
-                        assignment.set_int(var, val);
-                        refutation.push(Box::new(var.expr().ne(IntExpr::Const(val))));
-                    }
-                    refutation_expr = BoolExpr::Or(refutation);
-                    ret.push(assignment);
-                }
-                None => break,
-            }
-
-            self.add_expr(refutation_expr);
-        }
-        ret
+        self.answer_iter(&bool_vars, &int_vars).collect()
     }
 
     pub fn decide_irrefutable_facts(
@@ -230,8 +200,49 @@ impl IntegratedSolver {
         Some(assignment)
     }
 
+    pub fn answer_iter(self, bool_vars: &[BoolVar], int_vars: &[IntVar]) -> AnswerIterator {
+        AnswerIterator {
+            solver: self,
+            key_bool: bool_vars.iter().cloned().collect(),
+            key_int: int_vars.iter().cloned().collect(),
+        }
+    }
+
     pub fn perf_stats(&self) -> PerfStats {
         self.perf_stats.clone()
+    }
+}
+
+pub struct AnswerIterator {
+    solver: IntegratedSolver,
+    key_bool: Vec<BoolVar>,
+    key_int: Vec<IntVar>,
+}
+
+impl Iterator for AnswerIterator {
+    type Item = Assignment;
+
+    fn next(&mut self) -> Option<Assignment> {
+        let model = self.solver.solve();
+        if let Some(model) = &model {
+            let mut ret = Assignment::new();
+            let mut refutation = vec![];
+            for &var in &self.key_bool {
+                let b = model.get_bool(var);
+                ret.set_bool(var, b);
+                refutation.push(Box::new(if b { !var.expr() } else { var.expr() }));
+            }
+            for &var in &self.key_int {
+                let n = model.get_int(var);
+                ret.set_int(var, n);
+                refutation.push(Box::new(var.expr().ne(IntExpr::Const(n))));
+            }
+            self.solver.add_expr(BoolExpr::Or(refutation));
+
+            Some(ret)
+        } else {
+            None
+        }
     }
 }
 
@@ -841,6 +852,24 @@ mod tests {
         assert_eq!(res.get_int(b), None);
         assert_eq!(res.get_int(c), None);
         assert_eq!(res.get_int(d), Some(4));
+    }
+
+    #[test]
+    fn test_integration_solver_iterator() {
+        let mut solver = IntegratedSolver::new();
+
+        let a = solver.new_int_var(Domain::range(1, 3));
+        let b = solver.new_int_var(Domain::range(1, 3));
+        let x = solver.new_bool_var();
+
+        solver
+            .add_expr((a.expr() + b.expr()).ge(x.expr().ite(IntExpr::Const(3), IntExpr::Const(4))));
+
+        let mut n_ans = 0;
+        for _ in solver.answer_iter(&[x], &[a, b]) {
+            n_ans += 1;
+        }
+        assert_eq!(n_ans, 14);
     }
 
     #[test]
