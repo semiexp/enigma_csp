@@ -1041,10 +1041,16 @@ impl Solver {
         self.solver.solve().map(|model| Model { model })
     }
 
-    pub fn irrefutable_facts(self) -> Option<IrrefutableFacts> {
+    pub fn irrefutable_facts(self) -> Option<OwnedPartialModel> {
         self.solver
             .decide_irrefutable_facts(&self.answer_key_bool, &self.answer_key_int)
-            .map(|assignment| IrrefutableFacts { assignment })
+            .map(|assignment| OwnedPartialModel { assignment })
+    }
+
+    pub fn answer_iter(self) -> impl Iterator<Item = OwnedPartialModel> {
+        self.solver
+            .answer_iter(&self.answer_key_bool, &self.answer_key_int)
+            .map(|assignment| OwnedPartialModel { assignment })
     }
 }
 
@@ -1173,82 +1179,154 @@ impl<'a> Model<'a> {
     }
 }
 
-pub trait FromIrrefutableFacts {
+pub trait FromOwnedPartialModel {
     type Output;
+    type OutputUnwrap;
 
-    fn from_irrefutable_facts(&self, irrefutable_facts: &IrrefutableFacts) -> Self::Output;
+    fn from_irrefutable_facts(&self, irrefutable_facts: &OwnedPartialModel) -> Self::Output;
+    fn from_irrefutable_facts_unwrap(
+        &self,
+        irrefutable_facts: &OwnedPartialModel,
+    ) -> Self::OutputUnwrap;
 }
 
-impl FromIrrefutableFacts for Value<Array0DImpl<CSPBoolVar>> {
+impl FromOwnedPartialModel for Value<Array0DImpl<CSPBoolVar>> {
     type Output = <Array0DImpl<CSPBoolVar> as MapForArray<CSPBoolVar, Option<bool>>>::Output;
+    type OutputUnwrap = <Array0DImpl<CSPBoolVar> as MapForArray<CSPBoolVar, bool>>::Output;
 
-    fn from_irrefutable_facts(&self, irrefutable_facts: &IrrefutableFacts) -> Self::Output {
+    fn from_irrefutable_facts(&self, irrefutable_facts: &OwnedPartialModel) -> Self::Output {
         <Array0DImpl<CSPBoolVar> as MapForArray<CSPBoolVar, Option<bool>>>::map(&self.0, |v| {
             irrefutable_facts.assignment.get_bool(*v)
         })
     }
+
+    fn from_irrefutable_facts_unwrap(
+        &self,
+        irrefutable_facts: &OwnedPartialModel,
+    ) -> Self::OutputUnwrap {
+        <Array0DImpl<CSPBoolVar> as MapForArray<CSPBoolVar, bool>>::map(&self.0, |v| {
+            irrefutable_facts.assignment.get_bool(*v).unwrap()
+        })
+    }
 }
 
-impl FromIrrefutableFacts for Value<Array1DImpl<CSPBoolVar>> {
+impl FromOwnedPartialModel for Value<Array1DImpl<CSPBoolVar>> {
     type Output = <Array1DImpl<CSPBoolVar> as MapForArray<CSPBoolVar, Option<bool>>>::Output;
+    type OutputUnwrap = <Array1DImpl<CSPBoolVar> as MapForArray<CSPBoolVar, bool>>::Output;
 
-    fn from_irrefutable_facts(&self, irrefutable_facts: &IrrefutableFacts) -> Self::Output {
+    fn from_irrefutable_facts(&self, irrefutable_facts: &OwnedPartialModel) -> Self::Output {
         <Array1DImpl<CSPBoolVar> as MapForArray<CSPBoolVar, Option<bool>>>::map(&self.0, |v| {
             irrefutable_facts.assignment.get_bool(*v)
         })
     }
+
+    fn from_irrefutable_facts_unwrap(
+        &self,
+        irrefutable_facts: &OwnedPartialModel,
+    ) -> Self::OutputUnwrap {
+        <Array1DImpl<CSPBoolVar> as MapForArray<CSPBoolVar, bool>>::map(&self.0, |v| {
+            irrefutable_facts.assignment.get_bool(*v).unwrap()
+        })
+    }
 }
 
-impl FromIrrefutableFacts for Value<Array2DImpl<CSPBoolVar>> {
+impl FromOwnedPartialModel for Value<Array2DImpl<CSPBoolVar>> {
     type Output = <Array2DImpl<CSPBoolVar> as MapForArray<CSPBoolVar, Option<bool>>>::Output;
+    type OutputUnwrap = <Array2DImpl<CSPBoolVar> as MapForArray<CSPBoolVar, bool>>::Output;
 
-    fn from_irrefutable_facts(&self, irrefutable_facts: &IrrefutableFacts) -> Self::Output {
+    fn from_irrefutable_facts(&self, irrefutable_facts: &OwnedPartialModel) -> Self::Output {
         <Array2DImpl<CSPBoolVar> as MapForArray<CSPBoolVar, Option<bool>>>::map(&self.0, |v| {
             irrefutable_facts.assignment.get_bool(*v)
         })
     }
+
+    fn from_irrefutable_facts_unwrap(
+        &self,
+        irrefutable_facts: &OwnedPartialModel,
+    ) -> Self::OutputUnwrap {
+        <Array2DImpl<CSPBoolVar> as MapForArray<CSPBoolVar, bool>>::map(&self.0, |v| {
+            irrefutable_facts.assignment.get_bool(*v).unwrap()
+        })
+    }
 }
 
-impl FromIrrefutableFacts for Value<Array0DImpl<CSPIntVar>> {
+impl FromOwnedPartialModel for Value<Array0DImpl<CSPIntVar>> {
     type Output = <Array0DImpl<CSPIntVar> as MapForArray<CSPIntVar, Option<i32>>>::Output;
+    type OutputUnwrap = <Array0DImpl<CSPIntVar> as MapForArray<CSPIntVar, i32>>::Output;
 
-    fn from_irrefutable_facts(&self, irrefutable_facts: &IrrefutableFacts) -> Self::Output {
+    fn from_irrefutable_facts(&self, irrefutable_facts: &OwnedPartialModel) -> Self::Output {
         <Array0DImpl<CSPIntVar> as MapForArray<CSPIntVar, Option<i32>>>::map(&self.0, |v| {
             irrefutable_facts.assignment.get_int(*v)
         })
     }
+
+    fn from_irrefutable_facts_unwrap(
+        &self,
+        irrefutable_facts: &OwnedPartialModel,
+    ) -> Self::OutputUnwrap {
+        <Array0DImpl<CSPIntVar> as MapForArray<CSPIntVar, i32>>::map(&self.0, |v| {
+            irrefutable_facts.assignment.get_int(*v).unwrap()
+        })
+    }
 }
 
-impl FromIrrefutableFacts for Value<Array1DImpl<CSPIntVar>> {
+impl FromOwnedPartialModel for Value<Array1DImpl<CSPIntVar>> {
     type Output = <Array1DImpl<CSPIntVar> as MapForArray<CSPIntVar, Option<i32>>>::Output;
+    type OutputUnwrap = <Array1DImpl<CSPIntVar> as MapForArray<CSPIntVar, i32>>::Output;
 
-    fn from_irrefutable_facts(&self, irrefutable_facts: &IrrefutableFacts) -> Self::Output {
+    fn from_irrefutable_facts(&self, irrefutable_facts: &OwnedPartialModel) -> Self::Output {
         <Array1DImpl<CSPIntVar> as MapForArray<CSPIntVar, Option<i32>>>::map(&self.0, |v| {
             irrefutable_facts.assignment.get_int(*v)
         })
     }
-}
 
-impl FromIrrefutableFacts for Value<Array2DImpl<CSPIntVar>> {
-    type Output = <Array2DImpl<CSPIntVar> as MapForArray<CSPIntVar, Option<i32>>>::Output;
-
-    fn from_irrefutable_facts(&self, irrefutable_facts: &IrrefutableFacts) -> Self::Output {
-        <Array2DImpl<CSPIntVar> as MapForArray<CSPIntVar, Option<i32>>>::map(&self.0, |v| {
-            irrefutable_facts.assignment.get_int(*v)
+    fn from_irrefutable_facts_unwrap(
+        &self,
+        irrefutable_facts: &OwnedPartialModel,
+    ) -> Self::OutputUnwrap {
+        <Array1DImpl<CSPIntVar> as MapForArray<CSPIntVar, i32>>::map(&self.0, |v| {
+            irrefutable_facts.assignment.get_int(*v).unwrap()
         })
     }
 }
 
-pub struct IrrefutableFacts {
+impl FromOwnedPartialModel for Value<Array2DImpl<CSPIntVar>> {
+    type Output = <Array2DImpl<CSPIntVar> as MapForArray<CSPIntVar, Option<i32>>>::Output;
+    type OutputUnwrap = <Array2DImpl<CSPIntVar> as MapForArray<CSPIntVar, i32>>::Output;
+
+    fn from_irrefutable_facts(&self, irrefutable_facts: &OwnedPartialModel) -> Self::Output {
+        <Array2DImpl<CSPIntVar> as MapForArray<CSPIntVar, Option<i32>>>::map(&self.0, |v| {
+            irrefutable_facts.assignment.get_int(*v)
+        })
+    }
+
+    fn from_irrefutable_facts_unwrap(
+        &self,
+        irrefutable_facts: &OwnedPartialModel,
+    ) -> Self::OutputUnwrap {
+        <Array2DImpl<CSPIntVar> as MapForArray<CSPIntVar, i32>>::map(&self.0, |v| {
+            irrefutable_facts.assignment.get_int(*v).unwrap()
+        })
+    }
+}
+
+pub struct OwnedPartialModel {
     assignment: Assignment,
 }
 
-impl IrrefutableFacts {
-    pub fn get<T>(&self, var: &T) -> <T as FromIrrefutableFacts>::Output
+impl OwnedPartialModel {
+    pub fn get<T>(&self, var: &T) -> <T as FromOwnedPartialModel>::Output
     where
-        T: FromIrrefutableFacts,
+        T: FromOwnedPartialModel,
     {
         var.from_irrefutable_facts(self)
+    }
+
+    pub fn get_unwrap<T>(&self, var: &T) -> <T as FromOwnedPartialModel>::OutputUnwrap
+    where
+        T: FromOwnedPartialModel,
+    {
+        var.from_irrefutable_facts_unwrap(self)
     }
 }
 
@@ -1347,5 +1425,19 @@ mod tests {
         solver.add_answer_key_bool(b0d);
         solver.add_answer_key_bool([b0d]);
         solver.add_answer_key_bool(&[b0d]);
+    }
+
+    #[test]
+    fn test_solver_iterator() {
+        let mut solver = Solver::new();
+        let array = &solver.bool_var_1d(5);
+        solver.add_answer_key_bool(array);
+        solver.add_expr(array.at(0) | array.at(1));
+
+        let mut n_ans = 0;
+        for _ in solver.answer_iter() {
+            n_ans += 1;
+        }
+        assert_eq!(n_ans, 24);
     }
 }

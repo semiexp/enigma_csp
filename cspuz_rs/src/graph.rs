@@ -2,7 +2,7 @@ use std::ops::Index;
 
 use super::solver::{
     count_true, Array0DImpl, Array2DImpl, BoolVar, BoolVarArray1D, BoolVarArray2D, CSPBoolExpr,
-    FromIrrefutableFacts, FromModel, IrrefutableFacts, Model, Operand, Solver, Value,
+    FromModel, FromOwnedPartialModel, Model, Operand, OwnedPartialModel, Solver, Value,
 };
 
 pub struct Graph {
@@ -180,13 +180,24 @@ impl FromModel for BoolGridFrame {
     }
 }
 
-impl FromIrrefutableFacts for BoolGridFrame {
+impl FromOwnedPartialModel for BoolGridFrame {
     type Output = GridFrame<Vec<Vec<Option<bool>>>>;
+    type OutputUnwrap = GridFrame<Vec<Vec<bool>>>;
 
-    fn from_irrefutable_facts(&self, irrefutable_facts: &IrrefutableFacts) -> Self::Output {
+    fn from_irrefutable_facts(&self, irrefutable_facts: &OwnedPartialModel) -> Self::Output {
         GridFrame {
             horizontal: irrefutable_facts.get(&self.horizontal),
             vertical: irrefutable_facts.get(&self.vertical),
+        }
+    }
+
+    fn from_irrefutable_facts_unwrap(
+        &self,
+        irrefutable_facts: &OwnedPartialModel,
+    ) -> Self::OutputUnwrap {
+        GridFrame {
+            horizontal: irrefutable_facts.get_unwrap(&self.horizontal),
+            vertical: irrefutable_facts.get_unwrap(&self.vertical),
         }
     }
 }
