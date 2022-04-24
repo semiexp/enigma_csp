@@ -3,7 +3,7 @@ use crate::serializer::{
     problem_to_url_with_context, url_to_problem, Choice, Combinator, Context, HexInt, Optionalize,
     RoomsWithValues, Size, Spaces,
 };
-use crate::solver::{count_true, Solver};
+use crate::solver::{count_true, BoolVarArray2D, Solver};
 
 pub fn solve_heyawake(
     borders: &graph::GridFrame<Vec<Vec<bool>>>,
@@ -17,7 +17,44 @@ pub fn solve_heyawake(
     let is_black = &solver.bool_var_2d((h, w));
     solver.add_answer_key_bool(is_black);
 
-    graph::active_vertices_connected_2d(&mut solver, !is_black);
+    add_constraints(&mut solver, is_black, borders, clues);
+
+    solver.irrefutable_facts().map(|f| f.get(is_black))
+}
+
+pub fn enumerate_answers_heyawake(
+    borders: &graph::GridFrame<Vec<Vec<bool>>>,
+    clues: &[Option<i32>],
+    num_max_answers: usize,
+) -> Vec<Vec<Vec<bool>>> {
+    let h = borders.vertical.len();
+    assert!(h > 0);
+    let w = borders.vertical[0].len() + 1;
+
+    let mut solver = Solver::new();
+    let is_black = &solver.bool_var_2d((h, w));
+    solver.add_answer_key_bool(is_black);
+
+    add_constraints(&mut solver, is_black, borders, clues);
+
+    solver
+        .answer_iter()
+        .take(num_max_answers)
+        .map(|f| f.get_unwrap(is_black))
+        .collect()
+}
+
+fn add_constraints(
+    solver: &mut Solver,
+    is_black: &BoolVarArray2D,
+    borders: &graph::GridFrame<Vec<Vec<bool>>>,
+    clues: &[Option<i32>],
+) {
+    let h = borders.vertical.len();
+    assert!(h > 0);
+    let w = borders.vertical[0].len() + 1;
+
+    graph::active_vertices_connected_2d(solver, !is_black);
     solver.add_expr(!(is_black.slice((..(h - 1), ..)) & is_black.slice((1.., ..))));
     solver.add_expr(!(is_black.slice((.., ..(w - 1))) & is_black.slice((.., 1..))));
 
@@ -56,8 +93,6 @@ pub fn solve_heyawake(
             solver.add_expr(count_true(cells).eq(n));
         }
     }
-
-    solver.irrefutable_facts().map(|f| f.get(is_black))
 }
 
 type Problem = (graph::GridFrame<Vec<Vec<bool>>>, Vec<Option<i32>>);

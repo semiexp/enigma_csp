@@ -79,6 +79,7 @@ impl Item {
 
 #[allow(unused)]
 enum BoardKind {
+    Empty,
     Grid,
     DotGrid,
 }
@@ -96,6 +97,7 @@ impl Board {
         let height = self.height;
         let width = self.width;
         let default_style = match self.kind {
+            BoardKind::Empty => "empty",
             BoardKind::Grid => "grid",
             BoardKind::DotGrid => "dots",
         };
@@ -287,6 +289,96 @@ fn solve_heyawake(url: &str) -> Result<Board, &'static str> {
     })
 }
 
+fn enumerate_answers_heyawake(
+    url: &str,
+    num_max_answers: usize,
+) -> Result<(Board, Vec<Board>), &'static str> {
+    let (borders, clues) = heyawake::deserialize_problem(url).ok_or("invalid url")?;
+    let is_black_common = heyawake::solve_heyawake(&borders, &clues).ok_or("no answer")?;
+    let answers = heyawake::enumerate_answers_heyawake(&borders, &clues, num_max_answers);
+
+    let height = is_black_common.len();
+    let width = is_black_common[0].len();
+
+    let mut data = vec![];
+    for y in 0..height {
+        for x in 0..width {
+            if y < height - 1 && borders.horizontal[y][x] {
+                data.push(Item {
+                    y: y * 2 + 2,
+                    x: x * 2 + 1,
+                    color: "black",
+                    kind: ItemKind::BoldWall,
+                });
+            }
+            if x < width - 1 && borders.vertical[y][x] {
+                data.push(Item {
+                    y: y * 2 + 1,
+                    x: x * 2 + 2,
+                    color: "black",
+                    kind: ItemKind::BoldWall,
+                });
+            }
+        }
+    }
+    for y in 0..height {
+        for x in 0..width {
+            if let Some(b) = is_black_common[y][x] {
+                data.push(Item::cell(
+                    y,
+                    x,
+                    "#339933",
+                    if b { ItemKind::Block } else { ItemKind::Dot },
+                ));
+            }
+        }
+    }
+    let rooms = graph::borders_to_rooms(&borders);
+    assert_eq!(rooms.len(), clues.len());
+    for i in 0..rooms.len() {
+        if let Some(n) = clues[i] {
+            let (y, x) = rooms[i][0];
+            data.push(Item::cell(y, x, "black", ItemKind::Num(n)));
+        }
+    }
+
+    let board_common = Board {
+        kind: BoardKind::Grid,
+        height,
+        width,
+        data,
+    };
+
+    let mut board_answers = vec![];
+    for ans in answers {
+        let mut data = vec![];
+        for y in 0..height {
+            for x in 0..width {
+                if is_black_common[y][x].is_none() {
+                    data.push(Item::cell(
+                        y,
+                        x,
+                        "#cccccc",
+                        if ans[y][x] {
+                            ItemKind::Block
+                        } else {
+                            ItemKind::Dot
+                        },
+                    ));
+                }
+            }
+        }
+        board_answers.push(Board {
+            kind: BoardKind::Empty,
+            height,
+            width,
+            data,
+        });
+    }
+
+    Ok((board_common, board_answers))
+}
+
 fn solve_slitherlink(url: &str) -> Result<Board, &'static str> {
     let problem = slitherlink::deserialize_problem(url).ok_or("invalid url")?;
     let is_line = slitherlink::solve_slitherlink(&problem).ok_or("no answer")?;
@@ -436,6 +528,21 @@ fn decode_and_solve(url: &[u8]) -> Result<Board, &'static str> {
     }
 }
 
+fn decode_and_enumerate(
+    url: &[u8],
+    num_max_answers: usize,
+) -> Result<(Board, Vec<Board>), &'static str> {
+    let url = std::str::from_utf8(url).map_err(|_| "failed to decode URL as UTF-8")?;
+
+    let puzzle_kind = url_to_puzzle_kind(url).ok_or("puzzle type not detected")?;
+
+    if puzzle_kind == "heyawake" {
+        enumerate_answers_heyawake(url, num_max_answers)
+    } else {
+        Err("unsupported puzzle type")
+    }
+}
+
 #[no_mangle]
 fn solve_problem(url: *const u8, len: usize) -> *const u8 {
     let url = unsafe { std::slice::from_raw_parts(url, len) };
@@ -444,6 +551,42 @@ fn solve_problem(url: *const u8, len: usize) -> *const u8 {
     let ret_string = match result {
         Ok(board) => {
             format!("{{\"status\":\"ok\",\"description\":{}}}", board.to_json())
+        }
+        Err(err) => {
+            // TODO: escape `err` if necessary
+            format!("{{\"status\":\"error\",\"description\":\"{}\"}}", err)
+        }
+    };
+
+    let ret_len = ret_string.len();
+    unsafe {
+        SHARED_ARRAY.clear();
+        SHARED_ARRAY.reserve(4 + ret_len);
+        SHARED_ARRAY.push((ret_len & 0xff) as u8);
+        SHARED_ARRAY.push(((ret_len >> 8) & 0xff) as u8);
+        SHARED_ARRAY.push(((ret_len >> 16) & 0xff) as u8);
+        SHARED_ARRAY.push(((ret_len >> 24) & 0xff) as u8);
+        SHARED_ARRAY.extend_from_slice(ret_string.as_bytes());
+        SHARED_ARRAY.as_ptr()
+    }
+}
+
+#[no_mangle]
+fn enumerate_answers_problem(url: *const u8, len: usize, num_max_answers: usize) -> *const u8 {
+    let url = unsafe { std::slice::from_raw_parts(url, len) };
+    let result = decode_and_enumerate(url, num_max_answers);
+
+    let ret_string = match result {
+        Ok((common, per_answer)) => {
+            format!(
+                "{{\"status\":\"ok\",\"description\":{{\"common\":{},\"answers\":[{}]}}}}",
+                common.to_json(),
+                per_answer
+                    .iter()
+                    .map(|x| x.to_json())
+                    .collect::<Vec<_>>()
+                    .join(",")
+            )
         }
         Err(err) => {
             // TODO: escape `err` if necessary
