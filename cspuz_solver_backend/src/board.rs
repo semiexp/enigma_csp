@@ -1,3 +1,10 @@
+pub struct Compass {
+    pub up: Option<i32>,
+    pub down: Option<i32>,
+    pub left: Option<i32>,
+    pub right: Option<i32>,
+}
+
 #[allow(unused)]
 pub enum ItemKind {
     Dot,
@@ -16,6 +23,7 @@ pub enum ItemKind {
     BoldWall,
     Text(&'static str),
     Num(i32),
+    Compass(Compass),
 }
 
 impl ItemKind {
@@ -37,6 +45,13 @@ impl ItemKind {
             &ItemKind::DottedVerticalWall => String::from("\"dottedVerticalWall\""),
             &ItemKind::Text(text) => format!("{{\"kind\":\"text\",\"data\":\"{}\"}}", text),
             &ItemKind::Num(num) => format!("{{\"kind\":\"text\",\"data\":\"{}\"}}", num),
+            ItemKind::Compass(compass) => format!(
+                "{{\"kind\":\"compass\",\"up\":{},\"down\":{},\"left\":{},\"right\":{}}}",
+                compass.up.unwrap_or(-1),
+                compass.down.unwrap_or(-1),
+                compass.left.unwrap_or(-1),
+                compass.right.unwrap_or(-1)
+            ),
         }
     }
 }
@@ -73,6 +88,7 @@ impl Item {
 pub enum BoardKind {
     Empty,
     Grid,
+    OuterGrid,
     DotGrid,
 }
 
@@ -91,6 +107,7 @@ impl Board {
         let default_style = match self.kind {
             BoardKind::Empty => "empty",
             BoardKind::Grid => "grid",
+            BoardKind::OuterGrid => "outer_grid",
             BoardKind::DotGrid => "dots",
         };
         let data = self

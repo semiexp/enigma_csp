@@ -7,10 +7,10 @@ use crate::solver::Solver;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct CompassClue {
-    up: Option<i32>,
-    down: Option<i32>,
-    left: Option<i32>,
-    right: Option<i32>,
+    pub up: Option<i32>,
+    pub down: Option<i32>,
+    pub left: Option<i32>,
+    pub right: Option<i32>,
 }
 
 pub fn solve_compass(
