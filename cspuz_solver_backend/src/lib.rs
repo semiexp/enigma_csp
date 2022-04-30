@@ -27,6 +27,8 @@ fn decode_and_solve(url: &[u8]) -> Result<Board, &'static str> {
         puzzle::nurimisaki::solve_nurimisaki(url)
     } else if puzzle_kind == "compass" {
         puzzle::compass::solve_compass(url)
+    } else if puzzle_kind == "akari" {
+        puzzle::akari::solve_akari(url)
     } else {
         Err("unknown puzzle type")
     }
