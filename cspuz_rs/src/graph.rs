@@ -57,17 +57,38 @@ fn infer_graph_from_2d_array(shape: (usize, usize)) -> Graph {
     graph
 }
 
+/// A struct for maintaining "edges" of a grid, including those on the outer border.
+/// Suppose we have a H * W grid. Then, each cell is surrounded by 2 horizontal edges and 2 vertical edges.
+/// Thus we have (H + 1) * W horizontal edges and H * (W + 1) vertical edges in total.
+///
+/// As the method `dual` suggests, `GridEdges` of a H * W grid is in a sense "dual" of `InnerGridEdges` of a (H + 1) * (W + 1) grid.
+/// Therefore, we can interchangeably use `GridEdges` and `InnerGridEdges`.
+/// Even though, we basically use the one which correctly reflects the "orientation" of edges.
+/// For example, answers of H * W Slitherlink problems can be naturally seen as `GridEdges` instances of H * W grids.
+/// On the other hand, although answers of H * W Masyu problems can be represented by `InnerGridEdges` instances of H * W grids,
+/// they ignore the orientation of edges: the horizontal line connecting cells (y, x) = (0, 0) and (0, 1) is represented by `vertical[0][0]`.
+/// Thus Masyu answers are better represented by `GridEdges` instances of (H - 1) * (W - 1) grids.
+/// Similarly, edges dividing a grid are better represented by `InnerGridEdges`.
 #[derive(PartialEq, Eq, Clone, Debug)]
-pub struct GridFrame<T> {
+pub struct GridEdges<T> {
     pub horizontal: T,
     pub vertical: T,
 }
 
-pub fn borders_to_rooms(borders: &GridFrame<Vec<Vec<bool>>>) -> Vec<Vec<(usize, usize)>> {
+/// A struct for maintaining "inner edges" of a grid. They do not include edges on the outer border.
+/// `InnerGridEdges` for a H * W grid have (H - 1) * W horizontal edges and H * (W - 1) vertical edges.
+/// See the description of `GridEdges` for distinction between `GridEdges` and `InnerGridEdges`.
+#[derive(PartialEq, Eq, Clone, Debug)]
+pub struct InnerGridEdges<T> {
+    pub horizontal: T,
+    pub vertical: T,
+}
+
+pub fn borders_to_rooms(borders: &InnerGridEdges<Vec<Vec<bool>>>) -> Vec<Vec<(usize, usize)>> {
     fn visit(
         y: usize,
         x: usize,
-        borders: &GridFrame<Vec<Vec<bool>>>,
+        borders: &InnerGridEdges<Vec<Vec<bool>>>,
         visited: &mut Vec<Vec<bool>>,
         room: &mut Vec<(usize, usize)>,
     ) {
@@ -109,14 +130,35 @@ pub fn borders_to_rooms(borders: &GridFrame<Vec<Vec<bool>>>) -> Vec<Vec<(usize, 
     ret
 }
 
-pub type BoolGridFrame = GridFrame<BoolVarArray2D>;
-pub type BoolGridFrameModel = GridFrame<Vec<Vec<bool>>>;
-pub type BoolGridFrameIrrefutableFacts = GridFrame<Vec<Vec<Option<bool>>>>;
+pub type BoolGridEdges = GridEdges<BoolVarArray2D>;
+pub type BoolGridEdgesModel = GridEdges<Vec<Vec<bool>>>;
+pub type BoolGridEdgesIrrefutableFacts = GridEdges<Vec<Vec<Option<bool>>>>;
+pub type BoolInnerGridEdges = InnerGridEdges<BoolVarArray2D>;
+pub type BoolInnerGridEdgesModel = InnerGridEdges<Vec<Vec<bool>>>;
+pub type BoolInnerGridEdgesIrrefutableFacts = InnerGridEdges<Vec<Vec<Option<bool>>>>;
 
-impl BoolGridFrame {
-    pub fn new(solver: &mut Solver, shape: (usize, usize)) -> BoolGridFrame {
+impl<T> GridEdges<T> {
+    pub fn dual(self) -> InnerGridEdges<T> {
+        InnerGridEdges {
+            horizontal: self.vertical,
+            vertical: self.horizontal,
+        }
+    }
+}
+
+impl<T> InnerGridEdges<T> {
+    pub fn dual(self) -> GridEdges<T> {
+        GridEdges {
+            horizontal: self.vertical,
+            vertical: self.horizontal,
+        }
+    }
+}
+
+impl BoolGridEdges {
+    pub fn new(solver: &mut Solver, shape: (usize, usize)) -> BoolGridEdges {
         let (height, width) = shape;
-        BoolGridFrame {
+        BoolGridEdges {
             horizontal: solver.bool_var_2d((height + 1, width)),
             vertical: solver.bool_var_2d((height, width + 1)),
         }
@@ -169,23 +211,23 @@ impl BoolGridFrame {
     }
 }
 
-impl FromModel for BoolGridFrame {
-    type Output = GridFrame<Vec<Vec<bool>>>;
+impl FromModel for BoolGridEdges {
+    type Output = GridEdges<Vec<Vec<bool>>>;
 
     fn from_model(&self, model: &Model) -> Self::Output {
-        GridFrame {
+        GridEdges {
             horizontal: model.get(&self.horizontal),
             vertical: model.get(&self.vertical),
         }
     }
 }
 
-impl FromOwnedPartialModel for BoolGridFrame {
-    type Output = GridFrame<Vec<Vec<Option<bool>>>>;
-    type OutputUnwrap = GridFrame<Vec<Vec<bool>>>;
+impl FromOwnedPartialModel for BoolGridEdges {
+    type Output = GridEdges<Vec<Vec<Option<bool>>>>;
+    type OutputUnwrap = GridEdges<Vec<Vec<bool>>>;
 
     fn from_irrefutable_facts(&self, irrefutable_facts: &OwnedPartialModel) -> Self::Output {
-        GridFrame {
+        GridEdges {
             horizontal: irrefutable_facts.get(&self.horizontal),
             vertical: irrefutable_facts.get(&self.vertical),
         }
@@ -195,7 +237,40 @@ impl FromOwnedPartialModel for BoolGridFrame {
         &self,
         irrefutable_facts: &OwnedPartialModel,
     ) -> Self::OutputUnwrap {
-        GridFrame {
+        GridEdges {
+            horizontal: irrefutable_facts.get_unwrap(&self.horizontal),
+            vertical: irrefutable_facts.get_unwrap(&self.vertical),
+        }
+    }
+}
+
+impl FromModel for BoolInnerGridEdges {
+    type Output = InnerGridEdges<Vec<Vec<bool>>>;
+
+    fn from_model(&self, model: &Model) -> Self::Output {
+        InnerGridEdges {
+            horizontal: model.get(&self.horizontal),
+            vertical: model.get(&self.vertical),
+        }
+    }
+}
+
+impl FromOwnedPartialModel for BoolInnerGridEdges {
+    type Output = InnerGridEdges<Vec<Vec<Option<bool>>>>;
+    type OutputUnwrap = InnerGridEdges<Vec<Vec<bool>>>;
+
+    fn from_irrefutable_facts(&self, irrefutable_facts: &OwnedPartialModel) -> Self::Output {
+        InnerGridEdges {
+            horizontal: irrefutable_facts.get(&self.horizontal),
+            vertical: irrefutable_facts.get(&self.vertical),
+        }
+    }
+
+    fn from_irrefutable_facts_unwrap(
+        &self,
+        irrefutable_facts: &OwnedPartialModel,
+    ) -> Self::OutputUnwrap {
+        InnerGridEdges {
             horizontal: irrefutable_facts.get_unwrap(&self.horizontal),
             vertical: irrefutable_facts.get_unwrap(&self.vertical),
         }
@@ -265,7 +340,7 @@ where
     is_passed
 }
 
-pub fn single_cycle_grid_frame(solver: &mut Solver, grid_frame: &BoolGridFrame) -> BoolVarArray2D {
+pub fn single_cycle_grid_edges(solver: &mut Solver, grid_frame: &BoolGridEdges) -> BoolVarArray2D {
     let (edges, graph) = grid_frame.representation();
     let is_passed_flat = active_edges_single_cycle(solver, edges, &graph);
     let (height, width) = grid_frame.base_shape();

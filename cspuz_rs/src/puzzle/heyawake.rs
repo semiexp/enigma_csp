@@ -6,7 +6,7 @@ use crate::serializer::{
 use crate::solver::{count_true, BoolVarArray2D, Solver};
 
 pub fn solve_heyawake(
-    borders: &graph::GridFrame<Vec<Vec<bool>>>,
+    borders: &graph::InnerGridEdges<Vec<Vec<bool>>>,
     clues: &[Option<i32>],
 ) -> Option<Vec<Vec<Option<bool>>>> {
     let h = borders.vertical.len();
@@ -23,7 +23,7 @@ pub fn solve_heyawake(
 }
 
 pub fn enumerate_answers_heyawake(
-    borders: &graph::GridFrame<Vec<Vec<bool>>>,
+    borders: &graph::InnerGridEdges<Vec<Vec<bool>>>,
     clues: &[Option<i32>],
     num_max_answers: usize,
 ) -> Vec<Vec<Vec<bool>>> {
@@ -47,7 +47,7 @@ pub fn enumerate_answers_heyawake(
 fn add_constraints(
     solver: &mut Solver,
     is_black: &BoolVarArray2D,
-    borders: &graph::GridFrame<Vec<Vec<bool>>>,
+    borders: &graph::InnerGridEdges<Vec<Vec<bool>>>,
     clues: &[Option<i32>],
 ) {
     let h = borders.vertical.len();
@@ -95,7 +95,7 @@ fn add_constraints(
     }
 }
 
-type Problem = (graph::GridFrame<Vec<Vec<bool>>>, Vec<Option<i32>>);
+type Problem = (graph::InnerGridEdges<Vec<Vec<bool>>>, Vec<Option<i32>>);
 
 fn combinator() -> impl Combinator<Problem> {
     Size::new(RoomsWithValues::new(Choice::new(vec![

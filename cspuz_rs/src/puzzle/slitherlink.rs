@@ -7,17 +7,17 @@ use crate::solver::Solver;
 
 pub fn solve_slitherlink(
     clues: &[Vec<Option<i32>>],
-) -> Option<graph::BoolGridFrameIrrefutableFacts> {
+) -> Option<graph::BoolGridEdgesIrrefutableFacts> {
     let h = clues.len();
     assert!(h > 0);
     let w = clues[0].len();
 
     let mut solver = Solver::new();
-    let is_line = &graph::BoolGridFrame::new(&mut solver, (h, w));
+    let is_line = &graph::BoolGridEdges::new(&mut solver, (h, w));
     solver.add_answer_key_bool(&is_line.horizontal);
     solver.add_answer_key_bool(&is_line.vertical);
 
-    graph::single_cycle_grid_frame(&mut solver, &is_line);
+    graph::single_cycle_grid_edges(&mut solver, &is_line);
 
     for y in 0..h {
         for x in 0..w {
@@ -99,7 +99,7 @@ mod tests {
         let ans = solve_slitherlink(&problem);
         assert!(ans.is_some());
         let ans = ans.unwrap();
-        let expected = graph::BoolGridFrameIrrefutableFacts {
+        let expected = graph::BoolGridEdgesIrrefutableFacts {
             horizontal: vec![
                 vec![Some(true), Some(true), Some(true), Some(true)],
                 vec![Some(true), Some(false), Some(true), Some(false)],

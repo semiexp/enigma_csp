@@ -1,4 +1,4 @@
-use crate::graph::{borders_to_rooms, GridFrame};
+use crate::graph::{borders_to_rooms, InnerGridEdges};
 
 pub fn is_dec(c: u8) -> bool {
     return '0' as u8 <= c && c <= '9' as u8;
@@ -766,11 +766,11 @@ where
 
 pub struct Rooms;
 
-impl Combinator<GridFrame<Vec<Vec<bool>>>> for Rooms {
+impl Combinator<InnerGridEdges<Vec<Vec<bool>>>> for Rooms {
     fn serialize(
         &self,
         ctx: &Context,
-        input: &[GridFrame<Vec<Vec<bool>>>],
+        input: &[InnerGridEdges<Vec<Vec<bool>>>],
     ) -> Option<(usize, Vec<u8>)> {
         if input.len() == 0 {
             return None;
@@ -809,7 +809,7 @@ impl Combinator<GridFrame<Vec<Vec<bool>>>> for Rooms {
         &self,
         ctx: &Context,
         input: &[u8],
-    ) -> Option<(usize, Vec<GridFrame<Vec<Vec<bool>>>>)> {
+    ) -> Option<(usize, Vec<InnerGridEdges<Vec<Vec<bool>>>>)> {
         let height = ctx.height.unwrap();
         let width = ctx.width.unwrap();
         let mut sequencer = Sequencer::new(input);
@@ -837,7 +837,7 @@ impl Combinator<GridFrame<Vec<Vec<bool>>>> for Rooms {
 
         Some((
             sequencer.n_read(),
-            vec![GridFrame {
+            vec![InnerGridEdges {
                 vertical,
                 horizontal,
             }],
@@ -855,7 +855,7 @@ impl<C> RoomsWithValues<C> {
     }
 }
 
-impl<T, C> Combinator<(GridFrame<Vec<Vec<bool>>>, Vec<T>)> for RoomsWithValues<C>
+impl<T, C> Combinator<(InnerGridEdges<Vec<Vec<bool>>>, Vec<T>)> for RoomsWithValues<C>
 where
     T: Clone,
     C: Combinator<T>,
@@ -863,7 +863,7 @@ where
     fn serialize(
         &self,
         ctx: &Context,
-        input: &[(GridFrame<Vec<Vec<bool>>>, Vec<T>)],
+        input: &[(InnerGridEdges<Vec<Vec<bool>>>, Vec<T>)],
     ) -> Option<(usize, Vec<u8>)> {
         if input.len() == 0 {
             return None;
@@ -884,7 +884,7 @@ where
         &self,
         ctx: &Context,
         input: &[u8],
-    ) -> Option<(usize, Vec<(GridFrame<Vec<Vec<bool>>>, Vec<T>)>)> {
+    ) -> Option<(usize, Vec<(InnerGridEdges<Vec<Vec<bool>>>, Vec<T>)>)> {
         let mut sequencer = Sequencer::new(input);
 
         let borders = sequencer.deserialize_one_elem(ctx, Rooms)?;
@@ -1294,7 +1294,7 @@ mod tests {
             combinator.serialize(
                 ctx,
                 &[(
-                    GridFrame {
+                    InnerGridEdges {
                         vertical: vec![
                             vec![true, false, true],
                             vec![true, false, true],
@@ -1316,7 +1316,7 @@ mod tests {
             Some((
                 8,
                 vec![(
-                    GridFrame {
+                    InnerGridEdges {
                         vertical: vec![
                             vec![true, false, true],
                             vec![true, false, true],

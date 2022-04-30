@@ -20,18 +20,18 @@ pub fn solve_slalom(
     origin: (usize, usize),
     is_black: &[Vec<bool>],
     gates: &[Gate],
-) -> Option<graph::BoolGridFrameIrrefutableFacts> {
+) -> Option<graph::BoolGridEdgesIrrefutableFacts> {
     let h = is_black.len();
     assert!(h > 0);
     let w = is_black[0].len();
 
     let mut solver = Solver::new();
-    let line = &graph::BoolGridFrame::new(&mut solver, (h - 1, w - 1));
-    let line_dir = &graph::BoolGridFrame::new(&mut solver, (h - 1, w - 1));
+    let line = &graph::BoolGridEdges::new(&mut solver, (h - 1, w - 1));
+    let line_dir = &graph::BoolGridEdges::new(&mut solver, (h - 1, w - 1));
     solver.add_answer_key_bool(&line.horizontal);
     solver.add_answer_key_bool(&line.vertical);
 
-    let passed = &graph::single_cycle_grid_frame(&mut solver, &line);
+    let passed = &graph::single_cycle_grid_edges(&mut solver, &line);
     let gate_ord = &solver.int_var_2d((h, w), 0, gates.len() as i32);
 
     let mut gate_id: Vec<Vec<Option<usize>>> = vec![vec![None; w]; h];
