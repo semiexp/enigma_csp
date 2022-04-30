@@ -1,4 +1,7 @@
 use crate::graph;
+use crate::serializer::{
+    problem_to_url, url_to_problem, Choice, Combinator, Dict, Grid, HexInt, Optionalize, Spaces,
+};
 use crate::solver::{any, Solver};
 
 pub fn solve_nurimisaki(clues: &[Vec<Option<i32>>]) -> Option<Vec<Vec<Option<bool>>>> {
@@ -80,6 +83,24 @@ pub fn solve_nurimisaki(clues: &[Vec<Option<i32>>]) -> Option<Vec<Vec<Option<boo
     solver.irrefutable_facts().map(|f| f.get(is_white))
 }
 
+type Problem = Vec<Vec<Option<i32>>>;
+
+fn combinator() -> impl Combinator<Problem> {
+    Grid::new(Choice::new(vec![
+        Box::new(Optionalize::new(HexInt)),
+        Box::new(Spaces::new(None, 'g')),
+        Box::new(Dict::new(Some(-1), ".")),
+    ]))
+}
+
+pub fn serialize_problem(problem: &Problem) -> Option<String> {
+    problem_to_url(combinator(), "nurimisaki", problem.clone())
+}
+
+pub fn deserialize_problem(url: &str) -> Option<Problem> {
+    url_to_problem(combinator(), &["nurimisaki"], url)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -94,7 +115,7 @@ mod tests {
             vec![None, None, None, None, None, None, None, None, Some(2), None],
             vec![None, None, None, None, None, None, None, None, None, None],
             vec![None, None, None, Some(2), None, None, None, None, None, None],
-            vec![None, None, None, None, Some(0), None, Some(2), None, None, None],
+            vec![None, None, None, None, Some(-1), None, Some(2), None, None, None],
             vec![None, Some(2), None, None, None, None, None, None, None, None],
             vec![None, None, None, None, None, None, None, None, None, Some(2)],
             vec![None, None, None, None, None, Some(2), None, None, None, None],
@@ -120,5 +141,33 @@ mod tests {
                 assert_eq!(ans[y][x], Some(expected[y][x] == 0), "mismatch at ({}, {})", y, x);
             }
         }
+    }
+
+    #[test]
+    #[rustfmt::skip]
+    fn test_nurimisaki_serializer() {
+        // https://twitter.com/semiexp/status/1168898897424633856
+        let problem = vec![
+            vec![None, None, None, None, Some(3), None, None, None, None, None],
+            vec![None, Some(3), None, None, None, None, None, None, None, None],
+            vec![None, None, None, None, None, None, None, None, Some(2), None],
+            vec![None, None, None, None, None, None, None, None, None, None],
+            vec![None, None, None, Some(2), None, None, None, None, None, None],
+            vec![None, None, None, None, Some(-1), None, Some(2), None, None, None],
+            vec![None, Some(2), None, None, None, None, None, None, None, None],
+            vec![None, None, None, None, None, None, None, None, None, Some(2)],
+            vec![None, None, None, None, None, Some(2), None, None, None, None],
+            vec![None, None, None, None, Some(3), None, None, None, None, None],
+        ];
+        let url = "https://puzz.link/p?nurimisaki/10/10/j3l3v2t2p.g2j2w2k2n3k";
+
+        let deserialized = deserialize_problem(url);
+        assert!(deserialized.is_some());
+        let deserialized = deserialized.unwrap();
+        assert_eq!(problem, deserialized);
+        let reserialized = serialize_problem(&deserialized);
+        assert!(reserialized.is_some());
+        let reserialized = reserialized.unwrap();
+        assert_eq!(reserialized, url);
     }
 }
