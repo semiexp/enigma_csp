@@ -23,6 +23,8 @@ fn decode_and_solve(url: &[u8]) -> Result<Board, &'static str> {
         puzzle::slitherlink::solve_slitherlink(url)
     } else if puzzle_kind == "slalom" {
         puzzle::slalom::solve_slalom(url)
+    } else if puzzle_kind == "nurimisaki" {
+        puzzle::nurimisaki::solve_nurimisaki(url)
     } else {
         Err("unknown puzzle type")
     }
