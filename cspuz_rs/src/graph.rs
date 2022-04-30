@@ -244,6 +244,16 @@ impl FromOwnedPartialModel for BoolGridEdges {
     }
 }
 
+impl BoolInnerGridEdges {
+    pub fn new(solver: &mut Solver, shape: (usize, usize)) -> BoolInnerGridEdges {
+        let (height, width) = shape;
+        BoolInnerGridEdges {
+            horizontal: solver.bool_var_2d((height - 1, width)),
+            vertical: solver.bool_var_2d((height, width - 1)),
+        }
+    }
+}
+
 impl FromModel for BoolInnerGridEdges {
     type Output = InnerGridEdges<Vec<Vec<bool>>>;
 
