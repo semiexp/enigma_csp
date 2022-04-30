@@ -1,4 +1,8 @@
 use crate::graph;
+use crate::serializer::{
+    problem_to_url_with_context, url_to_problem, Combinator, Context,
+    Rooms, Size,
+};
 use crate::solver::{any, count_true, Solver};
 
 pub fn solve_lits(
@@ -134,6 +138,27 @@ pub fn solve_lits(
     solver.irrefutable_facts().map(|f| f.get(is_black))
 }
 
+type Problem = graph::InnerGridEdges<Vec<Vec<bool>>>;
+
+fn combinator() -> impl Combinator<Problem> {
+    Size::new(Rooms)
+}
+
+pub fn serialize_problem(problem: &Problem) -> Option<String> {
+    let height = problem.vertical.len();
+    let width = problem.vertical[0].len() + 1;
+    problem_to_url_with_context(
+        combinator(),
+        "lits",
+        problem.clone(),
+        &Context::sized(height, width),
+    )
+}
+
+pub fn deserialize_problem(url: &str) -> Option<Problem> {
+    url_to_problem(combinator(), &["lits"], url)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -195,5 +220,20 @@ mod tests {
         let expected =
             expected_base.map(|row| row.iter().map(|&n| Some(n == 1)).collect::<Vec<_>>());
         assert_eq!(ans, expected);
+    }
+
+    #[test]
+    fn test_lits_serializer() {
+        let problem = problem_for_tests();
+        let url = "https://puzz.link/p?lits/10/10/08p0i3jbhmjg5j5ik048rgtr8q1e5gkf9hnu";
+
+        let deserialized = deserialize_problem(url);
+        assert!(deserialized.is_some());
+        let deserialized = deserialized.unwrap();
+        assert_eq!(problem, deserialized);
+        let reserialized = serialize_problem(&deserialized);
+        assert!(reserialized.is_some());
+        let reserialized = reserialized.unwrap();
+        assert_eq!(reserialized, url);
     }
 }
