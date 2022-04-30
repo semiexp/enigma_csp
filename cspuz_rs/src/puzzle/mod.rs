@@ -1,3 +1,4 @@
+pub mod akari;
 pub mod compass;
 pub mod heyawake;
 pub mod nurikabe;
