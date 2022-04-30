@@ -1,7 +1,6 @@
 use crate::graph;
 use crate::serializer::{
-    problem_to_url_with_context, url_to_problem, Combinator, Context,
-    Rooms, Size,
+    problem_to_url_with_context, url_to_problem, Combinator, Context, Rooms, Size,
 };
 use crate::solver::{any, count_true, Solver};
 
