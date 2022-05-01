@@ -2,6 +2,7 @@ pub mod akari;
 pub mod compass;
 pub mod heyawake;
 pub mod lits;
+pub mod masyu;
 pub mod nurikabe;
 pub mod nurimisaki;
 pub mod slalom;

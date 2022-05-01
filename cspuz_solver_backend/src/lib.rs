@@ -31,6 +31,8 @@ fn decode_and_solve(url: &[u8]) -> Result<Board, &'static str> {
         puzzle::akari::solve_akari(url)
     } else if puzzle_kind == "lits" {
         puzzle::lits::solve_lits(url)
+    } else if puzzle_kind == "masyu" || puzzle_kind == "mashu" {
+        puzzle::masyu::solve_masyu(url)
     } else {
         Err("unknown puzzle type")
     }
