@@ -7,16 +7,16 @@ pub fn solve_akari(url: &str) -> Result<Board, &'static str> {
 
     let height = problem.len();
     let width = problem[0].len();
-    let mut data = vec![];
+    let mut board = Board::new(BoardKind::Grid, height, width);
     for y in 0..height {
         for x in 0..width {
             if let Some(clue) = problem[y][x] {
-                data.push(Item::cell(y, x, "black", ItemKind::Fill));
+                board.push(Item::cell(y, x, "black", ItemKind::Fill));
                 if clue >= 0 {
-                    data.push(Item::cell(y, x, "white", ItemKind::Num(clue)));
+                    board.push(Item::cell(y, x, "white", ItemKind::Num(clue)));
                 }
             } else if let Some(a) = ans[y][x] {
-                data.push(Item::cell(
+                board.push(Item::cell(
                     y,
                     x,
                     "green",
@@ -26,10 +26,5 @@ pub fn solve_akari(url: &str) -> Result<Board, &'static str> {
         }
     }
 
-    Ok(Board {
-        kind: BoardKind::Grid,
-        height,
-        width,
-        data,
-    })
+    Ok(board)
 }

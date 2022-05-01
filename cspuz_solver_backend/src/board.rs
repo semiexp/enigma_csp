@@ -1,3 +1,5 @@
+use cspuz_rs::graph;
+
 pub struct Compass {
     pub up: Option<i32>,
     pub down: Option<i32>,
@@ -93,13 +95,100 @@ pub enum BoardKind {
 }
 
 pub struct Board {
-    pub kind: BoardKind,
-    pub height: usize,
-    pub width: usize,
-    pub data: Vec<Item>,
+    kind: BoardKind,
+    height: usize,
+    width: usize,
+    data: Vec<Item>,
 }
 
 impl Board {
+    pub fn new(kind: BoardKind, height: usize, width: usize) -> Board {
+        Board {
+            kind,
+            height,
+            width,
+            data: vec![],
+        }
+    }
+
+    pub fn push(&mut self, item: Item) {
+        self.data.push(item);
+    }
+
+    pub fn extend<I>(&mut self, items: I)
+    where
+        I: IntoIterator<Item = Item>,
+    {
+        self.data.extend(items);
+    }
+
+    pub fn add_borders(&mut self, borders: &graph::BoolInnerGridEdgesModel, color: &'static str) {
+        let height = self.height;
+        let width = self.width;
+        for y in 0..height {
+            for x in 0..width {
+                if y < height - 1 && borders.horizontal[y][x] {
+                    self.push(Item {
+                        y: y * 2 + 2,
+                        x: x * 2 + 1,
+                        color,
+                        kind: ItemKind::BoldWall,
+                    });
+                }
+                if x < width - 1 && borders.vertical[y][x] {
+                    self.push(Item {
+                        y: y * 2 + 1,
+                        x: x * 2 + 2,
+                        color,
+                        kind: ItemKind::BoldWall,
+                    });
+                }
+            }
+        }
+    }
+
+    pub fn add_lines_irrefutable_facts(
+        &mut self,
+        lines: &graph::BoolGridEdgesIrrefutableFacts,
+        color: &'static str,
+        skip: Option<&Vec<Vec<bool>>>,
+    ) {
+        for y in 0..(self.height - 1) {
+            for x in 0..self.width {
+                if let Some(skip) = skip {
+                    if skip[y][x] || skip[y + 1][x] {
+                        continue;
+                    }
+                }
+                if let Some(b) = lines.vertical[y][x] {
+                    self.push(Item {
+                        y: y * 2 + 2,
+                        x: x * 2 + 1,
+                        color,
+                        kind: if b { ItemKind::Line } else { ItemKind::Cross },
+                    });
+                }
+            }
+        }
+        for y in 0..self.height {
+            for x in 0..(self.width - 1) {
+                if let Some(skip) = skip {
+                    if skip[y][x] || skip[y][x + 1] {
+                        continue;
+                    }
+                }
+                if let Some(b) = lines.horizontal[y][x] {
+                    self.push(Item {
+                        y: y * 2 + 1,
+                        x: x * 2 + 2,
+                        color,
+                        kind: if b { ItemKind::Line } else { ItemKind::Cross },
+                    });
+                }
+            }
+        }
+    }
+
     pub fn to_json(&self) -> String {
         let kind = "grid";
         let height = self.height;

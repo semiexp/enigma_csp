@@ -10,11 +10,11 @@ pub fn solve_slalom(url: &str) -> Result<Board, &'static str> {
 
     let height = is_black.len();
     let width = is_black[0].len();
-    let mut data = vec![];
+    let mut board = Board::new(BoardKind::Grid, height, width);
 
     let (origin_y, origin_x) = origin;
-    data.push(Item::cell(origin_y, origin_x, "black", ItemKind::Circle));
-    data.push(Item::cell(
+    board.push(Item::cell(origin_y, origin_x, "black", ItemKind::Circle));
+    board.push(Item::cell(
         origin_y,
         origin_x,
         "black",
@@ -25,9 +25,9 @@ pub fn solve_slalom(url: &str) -> Result<Board, &'static str> {
         for x in 0..width {
             match problem.0[y][x] {
                 SlalomCell::Black(d, n) => {
-                    data.push(Item::cell(y, x, "black", ItemKind::Fill));
+                    board.push(Item::cell(y, x, "black", ItemKind::Fill));
                     if n >= 0 {
-                        data.push(Item::cell(y, x, "white", ItemKind::Num(n)));
+                        board.push(Item::cell(y, x, "white", ItemKind::Num(n)));
                     }
                     let arrow = match d {
                         SlalomBlackCellDir::Up => ItemKind::SideArrowUp,
@@ -36,48 +36,20 @@ pub fn solve_slalom(url: &str) -> Result<Board, &'static str> {
                         SlalomBlackCellDir::Right => ItemKind::SideArrowRight,
                         _ => continue,
                     };
-                    data.push(Item::cell(y, x, "white", arrow));
+                    board.push(Item::cell(y, x, "white", arrow));
                 }
                 SlalomCell::Horizontal => {
-                    data.push(Item::cell(y, x, "black", ItemKind::DottedHorizontalWall));
+                    board.push(Item::cell(y, x, "black", ItemKind::DottedHorizontalWall));
                 }
                 SlalomCell::Vertical => {
-                    data.push(Item::cell(y, x, "black", ItemKind::DottedVerticalWall));
+                    board.push(Item::cell(y, x, "black", ItemKind::DottedVerticalWall));
                 }
                 SlalomCell::White => (),
             }
         }
     }
 
-    for y in 0..height {
-        for x in 0..width {
-            if y < height - 1 && !(is_black[y][x] || is_black[y + 1][x]) {
-                if let Some(b) = is_line.vertical[y][x] {
-                    data.push(Item {
-                        y: y * 2 + 2,
-                        x: x * 2 + 1,
-                        color: "green",
-                        kind: if b { ItemKind::Line } else { ItemKind::Cross },
-                    });
-                }
-            }
-            if x < width - 1 && !(is_black[y][x] || is_black[y][x + 1]) {
-                if let Some(b) = is_line.horizontal[y][x] {
-                    data.push(Item {
-                        y: y * 2 + 1,
-                        x: x * 2 + 2,
-                        color: "green",
-                        kind: if b { ItemKind::Line } else { ItemKind::Cross },
-                    });
-                }
-            }
-        }
-    }
+    board.add_lines_irrefutable_facts(&is_line, "green", Some(&is_black));
 
-    Ok(Board {
-        kind: BoardKind::Grid,
-        height,
-        width,
-        data,
-    })
+    Ok(board)
 }

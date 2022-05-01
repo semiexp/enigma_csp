@@ -7,11 +7,11 @@ pub fn solve_compass(url: &str) -> Result<Board, &'static str> {
 
     let height = problem.len();
     let width = problem[0].len();
-    let mut data = vec![];
+    let mut board = Board::new(BoardKind::OuterGrid, height, width);
     for y in 0..height {
         for x in 0..width {
             if let Some(clue) = problem[y][x] {
-                data.push(Item::cell(
+                board.push(Item::cell(
                     y,
                     x,
                     "black",
@@ -30,7 +30,7 @@ pub fn solve_compass(url: &str) -> Result<Board, &'static str> {
             if y < height - 1 {
                 let mut need_default_edge = true;
                 if let Some(b) = ans.horizontal[y][x] {
-                    data.push(Item {
+                    board.push(Item {
                         y: y * 2 + 2,
                         x: x * 2 + 1,
                         color: "green",
@@ -45,7 +45,7 @@ pub fn solve_compass(url: &str) -> Result<Board, &'static str> {
                     }
                 }
                 if need_default_edge {
-                    data.push(Item {
+                    board.push(Item {
                         y: y * 2 + 2,
                         x: x * 2 + 1,
                         color: "#cccccc",
@@ -56,7 +56,7 @@ pub fn solve_compass(url: &str) -> Result<Board, &'static str> {
             if x < width - 1 {
                 let mut need_default_edge = true;
                 if let Some(b) = ans.vertical[y][x] {
-                    data.push(Item {
+                    board.push(Item {
                         y: y * 2 + 1,
                         x: x * 2 + 2,
                         color: "green",
@@ -71,7 +71,7 @@ pub fn solve_compass(url: &str) -> Result<Board, &'static str> {
                     }
                 }
                 if need_default_edge {
-                    data.push(Item {
+                    board.push(Item {
                         y: y * 2 + 1,
                         x: x * 2 + 2,
                         color: "#cccccc",
@@ -82,10 +82,5 @@ pub fn solve_compass(url: &str) -> Result<Board, &'static str> {
         }
     }
 
-    Ok(Board {
-        kind: BoardKind::OuterGrid,
-        height,
-        width,
-        data,
-    })
+    Ok(board)
 }

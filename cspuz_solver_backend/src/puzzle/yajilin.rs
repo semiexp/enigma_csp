@@ -9,7 +9,7 @@ pub fn solve_yajilin(url: &str) -> Result<Board, &'static str> {
 
     let height = problem.len();
     let width = problem[0].len();
-    let mut data = vec![];
+    let mut board = Board::new(BoardKind::Grid, height, width);
 
     let mut skip_line = vec![];
     for y in 0..height {
@@ -30,9 +30,9 @@ pub fn solve_yajilin(url: &str) -> Result<Board, &'static str> {
                     YajilinClue::Right(n) => (Some(ItemKind::SideArrowRight), n),
                 };
                 if let Some(arrow) = arrow {
-                    data.push(Item::cell(y, x, "black", arrow));
+                    board.push(Item::cell(y, x, "black", arrow));
                 }
-                data.push(Item::cell(
+                board.push(Item::cell(
                     y,
                     x,
                     "black",
@@ -43,7 +43,7 @@ pub fn solve_yajilin(url: &str) -> Result<Board, &'static str> {
                     },
                 ));
             } else if let Some(b) = is_black[y][x] {
-                data.push(Item::cell(
+                board.push(Item::cell(
                     y,
                     x,
                     "green",
@@ -52,35 +52,8 @@ pub fn solve_yajilin(url: &str) -> Result<Board, &'static str> {
             }
         }
     }
-    for y in 0..height {
-        for x in 0..width {
-            if y < height - 1 && !(skip_line[y][x] || skip_line[y + 1][x]) {
-                if let Some(b) = is_line.vertical[y][x] {
-                    data.push(Item {
-                        y: y * 2 + 2,
-                        x: x * 2 + 1,
-                        color: "green",
-                        kind: if b { ItemKind::Line } else { ItemKind::Cross },
-                    });
-                }
-            }
-            if x < width - 1 && !(skip_line[y][x] || skip_line[y][x + 1]) {
-                if let Some(b) = is_line.horizontal[y][x] {
-                    data.push(Item {
-                        y: y * 2 + 1,
-                        x: x * 2 + 2,
-                        color: "green",
-                        kind: if b { ItemKind::Line } else { ItemKind::Cross },
-                    });
-                }
-            }
-        }
-    }
 
-    Ok(Board {
-        kind: BoardKind::Grid,
-        height,
-        width,
-        data,
-    })
+    board.add_lines_irrefutable_facts(&is_line, "green", Some(&skip_line));
+
+    Ok(board)
 }

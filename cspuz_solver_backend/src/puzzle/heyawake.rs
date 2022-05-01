@@ -8,32 +8,14 @@ pub fn solve_heyawake(url: &str) -> Result<Board, &'static str> {
 
     let height = is_black.len();
     let width = is_black[0].len();
-    let mut data = vec![];
+    let mut board = Board::new(BoardKind::Grid, height, width);
+
+    board.add_borders(&borders, "black");
 
     for y in 0..height {
         for x in 0..width {
-            if y < height - 1 && borders.horizontal[y][x] {
-                data.push(Item {
-                    y: y * 2 + 2,
-                    x: x * 2 + 1,
-                    color: "black",
-                    kind: ItemKind::BoldWall,
-                });
-            }
-            if x < width - 1 && borders.vertical[y][x] {
-                data.push(Item {
-                    y: y * 2 + 1,
-                    x: x * 2 + 2,
-                    color: "black",
-                    kind: ItemKind::BoldWall,
-                });
-            }
-        }
-    }
-    for y in 0..height {
-        for x in 0..width {
             if let Some(b) = is_black[y][x] {
-                data.push(Item::cell(
+                board.push(Item::cell(
                     y,
                     x,
                     "green",
@@ -47,16 +29,11 @@ pub fn solve_heyawake(url: &str) -> Result<Board, &'static str> {
     for i in 0..rooms.len() {
         if let Some(n) = clues[i] {
             let (y, x) = rooms[i][0];
-            data.push(Item::cell(y, x, "black", ItemKind::Num(n)));
+            board.push(Item::cell(y, x, "black", ItemKind::Num(n)));
         }
     }
 
-    Ok(Board {
-        kind: BoardKind::Grid,
-        height,
-        width,
-        data,
-    })
+    Ok(board)
 }
 
 pub fn enumerate_answers_heyawake(
@@ -70,31 +47,12 @@ pub fn enumerate_answers_heyawake(
     let height = is_black_common.len();
     let width = is_black_common[0].len();
 
-    let mut data = vec![];
-    for y in 0..height {
-        for x in 0..width {
-            if y < height - 1 && borders.horizontal[y][x] {
-                data.push(Item {
-                    y: y * 2 + 2,
-                    x: x * 2 + 1,
-                    color: "black",
-                    kind: ItemKind::BoldWall,
-                });
-            }
-            if x < width - 1 && borders.vertical[y][x] {
-                data.push(Item {
-                    y: y * 2 + 1,
-                    x: x * 2 + 2,
-                    color: "black",
-                    kind: ItemKind::BoldWall,
-                });
-            }
-        }
-    }
+    let mut board_common = Board::new(BoardKind::Grid, height, width);
+    board_common.add_borders(&borders, "black");
     for y in 0..height {
         for x in 0..width {
             if let Some(b) = is_black_common[y][x] {
-                data.push(Item::cell(
+                board_common.push(Item::cell(
                     y,
                     x,
                     "#339933",
@@ -108,24 +66,17 @@ pub fn enumerate_answers_heyawake(
     for i in 0..rooms.len() {
         if let Some(n) = clues[i] {
             let (y, x) = rooms[i][0];
-            data.push(Item::cell(y, x, "black", ItemKind::Num(n)));
+            board_common.push(Item::cell(y, x, "black", ItemKind::Num(n)));
         }
     }
 
-    let board_common = Board {
-        kind: BoardKind::Grid,
-        height,
-        width,
-        data,
-    };
-
     let mut board_answers = vec![];
     for ans in answers {
-        let mut data = vec![];
+        let mut board_answer = Board::new(BoardKind::Empty, height, width);
         for y in 0..height {
             for x in 0..width {
                 if is_black_common[y][x].is_none() {
-                    data.push(Item::cell(
+                    board_answer.push(Item::cell(
                         y,
                         x,
                         "#cccccc",
@@ -138,12 +89,7 @@ pub fn enumerate_answers_heyawake(
                 }
             }
         }
-        board_answers.push(Board {
-            kind: BoardKind::Empty,
-            height,
-            width,
-            data,
-        });
+        board_answers.push(board_answer);
     }
 
     Ok((board_common, board_answers))
