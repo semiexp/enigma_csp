@@ -2,7 +2,7 @@ use crate::graph;
 use crate::serializer::{
     problem_to_url_with_context, url_to_problem, Combinator, Context, Rooms, Size,
 };
-use crate::solver::{any, count_true, Solver};
+use crate::solver::{any, count_true, Solver, FALSE};
 
 pub fn solve_lits(
     borders: &graph::InnerGridEdges<Vec<Vec<bool>>>,
@@ -35,24 +35,24 @@ pub fn solve_lits(
         for x in 0..w {
             let mut neighbors = vec![];
             if y > 0 && !borders.horizontal[y - 1][x] {
-                neighbors.push(is_black.at((y - 1, x)).any());
+                neighbors.push(is_black.at((y - 1, x)).expr());
             } else {
-                neighbors.push(any([false]));
+                neighbors.push(FALSE);
             }
             if x > 0 && !borders.vertical[y][x - 1] {
-                neighbors.push(is_black.at((y, x - 1)).any());
+                neighbors.push(is_black.at((y, x - 1)).expr());
             } else {
-                neighbors.push(any([false]));
+                neighbors.push(FALSE);
             }
             if y < h - 1 && !borders.horizontal[y][x] {
-                neighbors.push(is_black.at((y + 1, x)).any());
+                neighbors.push(is_black.at((y + 1, x)).expr());
             } else {
-                neighbors.push(any([false]));
+                neighbors.push(FALSE);
             }
             if x < w - 1 && !borders.vertical[y][x] {
-                neighbors.push(is_black.at((y, x + 1)).any());
+                neighbors.push(is_black.at((y, x + 1)).expr());
             } else {
-                neighbors.push(any([false]));
+                neighbors.push(FALSE);
             }
 
             solver.add_expr(kind.at((y, x)).eq(1).imp(count_true(&neighbors).eq(1)));

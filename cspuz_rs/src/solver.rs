@@ -885,6 +885,22 @@ where
     }
 }
 
+impl<T> Value<T>
+where
+    Value<T>: Clone + Operand,
+{
+    pub fn expr(&self) -> Value<<Self as Operand>::Output> {
+        self.clone().as_expr_array_value()
+    }
+}
+
+pub const TRUE: Value<Array0DImpl<CSPBoolExpr>> = Value(Array0DImpl {
+    data: CSPBoolExpr::Const(true),
+});
+pub const FALSE: Value<Array0DImpl<CSPBoolExpr>> = Value(Array0DImpl {
+    data: CSPBoolExpr::Const(false),
+});
+
 // ==========
 // Solver
 // ==========
