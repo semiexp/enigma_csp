@@ -3,7 +3,7 @@ use crate::serializer::{
 };
 use crate::solver::{count_true, Solver, FALSE};
 
-#[derive(PartialEq, Eq, Debug)]
+#[derive(PartialEq, Eq, Debug, Clone, Copy)]
 pub enum ShakashakaCell {
     Blank,
     UpperLeft,
