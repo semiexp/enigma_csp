@@ -302,6 +302,63 @@ impl<T: Clone + PartialEq> Combinator<T> for Spaces<T> {
     }
 }
 
+pub struct NumSpaces {
+    max_num: i32,
+    max_n_spaces: usize,
+}
+
+impl NumSpaces {
+    pub fn new(max_num: i32, max_n_spaces: usize) -> NumSpaces {
+        assert!((max_num + 1) * (max_n_spaces as i32 + 1) < 36);
+        NumSpaces {
+            max_num,
+            max_n_spaces,
+        }
+    }
+}
+
+impl Combinator<Option<i32>> for NumSpaces {
+    fn serialize(&self, _: &Context, input: &[Option<i32>]) -> Option<(usize, Vec<u8>)> {
+        if input.len() == 0 {
+            return None;
+        }
+        let n = input[0]?;
+        if !(0 <= n && n <= self.max_num) {
+            return None;
+        }
+        let mut n_spaces = 0;
+        while 1 + n_spaces < input.len()
+            && n_spaces < self.max_n_spaces
+            && input[1 + n_spaces].is_none()
+        {
+            n_spaces += 1;
+        }
+        Some((
+            1 + n_spaces,
+            vec![to_base36(n + n_spaces as i32 * (self.max_num + 1))],
+        ))
+    }
+
+    fn deserialize(&self, _: &Context, input: &[u8]) -> Option<(usize, Vec<Option<i32>>)> {
+        if input.len() == 0 {
+            return None;
+        }
+        let v = from_base36(input[0])?;
+        if !(0 <= v && v < (self.max_num + 1) * (self.max_n_spaces as i32 + 1)) {
+            return None;
+        }
+        let n = v % (self.max_num + 1);
+        let n_spaces = (v / (self.max_num + 1)) as i32;
+
+        let mut ret = vec![Some(n)];
+        for _ in 0..n_spaces {
+            ret.push(None);
+        }
+
+        Some((1, ret))
+    }
+}
+
 pub struct FixedLengthHexInt(usize);
 
 impl FixedLengthHexInt {
@@ -1047,6 +1104,43 @@ mod tests {
         assert_eq!(
             combinator.deserialize(ctx, "b".as_bytes()),
             Some((1, vec![0, 0, 0]))
+        );
+    }
+
+    #[test]
+    fn test_num_spaces() {
+        let ctx = &Context::new();
+        let combinator = NumSpaces::new(2, 3);
+
+        assert_eq!(combinator.serialize(ctx, &[]), None);
+        assert_eq!(
+            combinator.serialize(ctx, &[Some(1), None, Some(2)]),
+            Some((2, Vec::from("4")))
+        );
+        assert_eq!(
+            combinator.serialize(ctx, &[Some(1), Some(2)]),
+            Some((1, Vec::from("1")))
+        );
+        assert_eq!(
+            combinator.serialize(ctx, &[Some(2), None, None, None, None, Some(2)]),
+            Some((4, Vec::from("b")))
+        );
+        assert_eq!(
+            combinator.serialize(ctx, &[None, Some(2), None, None, Some(2)]),
+            None
+        );
+        assert_eq!(combinator.serialize(ctx, &[Some(3), None, Some(2)]), None);
+        assert_eq!(combinator.serialize(ctx, &[Some(-1), None, Some(2)]), None);
+
+        assert_eq!(combinator.deserialize(ctx, "".as_bytes()), None);
+        assert_eq!(combinator.deserialize(ctx, "c".as_bytes()), None);
+        assert_eq!(
+            combinator.deserialize(ctx, "b".as_bytes()),
+            Some((1, vec![Some(2), None, None, None]))
+        );
+        assert_eq!(
+            combinator.deserialize(ctx, "0".as_bytes()),
+            Some((1, vec![Some(0)]))
         );
     }
 
