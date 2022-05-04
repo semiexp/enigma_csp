@@ -1,3 +1,6 @@
+use crate::serializer::{
+    problem_to_url, url_to_problem, Choice, Combinator, Dict, Grid, NumSpaces, Spaces,
+};
 use crate::solver::{count_true, Solver, FALSE};
 
 #[derive(PartialEq, Eq, Debug)]
@@ -138,6 +141,24 @@ pub fn solve_shakashaka(problem: &[Vec<Option<i32>>]) -> Option<Vec<Vec<Option<S
     })
 }
 
+type Problem = Vec<Vec<Option<i32>>>;
+
+fn combinator() -> impl Combinator<Problem> {
+    Grid::new(Choice::new(vec![
+        Box::new(Spaces::new(None, 'g')),
+        Box::new(NumSpaces::new(4, 2)),
+        Box::new(Dict::new(Some(-1), ".")),
+    ]))
+}
+
+pub fn serialize_problem(problem: &Problem) -> Option<String> {
+    problem_to_url(combinator(), "shakashaka", problem.clone())
+}
+
+pub fn deserialize_problem(url: &str) -> Option<Problem> {
+    url_to_problem(combinator(), &["shakashaka"], url)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -176,5 +197,20 @@ mod tests {
         assert_eq!(ans[0][5], Some(ShakashakaCell::UpperLeft));
         assert_eq!(ans[7][4], Some(ShakashakaCell::UpperRight));
         assert_eq!(ans[6][2], Some(ShakashakaCell::LowerRight));
+    }
+
+    #[test]
+    fn test_shakashaka_serializer() {
+        let problem = problem_for_tests();
+        let url = "https://puzz.link/p?shakashaka/10/10/rdr70bdpdgccrczhcga";
+
+        let deserialized = deserialize_problem(url);
+        assert!(deserialized.is_some());
+        let deserialized = deserialized.unwrap();
+        assert_eq!(problem, deserialized);
+        let reserialized = serialize_problem(&deserialized);
+        assert!(reserialized.is_some());
+        let reserialized = reserialized.unwrap();
+        assert_eq!(reserialized, url);
     }
 }
