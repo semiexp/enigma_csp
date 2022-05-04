@@ -1,4 +1,5 @@
 pub mod akari;
+pub mod araf;
 pub mod compass;
 pub mod heyawake;
 pub mod lits;
