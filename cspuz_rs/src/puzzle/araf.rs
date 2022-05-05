@@ -1,3 +1,4 @@
+use super::util;
 use crate::graph;
 use crate::serializer::{
     problem_to_url, url_to_problem, Choice, Combinator, Grid, HexInt, Optionalize, Spaces,
@@ -5,9 +6,7 @@ use crate::serializer::{
 use crate::solver::{any, count_true, Solver};
 
 pub fn solve_araf(clues: &[Vec<Option<i32>>]) -> Option<graph::BoolInnerGridEdgesIrrefutableFacts> {
-    let h = clues.len();
-    assert!(h > 0);
-    let w = clues[0].len();
+    let (h, w) = util::infer_shape(clues);
 
     let mut clue_pos = vec![];
     let mut clue_max = 0;
@@ -125,30 +124,14 @@ mod tests {
         assert!(ans.is_some());
         let ans = ans.unwrap();
 
-        for y in 0..problem.len() {
-            for x in 0..(problem[0].len()) {
-                if y + 1 < problem.len() {
-                    assert!(ans.horizontal[y][x].is_some());
-                }
-                if x + 1 < problem[0].len() {
-                    assert!(ans.vertical[y][x].is_some());
-                }
-            }
-        }
+        util::tests::check_all_some(&ans.horizontal);
+        util::tests::check_all_some(&ans.vertical);
     }
 
     #[test]
     fn test_araf_serializer() {
         let problem = problem_for_tests();
         let url = "https://puzz.link/p?araf/6/6/h3j3j3p-1cj8j8h";
-
-        let deserialized = deserialize_problem(url);
-        assert!(deserialized.is_some());
-        let deserialized = deserialized.unwrap();
-        assert_eq!(problem, deserialized);
-        let reserialized = serialize_problem(&deserialized);
-        assert!(reserialized.is_some());
-        let reserialized = reserialized.unwrap();
-        assert_eq!(reserialized, url);
+        util::tests::serializer_test(problem, url, serialize_problem, deserialize_problem);
     }
 }

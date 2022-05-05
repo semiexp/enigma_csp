@@ -1,3 +1,4 @@
+use super::util;
 use crate::graph;
 use crate::serializer::{
     problem_to_url, url_to_problem, Choice, Combinator, Dict, Grid, HexInt, Optionalize, Spaces,
@@ -5,9 +6,7 @@ use crate::serializer::{
 use crate::solver::{any, Solver};
 
 pub fn solve_nurimisaki(clues: &[Vec<Option<i32>>]) -> Option<Vec<Vec<Option<bool>>>> {
-    let h = clues.len();
-    assert!(h > 0);
-    let w = clues[0].len();
+    let (h, w) = util::infer_shape(clues);
 
     let mut solver = Solver::new();
     let is_white = &solver.bool_var_2d((h, w));
@@ -105,11 +104,10 @@ pub fn deserialize_problem(url: &str) -> Option<Problem> {
 mod tests {
     use super::*;
 
-    #[test]
     #[rustfmt::skip]
-    fn test_nurimisaki_problem() {
+    fn problem_for_tests() -> Problem {
         // https://twitter.com/semiexp/status/1168898897424633856
-        let problem = [
+        vec![
             vec![None, None, None, None, Some(3), None, None, None, None, None],
             vec![None, Some(3), None, None, None, None, None, None, None, None],
             vec![None, None, None, None, None, None, None, None, Some(2), None],
@@ -120,7 +118,12 @@ mod tests {
             vec![None, None, None, None, None, None, None, None, None, Some(2)],
             vec![None, None, None, None, None, Some(2), None, None, None, None],
             vec![None, None, None, None, Some(3), None, None, None, None, None],
-        ];
+        ]
+    }
+
+    #[test]
+    fn test_nurimisaki_problem() {
+        let problem = problem_for_tests();
         let ans = solve_nurimisaki(&problem);
         assert!(ans.is_some());
         let ans = ans.unwrap();
@@ -138,36 +141,21 @@ mod tests {
         ];
         for y in 0..10 {
             for x in 0..10 {
-                assert_eq!(ans[y][x], Some(expected[y][x] == 0), "mismatch at ({}, {})", y, x);
+                assert_eq!(
+                    ans[y][x],
+                    Some(expected[y][x] == 0),
+                    "mismatch at ({}, {})",
+                    y,
+                    x
+                );
             }
         }
     }
 
     #[test]
-    #[rustfmt::skip]
     fn test_nurimisaki_serializer() {
-        // https://twitter.com/semiexp/status/1168898897424633856
-        let problem = vec![
-            vec![None, None, None, None, Some(3), None, None, None, None, None],
-            vec![None, Some(3), None, None, None, None, None, None, None, None],
-            vec![None, None, None, None, None, None, None, None, Some(2), None],
-            vec![None, None, None, None, None, None, None, None, None, None],
-            vec![None, None, None, Some(2), None, None, None, None, None, None],
-            vec![None, None, None, None, Some(-1), None, Some(2), None, None, None],
-            vec![None, Some(2), None, None, None, None, None, None, None, None],
-            vec![None, None, None, None, None, None, None, None, None, Some(2)],
-            vec![None, None, None, None, None, Some(2), None, None, None, None],
-            vec![None, None, None, None, Some(3), None, None, None, None, None],
-        ];
+        let problem = problem_for_tests();
         let url = "https://puzz.link/p?nurimisaki/10/10/j3l3v2t2p.g2j2w2k2n3k";
-
-        let deserialized = deserialize_problem(url);
-        assert!(deserialized.is_some());
-        let deserialized = deserialized.unwrap();
-        assert_eq!(problem, deserialized);
-        let reserialized = serialize_problem(&deserialized);
-        assert!(reserialized.is_some());
-        let reserialized = reserialized.unwrap();
-        assert_eq!(reserialized, url);
+        util::tests::serializer_test(problem, url, serialize_problem, deserialize_problem);
     }
 }

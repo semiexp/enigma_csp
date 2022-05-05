@@ -1,3 +1,4 @@
+use super::util;
 use crate::graph;
 use crate::serializer::{
     from_base16, problem_to_url, to_base16, url_to_problem, Choice, Combinator, Context, Grid,
@@ -17,9 +18,7 @@ pub enum YajilinClue {
 pub fn solve_yajilin(
     clues: &[Vec<Option<YajilinClue>>],
 ) -> Option<(graph::BoolGridEdgesIrrefutableFacts, Vec<Vec<Option<bool>>>)> {
-    let h = clues.len();
-    assert!(h > 0);
-    let w = clues[0].len();
+    let (h, w) = util::infer_shape(clues);
 
     let mut solver = Solver::new();
     let is_line = &graph::BoolGridEdges::new(&mut solver, (h - 1, w - 1));

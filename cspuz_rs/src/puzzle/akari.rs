@@ -1,3 +1,4 @@
+use super::util;
 use crate::serializer::{
     from_base16, problem_to_url, to_base16, url_to_problem, Choice, Combinator, Context, Dict,
     Grid, Spaces,
@@ -5,9 +6,7 @@ use crate::serializer::{
 use crate::solver::{BoolVar, Solver};
 
 pub fn solve_akari(clues: &[Vec<Option<i32>>]) -> Option<Vec<Vec<Option<bool>>>> {
-    let h = clues.len();
-    assert!(h > 0);
-    let w = clues[0].len();
+    let (h, w) = util::infer_shape(clues);
 
     let mut solver = Solver::new();
     let has_light = &solver.bool_var_2d((h, w));
@@ -150,11 +149,10 @@ pub fn deserialize_problem(url: &str) -> Option<Problem> {
 mod tests {
     use super::*;
 
-    #[test]
     #[rustfmt::skip]
-    fn test_akari_problem() {
+    fn problem_for_tests() -> Vec<Vec<Option<i32>>> {
         // https://twitter.com/semiexp/status/1225770511080144896
-        let problem = [
+        vec![
             vec![None, None, Some(2), None, None, None, None, None, None, None],
             vec![None, None, None, None, None, None, None, None, Some(2), None],
             vec![None, None, None, None, None, None, None, Some(-1), None, None],
@@ -165,11 +163,15 @@ mod tests {
             vec![None, None, Some(-1), None, None, None, None, None, None, None],
             vec![None, Some(2), None, None, None, None, None, None, None, None],
             vec![None, None, None, None, None, None, None, Some(-1), None, None],
-        ];
+        ]
+    }
+
+    #[test]
+    fn test_akari_problem() {
+        let problem = problem_for_tests();
         let ans = solve_akari(&problem);
         assert!(ans.is_some());
         let ans = ans.unwrap();
-        println!("{:?}", ans);
         let expected = [
             [1, 0, 0, 1, 0, 0, 0, 0, 0, 0],
             [0, 0, 1, 0, 0, 0, 0, 0, 0, 1],
@@ -198,27 +200,8 @@ mod tests {
     #[test]
     #[rustfmt::skip]
     fn test_akari_serializer() {
-        let problem = vec![
-            vec![None, None, Some(2), None, None, None, None, None, None, None],
-            vec![None, None, None, None, None, None, None, None, Some(2), None],
-            vec![None, None, None, None, None, None, None, Some(-1), None, None],
-            vec![Some(-1), None, None, None, Some(3), None, None, None, None, None],
-            vec![None, None, None, None, None, Some(-1), None, None, None, Some(-1)],
-            vec![Some(2), None, None, None, Some(2), None, None, None, None, None],
-            vec![None, None, None, None, None, Some(3), None, None, None, Some(-1)],
-            vec![None, None, Some(-1), None, None, None, None, None, None, None],
-            vec![None, Some(2), None, None, None, None, None, None, None, None],
-            vec![None, None, None, None, None, None, None, Some(-1), None, None],
-        ];
+        let problem = problem_for_tests();
         let url = "https://puzz.link/p?akari/10/10/hcscl.h.idn.i.cgcndg.h.ncs.h";
-
-        let deserialized = deserialize_problem(url);
-        assert!(deserialized.is_some());
-        let deserialized = deserialized.unwrap();
-        assert_eq!(problem, deserialized);
-        let reserialized = serialize_problem(&deserialized);
-        assert!(reserialized.is_some());
-        let reserialized = reserialized.unwrap();
-        assert_eq!(reserialized, url);
+        util::tests::serializer_test(problem, url, serialize_problem, deserialize_problem);
     }
 }

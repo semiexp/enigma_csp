@@ -1,3 +1,4 @@
+use super::util;
 use crate::graph;
 use crate::serializer::{
     problem_to_url, url_to_problem, Choice, Combinator, Dict, Grid, HexInt, Optionalize, Spaces,
@@ -5,9 +6,7 @@ use crate::serializer::{
 use crate::solver::Solver;
 
 pub fn solve_nurikabe(clues: &[Vec<Option<i32>>]) -> Option<Vec<Vec<Option<bool>>>> {
-    let h = clues.len();
-    assert!(h > 0);
-    let w = clues[0].len();
+    let (h, w) = util::infer_shape(clues);
 
     let mut solver = Solver::new();
     let is_black = &solver.bool_var_2d((h, w));

@@ -1,3 +1,4 @@
+use super::util;
 use crate::graph;
 use crate::serializer::{
     problem_to_url, url_to_problem, Choice, Combinator, Dict, Grid, HexInt, Map, Optionalize, Seq,
@@ -16,9 +17,7 @@ pub struct CompassClue {
 pub fn solve_compass(
     clues: &[Vec<Option<CompassClue>>],
 ) -> Option<graph::BoolInnerGridEdgesIrrefutableFacts> {
-    let h = clues.len();
-    assert!(h > 0);
-    let w = clues[0].len();
+    let (h, w) = util::infer_shape(clues);
 
     let mut solver = Solver::new();
     let edges = &graph::BoolInnerGridEdges::new(&mut solver, (h, w));
@@ -118,9 +117,7 @@ pub fn deserialize_problem(url: &str) -> Option<Problem> {
 mod tests {
     use super::*;
 
-    #[test]
-    #[rustfmt::skip]
-    fn test_compass_problem() {
+    fn problem_for_tests() -> Problem {
         // https://puzz.link/p?compass/5/5/m..1.i25.1g53..i1..1m
         let mut problem: Vec<Vec<Option<CompassClue>>> = vec![vec![None; 5]; 5];
         problem[1][2] = Some(CompassClue {
@@ -147,6 +144,13 @@ mod tests {
             left: None,
             right: Some(1),
         });
+        problem
+    }
+
+    #[test]
+    #[rustfmt::skip]
+    fn test_compass_problem() {
+        let problem = problem_for_tests();
 
         let ans = solve_compass(&problem);
         assert!(ans.is_some());
@@ -172,41 +176,8 @@ mod tests {
 
     #[test]
     fn test_compass_serializer() {
-        let mut problem: Vec<Vec<Option<CompassClue>>> = vec![vec![None; 5]; 5];
-        problem[1][2] = Some(CompassClue {
-            up: None,
-            down: None,
-            left: Some(1),
-            right: None,
-        });
-        problem[2][1] = Some(CompassClue {
-            up: Some(2),
-            down: Some(5),
-            left: None,
-            right: Some(1),
-        });
-        problem[2][3] = Some(CompassClue {
-            up: Some(5),
-            down: Some(3),
-            left: None,
-            right: None,
-        });
-        problem[3][2] = Some(CompassClue {
-            up: Some(1),
-            down: None,
-            left: None,
-            right: Some(1),
-        });
-
+        let problem = problem_for_tests();
         let url = "https://puzz.link/p?compass/5/5/m..1.i25.1g53..i1..1m";
-
-        let deserialized = deserialize_problem(url);
-        assert!(deserialized.is_some());
-        let deserialized = deserialized.unwrap();
-        assert_eq!(problem, deserialized);
-        let reserialized = serialize_problem(&deserialized);
-        assert!(reserialized.is_some());
-        let reserialized = reserialized.unwrap();
-        assert_eq!(reserialized, url);
+        util::tests::serializer_test(problem, url, serialize_problem, deserialize_problem);
     }
 }

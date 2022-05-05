@@ -1,3 +1,4 @@
+use super::util;
 use crate::graph;
 use crate::serializer::{
     url_to_problem, Choice, Combinator, Context, ContextBasedGrid, DecInt, Dict, FixedLengthHexInt,
@@ -21,9 +22,7 @@ pub fn solve_slalom(
     is_black: &[Vec<bool>],
     gates: &[Gate],
 ) -> Option<graph::BoolGridEdgesIrrefutableFacts> {
-    let h = is_black.len();
-    assert!(h > 0);
-    let w = is_black[0].len();
+    let (h, w) = util::infer_shape(is_black);
 
     let mut solver = Solver::new();
     let line = &graph::BoolGridEdges::new(&mut solver, (h - 1, w - 1));

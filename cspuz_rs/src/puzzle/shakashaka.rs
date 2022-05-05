@@ -1,3 +1,4 @@
+use super::util;
 use crate::serializer::{
     problem_to_url, url_to_problem, Choice, Combinator, Dict, Grid, NumSpaces, Spaces,
 };
@@ -13,9 +14,7 @@ pub enum ShakashakaCell {
 }
 
 pub fn solve_shakashaka(problem: &[Vec<Option<i32>>]) -> Option<Vec<Vec<Option<ShakashakaCell>>>> {
-    let h = problem.len();
-    assert!(h > 0);
-    let w = problem[0].len();
+    let (h, w) = util::infer_shape(problem);
 
     // 1   2   3   4
     // +-+ +     + +-+
@@ -189,11 +188,7 @@ mod tests {
         assert!(ans.is_some());
         let ans = ans.unwrap();
 
-        for y in 0..ans.len() {
-            for x in 0..ans[0].len() {
-                assert!(ans[y][x].is_some());
-            }
-        }
+        util::tests::check_all_some(&ans);
         assert_eq!(ans[0][5], Some(ShakashakaCell::UpperLeft));
         assert_eq!(ans[7][4], Some(ShakashakaCell::UpperRight));
         assert_eq!(ans[6][2], Some(ShakashakaCell::LowerRight));
@@ -203,14 +198,6 @@ mod tests {
     fn test_shakashaka_serializer() {
         let problem = problem_for_tests();
         let url = "https://puzz.link/p?shakashaka/10/10/rdr70bdpdgccrczhcga";
-
-        let deserialized = deserialize_problem(url);
-        assert!(deserialized.is_some());
-        let deserialized = deserialized.unwrap();
-        assert_eq!(problem, deserialized);
-        let reserialized = serialize_problem(&deserialized);
-        assert!(reserialized.is_some());
-        let reserialized = reserialized.unwrap();
-        assert_eq!(reserialized, url);
+        util::tests::serializer_test(problem, url, serialize_problem, deserialize_problem);
     }
 }

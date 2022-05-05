@@ -1,3 +1,4 @@
+use super::util;
 use crate::graph;
 use crate::serializer::{problem_to_url, url_to_problem, Combinator, Grid, Map, MultiDigit};
 use crate::solver::{any, Solver};
@@ -10,9 +11,7 @@ pub enum MasyuClue {
 }
 
 pub fn solve_masyu(clues: &[Vec<MasyuClue>]) -> Option<graph::BoolGridEdgesIrrefutableFacts> {
-    let h = clues.len();
-    assert!(h > 0);
-    let w = clues[0].len();
+    let (h, w) = util::infer_shape(clues);
 
     let mut solver = Solver::new();
     let is_line = &graph::BoolGridEdges::new(&mut solver, (h - 1, w - 1));
@@ -170,14 +169,6 @@ mod tests {
     fn test_masyu_serializer() {
         let problem = problem_for_tests();
         let url = "https://puzz.link/p?masyu/10/10/0600003i06b1300600000a30600i090330";
-
-        let deserialized = deserialize_problem(url);
-        assert!(deserialized.is_some());
-        let deserialized = deserialized.unwrap();
-        assert_eq!(problem, deserialized);
-        let reserialized = serialize_problem(&deserialized);
-        assert!(reserialized.is_some());
-        let reserialized = reserialized.unwrap();
-        assert_eq!(reserialized, url);
+        util::tests::serializer_test(problem, url, serialize_problem, deserialize_problem);
     }
 }

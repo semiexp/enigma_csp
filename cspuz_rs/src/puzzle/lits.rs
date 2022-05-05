@@ -160,6 +160,7 @@ pub fn deserialize_problem(url: &str) -> Option<Problem> {
 
 #[cfg(test)]
 mod tests {
+    use super::super::util;
     use super::*;
 
     fn problem_for_tests() -> graph::InnerGridEdges<Vec<Vec<bool>>> {
@@ -225,14 +226,6 @@ mod tests {
     fn test_lits_serializer() {
         let problem = problem_for_tests();
         let url = "https://puzz.link/p?lits/10/10/08p0i3jbhmjg5j5ik048rgtr8q1e5gkf9hnu";
-
-        let deserialized = deserialize_problem(url);
-        assert!(deserialized.is_some());
-        let deserialized = deserialized.unwrap();
-        assert_eq!(problem, deserialized);
-        let reserialized = serialize_problem(&deserialized);
-        assert!(reserialized.is_some());
-        let reserialized = reserialized.unwrap();
-        assert_eq!(reserialized, url);
+        util::tests::serializer_test(problem, url, serialize_problem, deserialize_problem);
     }
 }
