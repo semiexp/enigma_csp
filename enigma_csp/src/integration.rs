@@ -8,25 +8,56 @@ use super::encoder::{encode, EncodeMap};
 use super::norm_csp::NormCSP;
 use super::normalizer::{normalize, NormalizeMap};
 use super::sat::{SATModel, SAT};
+use std::cell::Cell;
 
 #[derive(Clone, Debug)]
 pub struct PerfStats {
-    pub time_normalize: f64,
-    pub time_encode: f64,
-    pub time_sat_solver: f64,
+    time_normalize: Cell<f64>,
+    time_encode: Cell<f64>,
+    time_sat_solver: Cell<f64>,
+    decisions: Cell<u64>,
+    propagations: Cell<u64>,
+    conflicts: Cell<u64>,
 }
 
 impl PerfStats {
     pub fn new() -> PerfStats {
         PerfStats {
-            time_normalize: 0.0f64,
-            time_encode: 0.0f64,
-            time_sat_solver: 0.0f64,
+            time_normalize: Cell::new(0.0f64),
+            time_encode: Cell::new(0.0f64),
+            time_sat_solver: Cell::new(0.0f64),
+            decisions: Cell::new(0u64),
+            propagations: Cell::new(0u64),
+            conflicts: Cell::new(0u64),
         }
+    }
+
+    pub fn time_normalize(&self) -> f64 {
+        self.time_normalize.get()
+    }
+
+    pub fn time_encode(&self) -> f64 {
+        self.time_encode.get()
+    }
+
+    pub fn time_sat_solver(&self) -> f64 {
+        self.time_sat_solver.get()
+    }
+
+    pub fn decisions(&self) -> u64 {
+        self.decisions.get()
+    }
+
+    pub fn propagations(&self) -> u64 {
+        self.propagations.get()
+    }
+
+    pub fn conflicts(&self) -> u64 {
+        self.conflicts.get()
     }
 }
 
-pub struct IntegratedSolver {
+pub struct IntegratedSolver<'a> {
     csp: CSP,
     normalize_map: NormalizeMap,
     norm: NormCSP,
@@ -34,11 +65,11 @@ pub struct IntegratedSolver {
     sat: SAT,
     already_used: bool,
     config: Config,
-    perf_stats: PerfStats,
+    perf_stats: Option<&'a PerfStats>,
 }
 
-impl IntegratedSolver {
-    pub fn new() -> IntegratedSolver {
+impl<'a> IntegratedSolver<'a> {
+    pub fn new() -> IntegratedSolver<'a> {
         IntegratedSolver {
             csp: CSP::new(),
             normalize_map: NormalizeMap::new(),
@@ -47,7 +78,7 @@ impl IntegratedSolver {
             sat: SAT::new(),
             already_used: false,
             config: Config::default(),
-            perf_stats: PerfStats::new(),
+            perf_stats: None,
         }
     }
 
@@ -71,7 +102,7 @@ impl IntegratedSolver {
         self.add_constraint(Stmt::Expr(expr))
     }
 
-    pub fn solve<'a>(&'a mut self) -> Option<Model<'a>> {
+    pub fn solve<'b>(&'b mut self) -> Option<Model<'b>> {
         let is_first = !self.already_used;
         self.already_used = true;
 
@@ -93,7 +124,11 @@ impl IntegratedSolver {
             &mut self.normalize_map,
             &self.config,
         );
-        self.perf_stats.time_normalize += start.elapsed().as_secs_f64();
+        if let Some(perf_stats) = self.perf_stats {
+            perf_stats
+                .time_normalize
+                .set(perf_stats.time_normalize() + start.elapsed().as_secs_f64());
+        }
 
         if is_first && self.config.use_norm_domain_refinement {
             self.norm.refine_domain();
@@ -109,11 +144,35 @@ impl IntegratedSolver {
             &mut self.encode_map,
             &self.config,
         );
-        self.perf_stats.time_encode += start.elapsed().as_secs_f64();
+        if let Some(perf_stats) = self.perf_stats {
+            perf_stats
+                .time_encode
+                .set(perf_stats.time_encode() + start.elapsed().as_secs_f64());
+        }
 
         let start = std::time::Instant::now();
-        let solver_result = self.sat.solve();
-        self.perf_stats.time_sat_solver += start.elapsed().as_secs_f64();
+        let solver_result = if self.sat.solve_without_model() {
+            Some(unsafe { self.sat.model() })
+        } else {
+            None
+        };
+        if let Some(perf_stats) = self.perf_stats {
+            perf_stats
+                .time_sat_solver
+                .set(perf_stats.time_sat_solver() + start.elapsed().as_secs_f64());
+        }
+        let solver_stats = self.sat.stats();
+        if let Some(perf_stats) = self.perf_stats {
+            if let Some(decisions) = solver_stats.decisions {
+                perf_stats.decisions.set(decisions);
+            }
+            if let Some(propagations) = solver_stats.propagations {
+                perf_stats.propagations.set(propagations);
+            }
+            if let Some(conflicts) = solver_stats.conflicts {
+                perf_stats.conflicts.set(conflicts);
+            }
+        }
 
         match solver_result {
             Some(model) => Some(Model {
@@ -200,7 +259,7 @@ impl IntegratedSolver {
         Some(assignment)
     }
 
-    pub fn answer_iter(self, bool_vars: &[BoolVar], int_vars: &[IntVar]) -> AnswerIterator {
+    pub fn answer_iter(self, bool_vars: &[BoolVar], int_vars: &[IntVar]) -> AnswerIterator<'a> {
         AnswerIterator {
             solver: self,
             key_bool: bool_vars.iter().cloned().collect(),
@@ -208,18 +267,22 @@ impl IntegratedSolver {
         }
     }
 
-    pub fn perf_stats(&self) -> PerfStats {
-        self.perf_stats.clone()
+    pub fn set_perf_stats<'b: 'a>(&mut self, perf_stats: &'b PerfStats) {
+        self.perf_stats = Some(perf_stats);
+    }
+
+    pub fn perf_stats(&self) -> Option<PerfStats> {
+        self.perf_stats.as_deref().cloned()
     }
 }
 
-pub struct AnswerIterator {
-    solver: IntegratedSolver,
+pub struct AnswerIterator<'a> {
+    solver: IntegratedSolver<'a>,
     key_bool: Vec<BoolVar>,
     key_int: Vec<IntVar>,
 }
 
-impl Iterator for AnswerIterator {
+impl<'a> Iterator for AnswerIterator<'a> {
     type Item = Assignment;
 
     fn next(&mut self) -> Option<Assignment> {
@@ -304,15 +367,15 @@ mod tests {
     use super::*;
     use crate::util;
 
-    struct IntegrationTester {
+    struct IntegrationTester<'a> {
         original_constr: Vec<Stmt>,
-        solver: IntegratedSolver,
+        solver: IntegratedSolver<'a>,
         bool_vars: Vec<BoolVar>,
         int_vars: Vec<(IntVar, Domain)>,
     }
 
-    impl IntegrationTester {
-        fn new() -> IntegrationTester {
+    impl<'a> IntegrationTester<'a> {
+        fn new() -> IntegrationTester<'a> {
             IntegrationTester {
                 original_constr: vec![],
                 solver: IntegratedSolver::new(),
@@ -870,6 +933,27 @@ mod tests {
             n_ans += 1;
         }
         assert_eq!(n_ans, 14);
+    }
+
+    #[test]
+    fn test_integration_perf_stats() {
+        let perf_stats = PerfStats::new();
+        let mut solver = IntegratedSolver::new();
+        solver.set_perf_stats(&perf_stats);
+
+        let a = solver.new_int_var(Domain::range(0, 5));
+        let b = solver.new_int_var(Domain::range(0, 5));
+        solver.add_expr((a.expr() + b.expr()).ge(IntExpr::Const(4)));
+        solver.add_expr((a.expr() - b.expr()).le(IntExpr::Const(2)));
+
+        let mut propagations_prev = 0;
+        let mut n_ans = 0;
+        for _ in solver.answer_iter(&[], &[a, b]) {
+            assert!(propagations_prev < perf_stats.propagations());
+            propagations_prev = perf_stats.propagations();
+            n_ans += 1;
+        }
+        assert_eq!(n_ans, 21);
     }
 
     #[test]

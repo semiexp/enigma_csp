@@ -36,6 +36,12 @@ impl Not for Lit {
     }
 }
 
+pub struct SATSolverStats {
+    pub decisions: Option<u64>,
+    pub propagations: Option<u64>,
+    pub conflicts: Option<u64>,
+}
+
 /// Adapter to SAT solver.
 /// To support other SAT solver without changing previous stages, we introduce an adapter instead of
 /// using `glucose::Solver` directly from the encoder.
@@ -106,6 +112,24 @@ impl SAT {
 
     pub fn solve<'a>(&'a mut self) -> Option<SATModel<'a>> {
         self.solver.solve().map(|model| SATModel { model })
+    }
+
+    pub fn solve_without_model(&mut self) -> bool {
+        self.solver.solve_without_model()
+    }
+
+    pub(crate) unsafe fn model<'a>(&'a self) -> SATModel<'a> {
+        SATModel {
+            model: self.solver.model(),
+        }
+    }
+
+    pub fn stats(&self) -> SATSolverStats {
+        SATSolverStats {
+            decisions: Some(self.solver.stats_decisions()),
+            propagations: Some(self.solver.stats_propagations()),
+            conflicts: Some(self.solver.stats_conflicts()),
+        }
     }
 }
 

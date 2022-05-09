@@ -68,4 +68,16 @@ int32_t Glucose_AddActiveVerticesConnected(Glucose::Solver* solver, int32_t n_ve
     return solver->addConstraint(std::make_unique<Glucose::ActiveVerticesConnected>(std::move(g_lits), std::move(g_edges))) ? 1 : 0;
 }
 
+uint64_t Glucose_SolverStats_decisions(Glucose::Solver* solver) {
+    return solver->decisions;
+}
+
+uint64_t Glucose_SolverStats_propagations(Glucose::Solver* solver) {
+    return solver->propagations;
+}
+
+uint64_t Glucose_SolverStats_conflicts(Glucose::Solver* solver) {
+    return solver->conflicts;
+}
+
 }

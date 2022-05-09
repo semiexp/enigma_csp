@@ -950,14 +950,14 @@ macro_rules! impl_deref_var {
 impl_deref_var!(CSPBoolVar);
 impl_deref_var!(CSPIntVar);
 
-pub struct Solver {
-    solver: IntegratedSolver,
+pub struct Solver<'a> {
+    solver: IntegratedSolver<'a>,
     answer_key_bool: Vec<CSPBoolVar>,
     answer_key_int: Vec<CSPIntVar>,
 }
 
-impl Solver {
-    pub fn new() -> Solver {
+impl<'a> Solver<'a> {
+    pub fn new() -> Solver<'a> {
         Solver {
             solver: IntegratedSolver::new(),
             answer_key_bool: vec![],
@@ -1053,7 +1053,7 @@ impl Solver {
             .extend(keys.into_iter().map(|x| x.deref_var().0.data))
     }
 
-    pub fn solve<'a>(&'a mut self) -> Option<Model<'a>> {
+    pub fn solve<'b>(&'b mut self) -> Option<Model<'b>> {
         self.solver.solve().map(|model| Model { model })
     }
 
@@ -1063,7 +1063,7 @@ impl Solver {
             .map(|assignment| OwnedPartialModel { assignment })
     }
 
-    pub fn answer_iter(self) -> impl Iterator<Item = OwnedPartialModel> {
+    pub fn answer_iter(self) -> impl Iterator<Item = OwnedPartialModel> + 'a {
         self.solver
             .answer_iter(&self.answer_key_bool, &self.answer_key_int)
             .map(|assignment| OwnedPartialModel { assignment })

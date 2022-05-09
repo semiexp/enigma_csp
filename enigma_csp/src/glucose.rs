@@ -29,6 +29,9 @@ extern "C" {
         n_edges: i32,
         edges: *const i32,
     ) -> i32;
+    fn Glucose_SolverStats_decisions(solver: *mut Opaque) -> u64;
+    fn Glucose_SolverStats_propagations(solver: *mut Opaque) -> u64;
+    fn Glucose_SolverStats_conflicts(solver: *mut Opaque) -> u64;
 }
 
 #[derive(Clone, Copy)]
@@ -154,12 +157,32 @@ impl Solver {
     }
 
     pub fn solve<'a>(&'a mut self) -> Option<Model<'a>> {
-        let res = unsafe { Glucose_Solve(self.ptr) };
-        if res != 0 {
-            Some(Model { solver: self })
+        if self.solve_without_model() {
+            Some(unsafe { self.model() })
         } else {
             None
         }
+    }
+
+    pub fn solve_without_model(&mut self) -> bool {
+        let res = unsafe { Glucose_Solve(self.ptr) };
+        res != 0
+    }
+
+    pub(crate) unsafe fn model<'a>(&'a self) -> Model<'a> {
+        Model { solver: self }
+    }
+
+    pub fn stats_decisions(&self) -> u64 {
+        unsafe { Glucose_SolverStats_decisions(self.ptr) }
+    }
+
+    pub fn stats_propagations(&self) -> u64 {
+        unsafe { Glucose_SolverStats_propagations(self.ptr) }
+    }
+
+    pub fn stats_conflicts(&self) -> u64 {
+        unsafe { Glucose_SolverStats_conflicts(self.ptr) }
     }
 }
 
