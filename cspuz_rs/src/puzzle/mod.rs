@@ -1,6 +1,7 @@
 pub mod util;
 
 pub mod akari;
+pub mod aqre;
 pub mod araf;
 pub mod compass;
 pub mod heyawake;

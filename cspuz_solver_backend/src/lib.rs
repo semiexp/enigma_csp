@@ -37,6 +37,8 @@ fn decode_and_solve(url: &[u8]) -> Result<Board, &'static str> {
         puzzle::shakashaka::solve_shakashaka(url)
     } else if puzzle_kind == "araf" {
         puzzle::araf::solve_araf(url)
+    } else if puzzle_kind == "aqre" {
+        puzzle::aqre::solve_aqre(url)
     } else {
         Err("unknown puzzle type")
     }
