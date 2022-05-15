@@ -31,6 +31,7 @@ pub enum ItemKind {
     Text(&'static str),
     Num(i32),
     Compass(Compass),
+    TapaClue([i32; 4]),
 }
 
 impl ItemKind {
@@ -63,6 +64,10 @@ impl ItemKind {
                 compass.down.unwrap_or(-1),
                 compass.left.unwrap_or(-1),
                 compass.right.unwrap_or(-1)
+            ),
+            ItemKind::TapaClue(clues) => format!(
+                "{{\"kind\":\"tapaClue\",\"value\":[{},{},{},{}]}}",
+                clues[0], clues[1], clues[2], clues[3]
             ),
         }
     }

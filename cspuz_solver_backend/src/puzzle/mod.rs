@@ -10,4 +10,5 @@ pub mod nurimisaki;
 pub mod shakashaka;
 pub mod slalom;
 pub mod slitherlink;
+pub mod tapa;
 pub mod yajilin;
