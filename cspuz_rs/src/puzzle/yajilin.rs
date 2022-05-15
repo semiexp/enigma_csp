@@ -40,7 +40,7 @@ pub fn solve_yajilin(
                 match clue {
                     YajilinClue::Unspecified(n) => {
                         if n >= 0 {
-                            unimplemented!();
+                            // unimplemented!();
                         }
                     }
                     YajilinClue::Up(n) => {
