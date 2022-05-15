@@ -6,6 +6,21 @@ use crate::solver::Solver;
 pub fn solve_simpleloop(is_black: &[Vec<bool>]) -> Option<graph::BoolGridEdgesIrrefutableFacts> {
     let (h, w) = util::infer_shape(is_black);
 
+    let mut parity_diff = 0;
+    for y in 0..h {
+        for x in 0..w {
+            if is_black[y][x] {
+                if (y + x) % 2 == 0 {
+                    parity_diff += 1;
+                } else {
+                    parity_diff -= 1;
+                }
+            }
+        }
+    }
+    if parity_diff != 0 {
+        return None;
+    }
     let mut solver = Solver::new();
     let is_line = &graph::BoolGridEdges::new(&mut solver, (h - 1, w - 1));
     solver.add_answer_key_bool(&is_line.horizontal);
