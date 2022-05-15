@@ -56,10 +56,15 @@ pub fn solve_tapa(clues: &[Vec<Option<[i32; 4]>>]) -> Option<Vec<Vec<Option<bool
 
                 let mut clue_counts = [0; 9];
                 let mut total_clue_counts = 0;
+                let mut has_any = false;
                 for i in 0..4 {
                     if clue[i] != -1 {
-                        assert!(0 <= clue[i] && clue[i] <= 7);
-                        clue_counts[clue[i] as usize] += 1;
+                        assert!(clue[i] == -2 || 0 <= clue[i] && clue[i] <= 7);
+                        if clue[i] == -2 {
+                            has_any = true;
+                        } else {
+                            clue_counts[clue[i] as usize] += 1;
+                        }
                         total_clue_counts += 1;
                     }
                 }
@@ -79,7 +84,11 @@ pub fn solve_tapa(clues: &[Vec<Option<[i32; 4]>>]) -> Option<Vec<Vec<Option<bool
                         }
                         conds.push(all(cond));
                     }
-                    solver.add_expr(count_true(conds).eq(clue_counts[l]));
+                    if has_any {
+                        solver.add_expr(count_true(conds).ge(clue_counts[l]));
+                    } else {
+                        solver.add_expr(count_true(conds).eq(clue_counts[l]));
+                    }
                 }
 
                 let mut unit_count = vec![];
@@ -100,7 +109,7 @@ pub type Problem = Vec<Vec<Option<[i32; 4]>>>;
 mod tests {
     pub use super::*;
 
-    fn problem_for_tests() -> Problem {
+    fn problem_for_tests1() -> Problem {
         let height = 6;
         let width = 7;
         let mut ret: Problem = vec![vec![None; width]; height];
@@ -114,9 +123,24 @@ mod tests {
         ret
     }
 
+    fn problem_for_tests2() -> Problem {
+        let height = 8;
+        let width = 6;
+        let mut ret: Problem = vec![vec![None; width]; height];
+
+        ret[1][5] = Some([2, -1, -1, -1]);
+        ret[2][1] = Some([1, 1, 1, 1]);
+        ret[2][3] = Some([-2, -1, -1, -1]);
+        ret[4][3] = Some([-2, -2, -2, -1]);
+        ret[6][2] = Some([-2, -2, -1, -1]);
+        ret[6][3] = Some([3, -2, -2, -1]);
+
+        ret
+    }
+
     #[test]
-    fn test_tapa_problem() {
-        let problem = problem_for_tests();
+    fn test_tapa_problem1() {
+        let problem = problem_for_tests1();
         let ans = solve_tapa(&problem);
         assert!(ans.is_some());
         let ans = ans.unwrap();
@@ -130,6 +154,35 @@ mod tests {
         ];
         for y in 0..6 {
             for x in 0..7 {
+                assert_eq!(
+                    ans[y][x],
+                    Some(expected[y][x] == 1),
+                    "mismatch at ({}, {})",
+                    y,
+                    x
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn test_tapa_problem2() {
+        let problem = problem_for_tests2();
+        let ans = solve_tapa(&problem);
+        assert!(ans.is_some());
+        let ans = ans.unwrap();
+        let expected = [
+            [1, 1, 1, 0, 0, 0],
+            [1, 0, 1, 1, 1, 0],
+            [0, 0, 0, 0, 1, 0],
+            [1, 0, 1, 1, 1, 1],
+            [1, 0, 0, 0, 0, 1],
+            [1, 1, 1, 0, 1, 1],
+            [1, 0, 0, 0, 0, 1],
+            [1, 1, 1, 1, 1, 1],
+        ];
+        for y in 0..8 {
+            for x in 0..6 {
                 assert_eq!(
                     ans[y][x],
                     Some(expected[y][x] == 1),
