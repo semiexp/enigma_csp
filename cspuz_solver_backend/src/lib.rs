@@ -41,6 +41,8 @@ fn decode_and_solve(url: &[u8]) -> Result<Board, &'static str> {
         puzzle::aqre::solve_aqre(url)
     } else if puzzle_kind == "tapa" {
         puzzle::tapa::solve_tapa(url)
+    } else if puzzle_kind == "simpleloop" {
+        puzzle::simpleloop::solve_simpleloop(url)
     } else {
         Err("unknown puzzle type")
     }

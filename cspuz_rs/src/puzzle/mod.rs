@@ -10,6 +10,7 @@ pub mod masyu;
 pub mod nurikabe;
 pub mod nurimisaki;
 pub mod shakashaka;
+pub mod simpleloop;
 pub mod slalom;
 pub mod slitherlink;
 pub mod star_battle;
