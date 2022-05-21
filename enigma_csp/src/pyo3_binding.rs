@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use pyo3::prelude::*;
 
 use crate::config::Config;
@@ -133,13 +135,30 @@ fn set_config(config: PyConfig) {
 #[pyfunction]
 fn solver(input: String) -> String {
     let mut bytes = input.as_bytes();
-    let res = csugar_cli(&mut bytes, unsafe { GLOBAL_CONFIG.config.clone() });
+    let (res, _) = csugar_cli(&mut bytes, unsafe { GLOBAL_CONFIG.config.clone() });
     res
+}
+
+#[pyfunction]
+fn solver_with_perf(input: String) -> (String, HashMap<String, f64>) {
+    let mut bytes = input.as_bytes();
+    let (res, perf) = csugar_cli(&mut bytes, unsafe { GLOBAL_CONFIG.config.clone() });
+
+    let mut perf_map = HashMap::<String, f64>::new();
+    perf_map.insert(String::from("time_normalize"), perf.time_normalize());
+    perf_map.insert(String::from("time_encode"), perf.time_encode());
+    perf_map.insert(String::from("time_sat_solver"), perf.time_sat_solver());
+    perf_map.insert(String::from("decisions"), perf.decisions() as f64);
+    perf_map.insert(String::from("propagations"), perf.propagations() as f64);
+    perf_map.insert(String::from("conflicts"), perf.conflicts() as f64);
+
+    (res, perf_map)
 }
 
 #[pymodule]
 pub fn enigma_csp(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(solver, m)?)?;
+    m.add_function(wrap_pyfunction!(solver_with_perf, m)?)?;
     m.add_function(wrap_pyfunction!(set_config, m)?)?;
     m.add_class::<PyConfig>()?;
 

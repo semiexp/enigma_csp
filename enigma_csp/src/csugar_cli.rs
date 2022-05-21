@@ -3,13 +3,16 @@ use std::fmt::Write;
 use std::io::BufRead;
 
 use super::config::Config;
-use super::integration::IntegratedSolver;
+use super::integration::{IntegratedSolver, PerfStats};
 use super::parser::{parse, ParseResult, Var, VarMap};
 
-pub fn csugar_cli<R: BufRead>(input: &mut R, config: Config) -> String {
+pub fn csugar_cli<R: BufRead>(input: &mut R, config: Config) -> (String, PerfStats) {
     let mut var_map = VarMap::new();
     let mut solver = IntegratedSolver::new();
     solver.set_config(config);
+
+    let perf_stats = PerfStats::new();
+    solver.set_perf_stats(&perf_stats);
 
     let mut buffer = String::new();
 
@@ -100,5 +103,5 @@ pub fn csugar_cli<R: BufRead>(input: &mut R, config: Config) -> String {
         },
     }
 
-    ret
+    (ret, perf_stats)
 }
