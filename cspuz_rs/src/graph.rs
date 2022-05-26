@@ -84,6 +84,15 @@ pub struct InnerGridEdges<T> {
     pub vertical: T,
 }
 
+impl<T> InnerGridEdges<Vec<Vec<T>>> {
+    pub fn base_shape(&self) -> (usize, usize) {
+        let height = self.vertical.len();
+        assert!(height > 0);
+        let width = self.vertical[0].len() + 1;
+        (height, width)
+    }
+}
+
 pub fn borders_to_rooms(borders: &InnerGridEdges<Vec<Vec<bool>>>) -> Vec<Vec<(usize, usize)>> {
     fn visit(
         y: usize,

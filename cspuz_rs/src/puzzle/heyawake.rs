@@ -9,9 +9,7 @@ pub fn solve_heyawake(
     borders: &graph::InnerGridEdges<Vec<Vec<bool>>>,
     clues: &[Option<i32>],
 ) -> Option<Vec<Vec<Option<bool>>>> {
-    let h = borders.vertical.len();
-    assert!(h > 0);
-    let w = borders.vertical[0].len() + 1;
+    let (h, w) = borders.base_shape();
 
     let mut solver = Solver::new();
     let is_black = &solver.bool_var_2d((h, w));

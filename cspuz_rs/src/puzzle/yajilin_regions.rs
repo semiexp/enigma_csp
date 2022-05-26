@@ -9,9 +9,7 @@ pub fn solve_yajilin_regions(
     borders: &graph::InnerGridEdges<Vec<Vec<bool>>>,
     clues: &[Option<i32>],
 ) -> Option<(graph::BoolGridEdgesIrrefutableFacts, Vec<Vec<Option<bool>>>)> {
-    let h = borders.vertical.len();
-    assert!(h > 0);
-    let w = borders.vertical[0].len() + 1;
+    let (h, w) = borders.base_shape();
 
     let mut solver = Solver::new();
     let is_line = &graph::BoolGridEdges::new(&mut solver, (h - 1, w - 1));
