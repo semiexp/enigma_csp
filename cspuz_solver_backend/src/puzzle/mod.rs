@@ -13,3 +13,4 @@ pub mod slalom;
 pub mod slitherlink;
 pub mod tapa;
 pub mod yajilin;
+pub mod yajilin_regions;

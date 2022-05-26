@@ -43,6 +43,8 @@ fn decode_and_solve(url: &[u8]) -> Result<Board, &'static str> {
         puzzle::tapa::solve_tapa(url)
     } else if puzzle_kind == "simpleloop" {
         puzzle::simpleloop::solve_simpleloop(url)
+    } else if puzzle_kind == "yajilin-regions" {
+        puzzle::yajilin_regions::solve_yajilin_regions(url)
     } else {
         Err("unknown puzzle type")
     }
