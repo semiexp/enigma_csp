@@ -811,7 +811,7 @@ where
     }
 }
 
-fn map_2d<'a, A, B, F>(input: &'a Vec<Vec<A>>, func: F) -> Vec<Vec<B>>
+pub fn map_2d<'a, A, B, F>(input: &'a Vec<Vec<A>>, func: F) -> Vec<Vec<B>>
 where
     F: Fn(&'a A) -> B,
 {

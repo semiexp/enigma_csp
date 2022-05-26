@@ -1019,6 +1019,18 @@ impl<'a> Solver<'a> {
             .for_each(|e| self.solver.add_expr(e.as_expr_array().data));
     }
 
+    pub fn all_different<T>(&mut self, exprs: T)
+    where
+        T: IntoIterator,
+        <T as IntoIterator>::Item: Operand<Output = Array0DImpl<CSPIntExpr>>,
+    {
+        let exprs = exprs
+            .into_iter()
+            .map(|e| e.as_expr_array().data)
+            .collect::<Vec<_>>();
+        self.solver.add_constraint(Stmt::AllDifferent(exprs));
+    }
+
     pub fn add_active_vertices_connected<T>(&mut self, exprs: T, graph: &[(usize, usize)])
     where
         T: IntoIterator,
