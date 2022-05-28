@@ -218,6 +218,25 @@ impl BoolGridEdges {
             self.vertical.at((y, x + 1)),
         ])
     }
+
+    pub fn vertex_neighbors(&self, vertex: (usize, usize)) -> BoolVarArray1D {
+        let (y, x) = vertex;
+        let (h, w) = self.base_shape();
+        let mut ret = vec![];
+        if y > 0 {
+            ret.push(self.vertical.at((y - 1, x)));
+        }
+        if y < h {
+            ret.push(self.vertical.at((y, x)));
+        }
+        if x > 0 {
+            ret.push(self.horizontal.at((y, x - 1)));
+        }
+        if x < w {
+            ret.push(self.horizontal.at((y, x)));
+        }
+        BoolVarArray1D::new(ret)
+    }
 }
 
 impl FromModel for BoolGridEdges {
