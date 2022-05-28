@@ -165,6 +165,51 @@ where
     }
 }
 
+pub struct Tuple3<A, B, C> {
+    a: A,
+    b: B,
+    c: C,
+}
+
+impl<A, B, C> Tuple3<A, B, C> {
+    pub fn new(a: A, b: B, c: C) -> Tuple3<A, B, C> {
+        Tuple3 { a, b, c }
+    }
+}
+
+impl<A, B, C, P, Q, R> Combinator<(P, Q, R)> for Tuple3<A, B, C>
+where
+    A: Combinator<P>,
+    B: Combinator<Q>,
+    C: Combinator<R>,
+    P: Clone,
+    Q: Clone,
+    R: Clone,
+{
+    fn serialize(&self, ctx: &Context, input: &[(P, Q, R)]) -> Option<(usize, Vec<u8>)> {
+        if input.len() == 0 {
+            return None;
+        }
+        let (p, q, r) = input[0].clone();
+        let mut ret = vec![];
+        let (_, app) = self.a.serialize(ctx, &[p])?;
+        ret.extend(app);
+        let (_, app) = self.b.serialize(ctx, &[q])?;
+        ret.extend(app);
+        let (_, app) = self.c.serialize(ctx, &[r])?;
+        ret.extend(app);
+        Some((1, ret))
+    }
+
+    fn deserialize(&self, ctx: &Context, input: &[u8]) -> Option<(usize, Vec<(P, Q, R)>)> {
+        let mut sequencer = Sequencer::new(input);
+        let p = sequencer.deserialize_one_elem(ctx, &self.a)?;
+        let q = sequencer.deserialize_one_elem(ctx, &self.b)?;
+        let r = sequencer.deserialize_one_elem(ctx, &self.c)?;
+        Some((sequencer.n_read(), vec![(p, q, r)]))
+    }
+}
+
 pub struct Choice<T> {
     choices: Vec<Box<dyn Combinator<T>>>,
 }

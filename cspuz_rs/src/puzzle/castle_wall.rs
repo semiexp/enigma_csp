@@ -1,5 +1,9 @@
 use super::util;
 use crate::graph;
+use crate::serializer::{
+    problem_to_url, url_to_problem, Choice, Combinator, Dict, FixedLengthHexInt, Grid, HexInt, Map,
+    Optionalize, Spaces, Tuple3,
+};
 use crate::solver::{Solver, FALSE};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -9,6 +13,25 @@ pub enum Side {
     Outside,
 }
 
+impl Side {
+    fn index(&self) -> i32 {
+        match self {
+            &Side::Unspecified => 0,
+            &Side::Inside => 1,
+            &Side::Outside => 2,
+        }
+    }
+
+    fn from_i32(n: i32) -> Option<Side> {
+        match n {
+            0 => Some(Side::Unspecified),
+            1 => Some(Side::Inside),
+            2 => Some(Side::Outside),
+            _ => None,
+        }
+    }
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Arrow {
     Unspecified(i32),
@@ -16,6 +39,39 @@ pub enum Arrow {
     Down(i32),
     Left(i32),
     Right(i32),
+}
+
+impl Arrow {
+    fn dir(&self) -> i32 {
+        match self {
+            &Arrow::Unspecified(_) => 0,
+            &Arrow::Up(_) => 1,
+            &Arrow::Down(_) => 2,
+            &Arrow::Left(_) => 3,
+            &Arrow::Right(_) => 4,
+        }
+    }
+
+    fn num(&self) -> i32 {
+        match self {
+            &Arrow::Unspecified(n) => n,
+            &Arrow::Up(n) => n,
+            &Arrow::Down(n) => n,
+            &Arrow::Left(n) => n,
+            &Arrow::Right(n) => n,
+        }
+    }
+
+    fn from_dir_and_num(dir: i32, num: i32) -> Option<Arrow> {
+        match dir {
+            0 => Some(Arrow::Unspecified(num)),
+            1 => Some(Arrow::Up(num)),
+            2 => Some(Arrow::Down(num)),
+            3 => Some(Arrow::Left(num)),
+            4 => Some(Arrow::Right(num)),
+            _ => None,
+        }
+    }
 }
 
 pub fn solve_castle_wall(
@@ -126,11 +182,36 @@ pub fn solve_castle_wall(
     solver.irrefutable_facts().map(|f| f.get(is_line))
 }
 
+type Problem = Vec<Vec<Option<(Side, Arrow)>>>;
+
+fn combinator() -> impl Combinator<Problem> {
+    Grid::new(Choice::new(vec![
+        Box::new(Optionalize::new(Map::new(
+            Tuple3::new(
+                FixedLengthHexInt::new(1),
+                FixedLengthHexInt::new(1),
+                Choice::new(vec![Box::new(HexInt), Box::new(Dict::new(-1, "."))]),
+            ),
+            |(side, arrow): (Side, Arrow)| Some((side.index(), arrow.dir(), arrow.num())),
+            |(s, d, n)| Some((Side::from_i32(s)?, Arrow::from_dir_and_num(d, n)?)),
+        ))),
+        Box::new(Spaces::new(None, 'a')),
+    ]))
+}
+
+pub fn serialize_problem(problem: &Problem) -> Option<String> {
+    problem_to_url(combinator(), "castle", problem.clone())
+}
+
+pub fn deserialize_problem(url: &str) -> Option<Problem> {
+    url_to_problem(combinator(), &["castle"], url)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    fn problem_for_tests() -> Vec<Vec<Option<(Side, Arrow)>>> {
+    fn problem_for_tests() -> Problem {
         // https://puzsq.jp/main/puzzle_play.php?pid=7711
         let height = 10;
         let width = 10;
@@ -159,5 +240,13 @@ mod tests {
         assert_eq!(ans.horizontal[4][7], Some(true));
         assert_eq!(ans.horizontal[4][8], Some(false));
         assert_eq!(ans.vertical[3][8], Some(true));
+    }
+
+    #[test]
+    fn test_castle_wall_serializer() {
+        let problem = problem_for_tests();
+        let url =
+            "https://puzz.link/p?castle/10/10/023b022b023v224c032f044p113c044b014w214b014b014e";
+        util::tests::serializer_test(problem, url, serialize_problem, deserialize_problem);
     }
 }
