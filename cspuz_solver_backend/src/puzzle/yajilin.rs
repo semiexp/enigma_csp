@@ -2,7 +2,7 @@ use crate::board::{Board, BoardKind, Item, ItemKind};
 use cspuz_rs::puzzle::yajilin;
 
 pub fn solve_yajilin(url: &str) -> Result<Board, &'static str> {
-    use yajilin::YajilinClue;
+    use cspuz_rs::items::NumberedArrow;
 
     let problem = yajilin::deserialize_problem(url).ok_or("invalid url")?;
     let (is_line, is_black) = yajilin::solve_yajilin(&problem).ok_or("no answer")?;
@@ -23,11 +23,11 @@ pub fn solve_yajilin(url: &str) -> Result<Board, &'static str> {
         for x in 0..width {
             if let Some(clue) = problem[y][x] {
                 let (arrow, n) = match clue {
-                    YajilinClue::Unspecified(n) => (None, n),
-                    YajilinClue::Up(n) => (Some(ItemKind::SideArrowUp), n),
-                    YajilinClue::Down(n) => (Some(ItemKind::SideArrowDown), n),
-                    YajilinClue::Left(n) => (Some(ItemKind::SideArrowLeft), n),
-                    YajilinClue::Right(n) => (Some(ItemKind::SideArrowRight), n),
+                    NumberedArrow::Unspecified(n) => (None, n),
+                    NumberedArrow::Up(n) => (Some(ItemKind::SideArrowUp), n),
+                    NumberedArrow::Down(n) => (Some(ItemKind::SideArrowDown), n),
+                    NumberedArrow::Left(n) => (Some(ItemKind::SideArrowLeft), n),
+                    NumberedArrow::Right(n) => (Some(ItemKind::SideArrowRight), n),
                 };
                 if let Some(arrow) = arrow {
                     board.push(Item::cell(y, x, "black", arrow));

@@ -1,4 +1,5 @@
 use crate::graph::{borders_to_rooms, InnerGridEdges};
+use crate::items::NumberedArrow;
 
 pub fn is_dec(c: u8) -> bool {
     return '0' as u8 <= c && c <= '9' as u8;
@@ -997,6 +998,75 @@ where
     }
 }
 
+pub struct NumberedArrowCombinator;
+
+impl Combinator<NumberedArrow> for NumberedArrowCombinator {
+    fn serialize(&self, _: &Context, input: &[NumberedArrow]) -> Option<(usize, Vec<u8>)> {
+        if input.len() == 0 {
+            return None;
+        }
+        let (dir, n) = match input[0] {
+            NumberedArrow::Unspecified(n) => (0, n),
+            NumberedArrow::Up(n) => (1, n),
+            NumberedArrow::Down(n) => (2, n),
+            NumberedArrow::Left(n) => (3, n),
+            NumberedArrow::Right(n) => (4, n),
+        };
+        if n == -1 {
+            Some((1, vec![dir + ('0' as u8), '.' as u8]))
+        } else if 0 <= n && n < 16 {
+            Some((1, vec![dir + ('0' as u8), to_base16(n)]))
+        } else if 16 <= n && n < 256 {
+            Some((
+                1,
+                vec![dir + ('5' as u8), to_base16(n >> 4), to_base16(n & 15)],
+            ))
+        } else {
+            None
+        }
+    }
+
+    fn deserialize(&self, _: &Context, input: &[u8]) -> Option<(usize, Vec<NumberedArrow>)> {
+        if input.len() < 2 {
+            return None;
+        }
+        let dir = input[0];
+        if !('0' as u8 <= dir && dir <= '9' as u8) {
+            return None;
+        }
+        let dir = dir - '0' as u8;
+        let n;
+        let n_read;
+        {
+            if dir < 5 {
+                if input[1] == '.' as u8 {
+                    n = -1;
+                } else {
+                    n = from_base16(input[1])?;
+                }
+                n_read = 2;
+            } else {
+                if input.len() < 3 {
+                    return None;
+                }
+                n = (from_base16(input[1])? << 4) | from_base16(input[2])?;
+                n_read = 3;
+            }
+        }
+        Some((
+            n_read,
+            vec![match dir % 5 {
+                0 => NumberedArrow::Unspecified(n),
+                1 => NumberedArrow::Up(n),
+                2 => NumberedArrow::Down(n),
+                3 => NumberedArrow::Left(n),
+                4 => NumberedArrow::Right(n),
+                _ => unreachable!(),
+            }],
+        ))
+    }
+}
+
 pub struct Grid<S> {
     base_serializer: S,
 }
@@ -1469,6 +1539,48 @@ mod tests {
                     vec![1, 0, 1, 2]
                 )]
             ))
+        );
+    }
+
+    #[test]
+    fn test_numbered_arrow_combinator() {
+        let ctx = &Context::new();
+        let combinator = NumberedArrowCombinator;
+
+        assert_eq!(combinator.serialize(ctx, &[]), None);
+        assert_eq!(
+            combinator.serialize(ctx, &[NumberedArrow::Up(0)]),
+            Some((1, Vec::from("10")))
+        );
+        assert_eq!(
+            combinator.serialize(ctx, &[NumberedArrow::Down(3)]),
+            Some((1, Vec::from("23")))
+        );
+        assert_eq!(
+            combinator.serialize(ctx, &[NumberedArrow::Left(-1)]),
+            Some((1, Vec::from("3.")))
+        );
+        assert_eq!(
+            combinator.serialize(ctx, &[NumberedArrow::Right(63)]),
+            Some((1, Vec::from("93f")))
+        );
+
+        assert_eq!(combinator.deserialize(ctx, "".as_bytes()), None);
+        assert_eq!(
+            combinator.deserialize(ctx, "105".as_bytes()),
+            Some((2, vec![NumberedArrow::Up(0)]))
+        );
+        assert_eq!(
+            combinator.deserialize(ctx, "23".as_bytes()),
+            Some((2, vec![NumberedArrow::Down(3)]))
+        );
+        assert_eq!(
+            combinator.deserialize(ctx, "3.".as_bytes()),
+            Some((2, vec![NumberedArrow::Left(-1)]))
+        );
+        assert_eq!(
+            combinator.deserialize(ctx, "93f".as_bytes()),
+            Some((3, vec![NumberedArrow::Right(63)]))
         );
     }
 }

@@ -2,7 +2,8 @@ use crate::board::{Board, BoardKind, Item, ItemKind};
 use cspuz_rs::puzzle::castle_wall;
 
 pub fn solve_castle_wall(url: &str) -> Result<Board, &'static str> {
-    use castle_wall::{Arrow, Side};
+    use castle_wall::Side;
+    use cspuz_rs::items::NumberedArrow;
     let problem = castle_wall::deserialize_problem(url).ok_or("invalid url")?;
     let is_line = castle_wall::solve_castle_wall(&problem).ok_or("no answer")?;
 
@@ -31,11 +32,11 @@ pub fn solve_castle_wall(url: &str) -> Result<Board, &'static str> {
                     board.push(Item::cell(y, x, "#cccccc", ItemKind::Fill));
                 }
                 let (arrow, n) = match arrow {
-                    Arrow::Unspecified(n) => (None, n),
-                    Arrow::Up(n) => (Some(ItemKind::SideArrowUp), n),
-                    Arrow::Down(n) => (Some(ItemKind::SideArrowDown), n),
-                    Arrow::Left(n) => (Some(ItemKind::SideArrowLeft), n),
-                    Arrow::Right(n) => (Some(ItemKind::SideArrowRight), n),
+                    NumberedArrow::Unspecified(n) => (None, n),
+                    NumberedArrow::Up(n) => (Some(ItemKind::SideArrowUp), n),
+                    NumberedArrow::Down(n) => (Some(ItemKind::SideArrowDown), n),
+                    NumberedArrow::Left(n) => (Some(ItemKind::SideArrowLeft), n),
+                    NumberedArrow::Right(n) => (Some(ItemKind::SideArrowRight), n),
                 };
                 if n >= 0 {
                     if let Some(arrow) = arrow {

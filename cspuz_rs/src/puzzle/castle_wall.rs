@@ -1,8 +1,9 @@
 use super::util;
 use crate::graph;
+use crate::items::NumberedArrow;
 use crate::serializer::{
-    problem_to_url, url_to_problem, Choice, Combinator, Dict, FixedLengthHexInt, Grid, HexInt, Map,
-    Optionalize, Spaces, Tuple3,
+    problem_to_url, url_to_problem, Choice, Combinator, Dict, Grid, NumberedArrowCombinator,
+    Optionalize, Spaces, Tuple2,
 };
 use crate::solver::{Solver, FALSE};
 
@@ -13,69 +14,8 @@ pub enum Side {
     Outside,
 }
 
-impl Side {
-    fn index(&self) -> i32 {
-        match self {
-            &Side::Unspecified => 0,
-            &Side::Inside => 1,
-            &Side::Outside => 2,
-        }
-    }
-
-    fn from_i32(n: i32) -> Option<Side> {
-        match n {
-            0 => Some(Side::Unspecified),
-            1 => Some(Side::Inside),
-            2 => Some(Side::Outside),
-            _ => None,
-        }
-    }
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Arrow {
-    Unspecified(i32),
-    Up(i32),
-    Down(i32),
-    Left(i32),
-    Right(i32),
-}
-
-impl Arrow {
-    fn dir(&self) -> i32 {
-        match self {
-            &Arrow::Unspecified(_) => 0,
-            &Arrow::Up(_) => 1,
-            &Arrow::Down(_) => 2,
-            &Arrow::Left(_) => 3,
-            &Arrow::Right(_) => 4,
-        }
-    }
-
-    fn num(&self) -> i32 {
-        match self {
-            &Arrow::Unspecified(n) => n,
-            &Arrow::Up(n) => n,
-            &Arrow::Down(n) => n,
-            &Arrow::Left(n) => n,
-            &Arrow::Right(n) => n,
-        }
-    }
-
-    fn from_dir_and_num(dir: i32, num: i32) -> Option<Arrow> {
-        match dir {
-            0 => Some(Arrow::Unspecified(num)),
-            1 => Some(Arrow::Up(num)),
-            2 => Some(Arrow::Down(num)),
-            3 => Some(Arrow::Left(num)),
-            4 => Some(Arrow::Right(num)),
-            _ => None,
-        }
-    }
-}
-
 pub fn solve_castle_wall(
-    clues: &[Vec<Option<(Side, Arrow)>>],
+    clues: &[Vec<Option<(Side, NumberedArrow)>>],
 ) -> Option<graph::BoolGridEdgesIrrefutableFacts> {
     let (h, w) = util::infer_shape(clues);
 
@@ -137,22 +77,22 @@ pub fn solve_castle_wall(
                     }
                 }
                 match arrow {
-                    Arrow::Unspecified(_) => (),
-                    Arrow::Up(n) => {
+                    NumberedArrow::Unspecified(_) => (),
+                    NumberedArrow::Up(n) => {
                         if n >= 0 {
                             solver.add_expr(
                                 is_line.vertical.slice_fixed_x((..y, x)).count_true().eq(n),
                             );
                         }
                     }
-                    Arrow::Down(n) => {
+                    NumberedArrow::Down(n) => {
                         if n >= 0 {
                             solver.add_expr(
                                 is_line.vertical.slice_fixed_x((y.., x)).count_true().eq(n),
                             );
                         }
                     }
-                    Arrow::Left(n) => {
+                    NumberedArrow::Left(n) => {
                         if n >= 0 {
                             solver.add_expr(
                                 is_line
@@ -163,7 +103,7 @@ pub fn solve_castle_wall(
                             );
                         }
                     }
-                    Arrow::Right(n) => {
+                    NumberedArrow::Right(n) => {
                         if n >= 0 {
                             solver.add_expr(
                                 is_line
@@ -182,18 +122,17 @@ pub fn solve_castle_wall(
     solver.irrefutable_facts().map(|f| f.get(is_line))
 }
 
-type Problem = Vec<Vec<Option<(Side, Arrow)>>>;
+type Problem = Vec<Vec<Option<(Side, NumberedArrow)>>>;
 
 fn combinator() -> impl Combinator<Problem> {
     Grid::new(Choice::new(vec![
-        Box::new(Optionalize::new(Map::new(
-            Tuple3::new(
-                FixedLengthHexInt::new(1),
-                FixedLengthHexInt::new(1),
-                Choice::new(vec![Box::new(HexInt), Box::new(Dict::new(-1, "."))]),
-            ),
-            |(side, arrow): (Side, Arrow)| Some((side.index(), arrow.dir(), arrow.num())),
-            |(s, d, n)| Some((Side::from_i32(s)?, Arrow::from_dir_and_num(d, n)?)),
+        Box::new(Optionalize::new(Tuple2::new(
+            Choice::new(vec![
+                Box::new(Dict::new(Side::Unspecified, "0")),
+                Box::new(Dict::new(Side::Inside, "1")),
+                Box::new(Dict::new(Side::Outside, "2")),
+            ]),
+            NumberedArrowCombinator,
         ))),
         Box::new(Spaces::new(None, 'a')),
     ]))
@@ -216,18 +155,18 @@ mod tests {
         let height = 10;
         let width = 10;
         let mut ret = vec![vec![None; width]; height];
-        ret[0][0] = Some((Side::Unspecified, Arrow::Down(3)));
-        ret[0][3] = Some((Side::Unspecified, Arrow::Down(2)));
-        ret[0][6] = Some((Side::Unspecified, Arrow::Down(3)));
-        ret[2][9] = Some((Side::Outside, Arrow::Down(4)));
-        ret[3][3] = Some((Side::Unspecified, Arrow::Left(2)));
-        ret[4][0] = Some((Side::Unspecified, Arrow::Right(4)));
-        ret[5][7] = Some((Side::Inside, Arrow::Up(3)));
-        ret[6][1] = Some((Side::Unspecified, Arrow::Right(4)));
-        ret[6][4] = Some((Side::Unspecified, Arrow::Up(4)));
-        ret[8][8] = Some((Side::Outside, Arrow::Up(4)));
-        ret[9][1] = Some((Side::Unspecified, Arrow::Up(4)));
-        ret[9][4] = Some((Side::Unspecified, Arrow::Up(4)));
+        ret[0][0] = Some((Side::Unspecified, NumberedArrow::Down(3)));
+        ret[0][3] = Some((Side::Unspecified, NumberedArrow::Down(2)));
+        ret[0][6] = Some((Side::Unspecified, NumberedArrow::Down(3)));
+        ret[2][9] = Some((Side::Outside, NumberedArrow::Down(4)));
+        ret[3][3] = Some((Side::Unspecified, NumberedArrow::Left(2)));
+        ret[4][0] = Some((Side::Unspecified, NumberedArrow::Right(4)));
+        ret[5][7] = Some((Side::Inside, NumberedArrow::Up(3)));
+        ret[6][1] = Some((Side::Unspecified, NumberedArrow::Right(4)));
+        ret[6][4] = Some((Side::Unspecified, NumberedArrow::Up(4)));
+        ret[8][8] = Some((Side::Outside, NumberedArrow::Up(4)));
+        ret[9][1] = Some((Side::Unspecified, NumberedArrow::Up(4)));
+        ret[9][4] = Some((Side::Unspecified, NumberedArrow::Up(4)));
         ret
     }
 
