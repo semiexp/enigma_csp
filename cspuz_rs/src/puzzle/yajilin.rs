@@ -29,36 +29,8 @@ pub fn solve_yajilin(
                 solver.add_expr(!is_passed.at((y, x)));
                 solver.add_expr(!is_black.at((y, x)));
 
-                match clue {
-                    NumberedArrow::Unspecified(n) => {
-                        if n >= 0 {
-                            // unimplemented!();
-                        }
-                    }
-                    NumberedArrow::Up(n) => {
-                        if n >= 0 {
-                            solver.add_expr(is_black.slice_fixed_x((..y, x)).count_true().eq(n));
-                        }
-                    }
-                    NumberedArrow::Down(n) => {
-                        if n >= 0 {
-                            solver.add_expr(
-                                is_black.slice_fixed_x(((y + 1).., x)).count_true().eq(n),
-                            );
-                        }
-                    }
-                    NumberedArrow::Left(n) => {
-                        if n >= 0 {
-                            solver.add_expr(is_black.slice_fixed_y((y, ..x)).count_true().eq(n));
-                        }
-                    }
-                    NumberedArrow::Right(n) => {
-                        if n >= 0 {
-                            solver.add_expr(
-                                is_black.slice_fixed_y((y, (x + 1)..)).count_true().eq(n),
-                            );
-                        }
-                    }
+                if let Some(cells) = is_black.pointing_cells((y, x), clue) {
+                    solver.add_expr(cells.count_true().eq(clue.num()));
                 }
             } else {
                 solver.add_expr(is_passed.at((y, x)) ^ is_black.at((y, x)));

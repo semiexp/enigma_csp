@@ -1,5 +1,6 @@
 use std::ops::{Add, BitAnd, BitOr, BitXor, Bound, Not, RangeBounds, Sub};
 
+use crate::items::NumberedArrow;
 pub use enigma_csp::csp::BoolExpr as CSPBoolExpr;
 pub use enigma_csp::csp::BoolVar as CSPBoolVar;
 pub use enigma_csp::csp::IntExpr as CSPIntExpr;
@@ -261,6 +262,21 @@ impl<T: Clone> Value<Array2DImpl<T>> {
 
     pub fn four_neighbors(&self, idx: (usize, usize)) -> Value<Array1DImpl<T>> {
         self.select(self.four_neighbor_indices(idx))
+    }
+
+    pub fn pointing_cells(
+        &self,
+        cell: (usize, usize),
+        arrow: NumberedArrow,
+    ) -> Option<Value<Array1DImpl<T>>> {
+        let (y, x) = cell;
+        match arrow {
+            NumberedArrow::Unspecified(_) => None,
+            NumberedArrow::Up(_) => Some(self.slice_fixed_x((..y, x))),
+            NumberedArrow::Down(_) => Some(self.slice_fixed_x(((y + 1).., x))),
+            NumberedArrow::Left(_) => Some(self.slice_fixed_y((y, ..x))),
+            NumberedArrow::Right(_) => Some(self.slice_fixed_y((y, (x + 1)..))),
+        }
     }
 }
 
