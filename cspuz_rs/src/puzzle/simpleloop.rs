@@ -9,7 +9,7 @@ pub fn solve_simpleloop(is_black: &[Vec<bool>]) -> Option<graph::BoolGridEdgesIr
     let mut parity_diff = 0;
     for y in 0..h {
         for x in 0..w {
-            if is_black[y][x] {
+            if !is_black[y][x] {
                 if (y + x) % 2 == 0 {
                     parity_diff += 1;
                 } else {
