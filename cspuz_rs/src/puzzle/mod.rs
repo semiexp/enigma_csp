@@ -12,6 +12,7 @@ pub mod masyu;
 pub mod nurikabe;
 pub mod nurimisaki;
 pub mod shakashaka;
+pub mod shimaguni;
 pub mod simpleloop;
 pub mod slalom;
 pub mod slitherlink;
