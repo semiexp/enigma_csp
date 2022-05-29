@@ -47,6 +47,8 @@ fn decode_and_solve(url: &[u8]) -> Result<Board, &'static str> {
         puzzle::yajilin_regions::solve_yajilin_regions(url)
     } else if puzzle_kind == "kropki" {
         puzzle::kropki::solve_kropki(url)
+    } else if puzzle_kind == "castle" {
+        puzzle::castle_wall::solve_castle_wall(url)
     } else {
         Err("unknown puzzle type")
     }
