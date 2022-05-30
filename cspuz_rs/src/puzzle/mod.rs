@@ -9,6 +9,7 @@ pub mod heyawake;
 pub mod kropki;
 pub mod lits;
 pub mod masyu;
+pub mod norinori;
 pub mod nurikabe;
 pub mod nurimisaki;
 pub mod shakashaka;
