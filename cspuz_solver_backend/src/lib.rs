@@ -51,6 +51,8 @@ fn decode_and_solve(url: &[u8]) -> Result<Board, &'static str> {
         puzzle::castle_wall::solve_castle_wall(url)
     } else if puzzle_kind == "shimaguni" {
         puzzle::shimaguni::solve_shimaguni(url)
+    } else if puzzle_kind == "norinori" {
+        puzzle::norinori::solve_norinori(url)
     } else {
         Err("unknown puzzle type")
     }
