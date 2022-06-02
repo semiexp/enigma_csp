@@ -1,5 +1,4 @@
 use crate::board::{Board, BoardKind, Item, ItemKind};
-use cspuz_rs::graph;
 use cspuz_rs::puzzle::norinori;
 
 pub fn solve_norinori(url: &str) -> Result<Board, &'static str> {
