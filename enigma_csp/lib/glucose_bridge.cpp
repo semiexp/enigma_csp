@@ -80,4 +80,12 @@ uint64_t Glucose_SolverStats_conflicts(Glucose::Solver* solver) {
     return solver->conflicts;
 }
 
+void Glucose_Set_random_seed(Glucose::Solver* solver, double random_seed) {
+    solver->random_seed = random_seed;
+}
+
+void Glucose_Set_rnd_init_act(Glucose::Solver* solver, int32_t rnd_init_act) {
+    solver->rnd_init_act = rnd_init_act != 0;
+}
+
 }

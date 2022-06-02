@@ -957,6 +957,34 @@ mod tests {
     }
 
     #[test]
+    fn test_integration_seed() {
+        let mut propagations = vec![];
+        for i in 1..=10 {
+            let perf_stats = PerfStats::new();
+            let mut solver = IntegratedSolver::new();
+            solver.set_perf_stats(&perf_stats);
+            solver.sat.set_rnd_init_act(true);
+            solver.sat.set_seed(i as f64 / 10.0);
+
+            let a = solver.new_int_var(Domain::range(0, 5));
+            let b = solver.new_int_var(Domain::range(0, 5));
+            solver.add_expr((a.expr() + b.expr()).ge(IntExpr::Const(4)));
+            solver.add_expr((a.expr() - b.expr()).le(IntExpr::Const(2)));
+
+            let mut propagations_prev = 0;
+            let mut n_ans = 0;
+            for _ in solver.answer_iter(&[], &[a, b]) {
+                assert!(propagations_prev < perf_stats.propagations());
+                propagations_prev = perf_stats.propagations();
+                n_ans += 1;
+            }
+            assert_eq!(n_ans, 21);
+            propagations.push(perf_stats.propagations());
+        }
+        assert!(propagations.iter().any(|&p| p != propagations[0]));
+    }
+
+    #[test]
     fn test_integration_exhaustive_bool1() {
         let mut tester = IntegrationTester::new();
 

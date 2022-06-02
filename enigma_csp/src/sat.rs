@@ -110,6 +110,14 @@ impl SAT {
         self.solver.add_active_vertices_connected(&lits, &edges)
     }
 
+    pub fn set_seed(&mut self, seed: f64) {
+        self.solver.set_seed(seed);
+    }
+
+    pub fn set_rnd_init_act(&mut self, rnd_init_act: bool) {
+        self.solver.set_rnd_init_act(rnd_init_act);
+    }
+
     pub fn solve<'a>(&'a mut self) -> Option<SATModel<'a>> {
         self.solver.solve().map(|model| SATModel { model })
     }

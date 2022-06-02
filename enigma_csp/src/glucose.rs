@@ -32,6 +32,8 @@ extern "C" {
     fn Glucose_SolverStats_decisions(solver: *mut Opaque) -> u64;
     fn Glucose_SolverStats_propagations(solver: *mut Opaque) -> u64;
     fn Glucose_SolverStats_conflicts(solver: *mut Opaque) -> u64;
+    fn Glucose_Set_random_seed(solver: *mut Opaque, random_seed: f64);
+    fn Glucose_Set_rnd_init_act(solver: *mut Opaque, rnd_init_act: i32);
 }
 
 #[derive(Clone, Copy)]
@@ -154,6 +156,18 @@ impl Solver {
             )
         };
         res != 0
+    }
+
+    pub fn set_seed(&mut self, seed: f64) {
+        unsafe {
+            Glucose_Set_random_seed(self.ptr, seed);
+        }
+    }
+
+    pub fn set_rnd_init_act(&mut self, rnd_init_act: bool) {
+        unsafe {
+            Glucose_Set_rnd_init_act(self.ptr, if rnd_init_act { 1 } else { 0 });
+        }
     }
 
     pub fn solve<'a>(&'a mut self) -> Option<Model<'a>> {
