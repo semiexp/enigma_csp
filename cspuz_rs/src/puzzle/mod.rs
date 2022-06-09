@@ -5,6 +5,7 @@ pub mod aqre;
 pub mod araf;
 pub mod castle_wall;
 pub mod compass;
+pub mod coral;
 pub mod heyawake;
 pub mod kropki;
 pub mod lits;
