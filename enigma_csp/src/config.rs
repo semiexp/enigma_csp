@@ -12,6 +12,8 @@ pub struct Config {
     pub native_linear_encoding_domain_product_threshold: usize,
     pub use_direct_encoding: bool,
     pub merge_equivalent_variables: bool,
+    pub glucose_random_seed: Option<f64>,
+    pub glucose_rnd_init_act: bool,
     pub verbose: bool,
 }
 
@@ -26,6 +28,8 @@ impl Config {
             native_linear_encoding_domain_product_threshold: 20,
             use_direct_encoding: true,
             merge_equivalent_variables: false,
+            glucose_random_seed: None,
+            glucose_rnd_init_act: false,
             verbose: false,
         }
     }

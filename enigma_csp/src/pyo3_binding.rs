@@ -112,6 +112,28 @@ impl PyConfig {
     }
 
     #[getter]
+    fn get_glucose_random_seed(&self) -> PyResult<Option<f64>> {
+        Ok(self.config.glucose_random_seed)
+    }
+
+    #[setter]
+    fn set_glucose_random_seed(&mut self, value: Option<f64>) -> PyResult<()> {
+        self.config.glucose_random_seed = value;
+        Ok(())
+    }
+
+    #[getter]
+    fn get_glucose_rnd_init_act(&self) -> PyResult<bool> {
+        Ok(self.config.glucose_rnd_init_act)
+    }
+
+    #[setter]
+    fn set_glucose_rnd_init_act(&mut self, value: bool) -> PyResult<()> {
+        self.config.glucose_rnd_init_act = value;
+        Ok(())
+    }
+
+    #[getter]
     fn get_verbose(&self) -> PyResult<bool> {
         Ok(self.config.verbose)
     }
