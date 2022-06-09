@@ -1121,6 +1121,23 @@ where
         .map(|body| prefix + puzzle_kind + "/" + &body)
 }
 
+pub fn problem_to_url_with_context_and_site<T, C>(
+    combinator: C,
+    puzzle_kind: &str,
+    site: &str,
+    problem: T,
+    ctx: &Context,
+) -> Option<String>
+where
+    C: Combinator<T>,
+{
+    let (_, body) = combinator.serialize(ctx, &[problem])?;
+    let prefix = String::from(site);
+    String::from_utf8(body)
+        .ok()
+        .map(|body| prefix + puzzle_kind + "/" + &body)
+}
+
 pub fn problem_to_url<T, C>(combinator: C, puzzle_kind: &str, problem: T) -> Option<String>
 where
     C: Combinator<T>,
@@ -1134,7 +1151,8 @@ pub fn url_to_puzzle_kind(serialized: &str) -> Option<String> {
         .or(serialized.strip_prefix("https://"))?;
     let serialized = serialized
         .strip_prefix("puzz.link/p?")
-        .or(serialized.strip_prefix("pzv.jp/p.html?"))?;
+        .or(serialized.strip_prefix("pzv.jp/p.html?"))
+        .or(serialized.strip_prefix("pzprxs.vercel.app/p?"))?;
     let pos = serialized.find('/')?;
     let kind = &serialized[0..pos];
     Some(String::from(kind))
@@ -1149,7 +1167,8 @@ where
         .or(serialized.strip_prefix("https://"))?;
     let serialized = serialized
         .strip_prefix("puzz.link/p?")
-        .or(serialized.strip_prefix("pzv.jp/p.html?"))?;
+        .or(serialized.strip_prefix("pzv.jp/p.html?"))
+        .or(serialized.strip_prefix("pzprxs.vercel.app/p?"))?;
     let pos = serialized.find('/')?;
     let kind = &serialized[0..pos];
     if !puzzle_kinds.iter().any(|&k| kind == k) {

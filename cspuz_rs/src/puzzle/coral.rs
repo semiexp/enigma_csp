@@ -1,4 +1,8 @@
 use crate::graph;
+use crate::serializer::{
+    problem_to_url_with_context_and_site, url_to_problem, Choice, Combinator, Context, HexInt,
+    Optionalize, Seq, Size, Spaces,
+};
 use crate::solver::{any, count_true, BoolVarArray1D, Solver, TRUE};
 
 pub fn solve_coral(
@@ -56,6 +60,121 @@ pub fn solve_coral(
     solver.irrefutable_facts().map(|f| f.get(is_black))
 }
 
+type Problem = (Vec<Option<Vec<i32>>>, Vec<Option<Vec<i32>>>);
+struct CoralCombinator;
+
+impl Combinator<Problem> for CoralCombinator {
+    fn serialize(&self, ctx: &Context, input: &[Problem]) -> Option<(usize, Vec<u8>)> {
+        if input.len() == 0 {
+            return None;
+        }
+
+        let (clue_vertical, clue_horizontal) = &input[0];
+        let h = ctx.height?;
+        let w = ctx.width?;
+        let mut seq = vec![];
+        for i in 0..w {
+            let n_filled = if let Some(clue) = &clue_vertical[i] {
+                for c in clue {
+                    seq.push(Some(*c));
+                }
+                clue.len()
+            } else {
+                0
+            };
+            let n_pad = (h + 1) / 2 - n_filled;
+            for _ in 0..n_pad {
+                seq.push(None);
+            }
+        }
+        for i in 0..h {
+            let n_filled = if let Some(clue) = &clue_horizontal[i] {
+                for c in clue {
+                    seq.push(Some(*c));
+                }
+                clue.len()
+            } else {
+                0
+            };
+            let n_pad = (w + 1) / 2 - n_filled;
+            for _ in 0..n_pad {
+                seq.push(None);
+            }
+        }
+        let sub = Seq::new(
+            Choice::new(vec![
+                Box::new(Optionalize::new(HexInt)),
+                Box::new(Spaces::new(None, 'g')),
+            ]),
+            seq.len(),
+        );
+        sub.serialize(ctx, &[seq])
+    }
+
+    fn deserialize(&self, ctx: &Context, input: &[u8]) -> Option<(usize, Vec<Problem>)> {
+        let h = ctx.height?;
+        let w = ctx.width?;
+        let base_seq_len = ((h + 1) / 2) * w + ((w + 1) / 2) * h;
+        let sub = Seq::new(
+            Choice::new(vec![
+                Box::new(Optionalize::new(HexInt)),
+                Box::new(Spaces::new(None, 'g')),
+            ]),
+            base_seq_len,
+        );
+        let (n_read, seq) = sub.deserialize(ctx, input)?;
+        assert_eq!(seq.len(), 1);
+        let seq = &seq[0];
+        let mut pos = 0;
+
+        let mut clue_vertical = vec![];
+        for _ in 0..w {
+            let cs = &seq[pos..(pos + (h + 1) / 2)];
+            let cs = cs.iter().filter_map(|&x| x).collect::<Vec<_>>();
+            if cs.is_empty() {
+                clue_vertical.push(None);
+            } else {
+                clue_vertical.push(Some(cs));
+            }
+            pos += (h + 1) / 2;
+        }
+
+        let mut clue_horizontal = vec![];
+        for _ in 0..h {
+            let cs = &seq[pos..(pos + (w + 1) / 2)];
+            let cs = cs.iter().filter_map(|&x| x).collect::<Vec<_>>();
+            if cs.is_empty() {
+                clue_horizontal.push(None);
+            } else {
+                clue_horizontal.push(Some(cs));
+            }
+            pos += (w + 1) / 2;
+        }
+
+        Some((n_read, vec![(clue_vertical, clue_horizontal)]))
+    }
+}
+
+fn combinator() -> impl Combinator<Problem> {
+    Size::new(CoralCombinator)
+}
+
+pub fn serialize_problem(problem: &Problem) -> Option<String> {
+    let height = problem.1.len();
+    let width = problem.0.len();
+    problem_to_url_with_context_and_site(
+        combinator(),
+        "coral",
+        "https://pzprxs.vercel.app/p?",
+        problem.clone(),
+        &Context::sized(height, width),
+    )
+}
+
+pub fn deserialize_problem(url: &str) -> Option<Problem> {
+    url_to_problem(combinator(), &["coral"], url)
+}
+
 fn add_coral_clue(solver: &mut Solver, cells: &BoolVarArray1D, clue: &Vec<i32>) -> bool {
     let n = cells.len();
     let ord = solver.int_var_1d(n, 0, clue.len() as i32);
@@ -107,12 +226,13 @@ fn add_coral_clue(solver: &mut Solver, cells: &BoolVarArray1D, clue: &Vec<i32>) 
 
 #[cfg(test)]
 mod tests {
+    use super::super::util;
     use super::*;
 
     fn problem_for_tests() -> (Vec<Option<Vec<i32>>>, Vec<Option<Vec<i32>>>) {
         let clue_vertical = vec![
             Some(vec![1]),
-            Some(vec![1, 1, 3]),
+            Some(vec![3, 1, 1]),
             Some(vec![3, 3]),
             None,
             None,
@@ -120,9 +240,9 @@ mod tests {
         ];
         let clue_horizontal = vec![
             None,
-            Some(vec![1, 2]),
-            Some(vec![1, 2]),
-            Some(vec![1, 2]),
+            Some(vec![2, 1]),
+            Some(vec![2, 1]),
+            Some(vec![2, 1]),
             Some(vec![3]),
             None,
             Some(vec![2]),
@@ -149,5 +269,12 @@ mod tests {
         let expected =
             expected_base.map(|row| row.iter().map(|&n| Some(n == 1)).collect::<Vec<_>>());
         assert_eq!(ans, expected);
+    }
+
+    #[test]
+    fn test_coral_serializer() {
+        let problem = problem_for_tests();
+        let url = "https://pzprxs.vercel.app/p?coral/6/7/1i311g33p111j21g21g21g3k2h";
+        util::tests::serializer_test(problem, url, serialize_problem, deserialize_problem);
     }
 }
