@@ -8,6 +8,7 @@ pub use enigma_csp::csp::IntVar as CSPIntVar;
 use enigma_csp::csp::{Assignment, Domain, Stmt};
 use enigma_csp::integration::IntegratedSolver;
 use enigma_csp::integration::Model as IntegratedModel;
+pub use enigma_csp::integration::PerfStats;
 
 #[derive(Clone)]
 pub struct Value<T>(T);
@@ -1063,6 +1064,10 @@ impl<'a> Solver<'a> {
             .add_constraint(Stmt::ActiveVerticesConnected(vertices, graph.to_owned()));
     }
 
+    pub fn set_perf_stats<'b: 'a>(&mut self, perf_stats: &'b PerfStats) {
+        self.solver.set_perf_stats(perf_stats);
+    }
+
     pub fn add_answer_key_bool<T>(&mut self, keys: T)
     where
         T: IntoIterator,
@@ -1079,6 +1084,10 @@ impl<'a> Solver<'a> {
     {
         self.answer_key_int
             .extend(keys.into_iter().map(|x| x.deref_var().0.data))
+    }
+
+    pub fn encode(&mut self) -> bool {
+        self.solver.encode()
     }
 
     pub fn solve<'b>(&'b mut self) -> Option<Model<'b>> {

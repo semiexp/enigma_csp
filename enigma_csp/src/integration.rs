@@ -106,7 +106,7 @@ impl<'a> IntegratedSolver<'a> {
         self.add_constraint(Stmt::Expr(expr))
     }
 
-    pub fn solve<'b>(&'b mut self) -> Option<Model<'b>> {
+    pub fn encode(&mut self) -> bool {
         let is_first = !self.already_used;
         self.already_used = true;
 
@@ -118,7 +118,7 @@ impl<'a> IntegratedSolver<'a> {
         }
 
         if self.csp.is_inconsistent() {
-            return None;
+            return false;
         }
 
         let start = std::time::Instant::now();
@@ -138,7 +138,7 @@ impl<'a> IntegratedSolver<'a> {
             self.norm.refine_domain();
         }
         if self.norm.is_inconsistent() {
-            return None;
+            return false;
         }
 
         let start = std::time::Instant::now();
@@ -153,7 +153,25 @@ impl<'a> IntegratedSolver<'a> {
                 .time_encode
                 .set(perf_stats.time_encode() + start.elapsed().as_secs_f64());
         }
+        let solver_stats = self.sat.stats();
+        if let Some(perf_stats) = self.perf_stats {
+            if let Some(decisions) = solver_stats.decisions {
+                perf_stats.decisions.set(decisions);
+            }
+            if let Some(propagations) = solver_stats.propagations {
+                perf_stats.propagations.set(propagations);
+            }
+            if let Some(conflicts) = solver_stats.conflicts {
+                perf_stats.conflicts.set(conflicts);
+            }
+        }
+        true
+    }
 
+    pub fn solve<'b>(&'b mut self) -> Option<Model<'b>> {
+        if !self.encode() {
+            return None;
+        }
         let start = std::time::Instant::now();
         let solver_result = if self.sat.solve_without_model() {
             Some(unsafe { self.sat.model() })
