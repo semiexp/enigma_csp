@@ -6,6 +6,7 @@ pub mod compass;
 pub mod coral;
 pub mod heyawake;
 pub mod kropki;
+pub mod kurotto;
 pub mod lits;
 pub mod masyu;
 pub mod norinori;
