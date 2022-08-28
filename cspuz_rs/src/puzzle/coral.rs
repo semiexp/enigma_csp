@@ -43,6 +43,22 @@ pub fn solve_coral(
     aux_vertices.push(TRUE);
     graph::active_vertices_connected(&mut solver, &aux_vertices, &aux_graph);
 
+    for y in 0..(h - 1) {
+        for x in 0..(w - 1) {
+            solver.add_expr(
+                !(is_black.at((y, x))
+                    & !(is_black.at((y, x + 1)))
+                    & !(is_black.at((y + 1, x)))
+                    & is_black.at((y + 1, x + 1))),
+            );
+            solver.add_expr(
+                !(!(is_black.at((y, x)))
+                    & is_black.at((y, x + 1))
+                    & is_black.at((y + 1, x))
+                    & !(is_black.at((y + 1, x + 1)))),
+            );
+        }
+    }
     for y in 0..h {
         if let Some(clue) = &clue_horizontal[y] {
             if !add_coral_clue(&mut solver, &is_black.slice_fixed_y((y, ..)), clue) {
