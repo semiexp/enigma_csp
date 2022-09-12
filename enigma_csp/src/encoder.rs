@@ -183,16 +183,9 @@ impl EncodeMap {
                     self.int_map[var] =
                         Some(Encoding::order_encoding(OrderEncoding { domain, lits }));
                 }
-                &IntVarRepresentation::Binary(cond, t, f) => {
-                    let domain;
-                    let lits;
-                    if f <= t {
-                        domain = vec![f, t];
-                        lits = vec![self.convert_bool_var(norm_vars, sat, cond)];
-                    } else {
-                        domain = vec![t, f];
-                        lits = vec![!self.convert_bool_var(norm_vars, sat, cond)];
-                    }
+                &IntVarRepresentation::Binary(cond, f, t) => {
+                    let domain = vec![f, t];
+                    let lits = vec![self.convert_bool_lit(norm_vars, sat, cond)];
                     self.int_map[var] =
                         Some(Encoding::order_encoding(OrderEncoding { domain, lits }));
                 }
@@ -222,17 +215,10 @@ impl EncodeMap {
                     self.int_map[var] =
                         Some(Encoding::direct_encoding(DirectEncoding { domain, lits }));
                 }
-                &IntVarRepresentation::Binary(cond, t, f) => {
-                    let c = self.convert_bool_var(norm_vars, sat, cond);
-                    let domain;
-                    let lits;
-                    if f <= t {
-                        domain = vec![f, t];
-                        lits = vec![!c, c];
-                    } else {
-                        domain = vec![t, f];
-                        lits = vec![c, !c];
-                    }
+                &IntVarRepresentation::Binary(cond, f, t) => {
+                    let c = self.convert_bool_lit(norm_vars, sat, cond);
+                    let domain = vec![f, t];
+                    let lits = vec![!c, c];
                     self.int_map[var] =
                         Some(Encoding::direct_encoding(DirectEncoding { domain, lits }));
                 }

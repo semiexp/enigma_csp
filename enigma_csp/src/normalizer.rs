@@ -477,16 +477,15 @@ fn normalize_int_expr(env: &mut NormalizerEnv, expr: &IntExpr) -> LinearSum {
                 match c.as_ref() {
                     &BoolExpr::Var(c) => {
                         let c = env.convert_bool_var(c);
-                        let v;
-                        if c.negated {
-                            v = env.norm.new_binary_int_var(c.var, val_false, val_true);
-                        } else {
-                            v = env.norm.new_binary_int_var(c.var, val_true, val_false);
-                        }
+                        let v = env.norm.new_binary_int_var(c, val_true, val_false);
                         return LinearSum::singleton(v);
                     }
                     &BoolExpr::NVar(c) => {
-                        let v = env.norm.new_binary_int_var(c, val_true, val_false);
+                        let v = env.norm.new_binary_int_var(
+                            NBoolLit::new(c, false),
+                            val_true,
+                            val_false,
+                        );
                         return LinearSum::singleton(v);
                     }
                     _ => {
@@ -497,7 +496,11 @@ fn normalize_int_expr(env: &mut NormalizerEnv, expr: &IntExpr) -> LinearSum {
                             env.norm.add_constraint(c);
                         }
 
-                        let v = env.norm.new_binary_int_var(b, val_true, val_false);
+                        let v = env.norm.new_binary_int_var(
+                            NBoolLit::new(b, false),
+                            val_true,
+                            val_false,
+                        );
                         return LinearSum::singleton(v);
                     }
                 }

@@ -142,7 +142,7 @@ impl Constraint {
 
 pub(super) enum IntVarRepresentation {
     Domain(super::csp::Domain),
-    Binary(BoolVar, CheckedInt, CheckedInt), // condition, true, false
+    Binary(BoolLit, CheckedInt, CheckedInt), // condition, false, true (order encoding)
 }
 
 impl IntVarRepresentation {
@@ -353,12 +353,17 @@ impl NormCSP {
 
     pub fn new_binary_int_var(
         &mut self,
-        cond: BoolVar,
+        cond: BoolLit,
         val_true: CheckedInt,
         val_false: CheckedInt,
     ) -> IntVar {
-        self.vars
-            .new_int_var(IntVarRepresentation::Binary(cond, val_true, val_false))
+        if val_true < val_false {
+            self.vars
+                .new_int_var(IntVarRepresentation::Binary(!cond, val_true, val_false))
+        } else {
+            self.vars
+                .new_int_var(IntVarRepresentation::Binary(cond, val_false, val_true))
+        }
     }
 
     pub fn add_constraint(&mut self, constraint: Constraint) {
