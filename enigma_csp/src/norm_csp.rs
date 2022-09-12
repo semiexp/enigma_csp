@@ -146,6 +146,7 @@ pub(super) enum IntVarRepresentation {
 }
 
 impl IntVarRepresentation {
+    #[allow(dead_code)]
     pub(super) fn is_domain(&self) -> bool {
         match self {
             IntVarRepresentation::Domain(_) => true,

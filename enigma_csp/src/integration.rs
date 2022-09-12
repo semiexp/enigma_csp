@@ -406,6 +406,10 @@ mod tests {
             }
         }
 
+        fn set_config(&mut self, config: Config) {
+            self.solver.set_config(config);
+        }
+
         fn new_bool_var(&mut self) -> BoolVar {
             let ret = self.solver.new_bool_var();
             self.bool_vars.push(ret);
@@ -1226,6 +1230,24 @@ mod tests {
             x.expr()
                 .ite(IntExpr::Const(1), IntExpr::Const(0))
                 .eq(IntExpr::Const(1)),
+        );
+
+        tester.check();
+    }
+
+    #[test]
+    fn test_integration_exhaustive_binary4() {
+        let mut tester = IntegrationTester::new();
+        let mut config = Config::default();
+        config.direct_encoding_for_binary_vars = true;
+        tester.set_config(config);
+
+        let x = tester.new_bool_var();
+        tester.add_expr(
+            x.expr()
+                .ite(IntExpr::Const(1), IntExpr::Const(0))
+                .eq(IntExpr::Const(1))
+                | x.expr(),
         );
 
         tester.check();
