@@ -50,7 +50,7 @@ impl<'a> SyntaxTree<'a> {
 }
 
 fn is_ident_char(c: char) -> bool {
-    c.is_alphanumeric() || c == '[' || c == ']'
+    c.is_alphanumeric() || c == '[' || c == ']' || c == '_'
 }
 
 fn parse_to_tree(input: &str) -> Result<SyntaxTree, nom::error::Error<&str>> {
