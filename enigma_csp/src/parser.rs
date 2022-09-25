@@ -3,8 +3,8 @@ use std::collections::{btree_map, BTreeMap};
 
 use nom::{
     branch::alt,
-    bytes::complete::tag,
-    character::complete::{alpha1, alphanumeric0, digit1},
+    bytes::complete::{tag, take_while},
+    character::complete::{alpha1, digit1},
     combinator::{eof, map, recognize},
     multi::separated_list0,
     sequence::{delimited, pair, preceded, terminated},
@@ -49,9 +49,13 @@ impl<'a> SyntaxTree<'a> {
     }
 }
 
+fn is_ident_char(c: char) -> bool {
+    c.is_alphanumeric() || c == '[' || c == ']'
+}
+
 fn parse_to_tree(input: &str) -> Result<SyntaxTree, nom::error::Error<&str>> {
     fn rec_parser(input: &str) -> IResult<&str, SyntaxTree> {
-        let ident_or_op = recognize(pair(alpha1, alphanumeric0));
+        let ident_or_op = recognize(pair(alpha1, take_while(is_ident_char)));
         let op = alt((
             tag("&&"),
             tag("||"),
