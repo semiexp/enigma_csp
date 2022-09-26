@@ -71,6 +71,7 @@ fn parse_to_tree(input: &str) -> Result<SyntaxTree, nom::error::Error<&str>> {
             tag(">"),
             tag("+"),
             tag("-"),
+            tag("*"),
         ));
         alt((
             delimited(
@@ -279,6 +280,17 @@ fn parse_int_expr(var_map: &VarMap, tree: &SyntaxTree) -> IntExpr {
                     IntExpr::Linear(vec![(Box::new(parse_int_expr(var_map, &child[1])), -1)])
                 } else {
                     parse_int_expr(var_map, &child[1]) - parse_int_expr(var_map, &child[2])
+                }
+            } else if op_name == "*" || op_name == "mul" {
+                assert!(child.len() == 3);
+                let lhs = parse_int_expr(var_map, &child[1]);
+                let rhs = parse_int_expr(var_map, &child[2]);
+                if let IntExpr::Const(c) = lhs {
+                    IntExpr::Linear(vec![(Box::new(rhs), c)])
+                } else if let IntExpr::Const(c) = rhs {
+                    IntExpr::Linear(vec![(Box::new(lhs), c)])
+                } else {
+                    panic!("mul operators whose both operands are non-const are not supported")
                 }
             } else if op_name == "if" {
                 assert_eq!(child.len(), 4);
