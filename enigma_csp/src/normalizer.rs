@@ -72,7 +72,8 @@ impl NormalizeMap {
         match self.int_map[var] {
             Some(x) => x,
             None => {
-                let ret = norm.new_int_var(csp_vars.int_var(var).domain.clone());
+                let var_desc = csp_vars.int_var(var);
+                let ret = norm.new_int_var(var_desc.domain.clone(), var_desc.domain_list.clone());
                 self.int_map[var] = Some(ret);
                 ret
             }
@@ -507,7 +508,7 @@ fn normalize_int_expr(env: &mut NormalizerEnv, expr: &IntExpr) -> LinearSum {
             }
 
             let dom = env.norm.get_domain_linear_sum(&t) | env.norm.get_domain_linear_sum(&f);
-            let v = env.norm.new_int_var(dom);
+            let v = env.norm.new_int_var(dom, None);
 
             let mut constr1 = normalize_bool_expr(env, c, false);
             {
@@ -653,8 +654,12 @@ mod tests {
                     IntVarRepresentation::Binary(_, t, f) => {
                         unfixed_int_domains.push(vec![(*t).min(*f), (*t).max(*f)]);
                     }
-                    &IntVarRepresentation::Domain(domain) => {
-                        unfixed_int_domains.push(domain.enumerate());
+                    &IntVarRepresentation::Domain(domain, domain_list) => {
+                        if let Some(l) = domain_list {
+                            unfixed_int_domains.push(l.clone());
+                        } else {
+                            unfixed_int_domains.push(domain.enumerate());
+                        }
                     }
                 }
             }

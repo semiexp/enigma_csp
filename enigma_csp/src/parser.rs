@@ -105,6 +105,7 @@ pub enum Var {
 pub enum ParseResult<'a> {
     BoolVarDecl(&'a str),
     IntVarDecl(&'a str, Domain),
+    IntVarWithListDomDecl(&'a str, Vec<i32>),
     Stmt(Stmt),
 }
 
@@ -147,11 +148,23 @@ pub fn parse<'a, 'b>(var_map: &'a VarMap, input: &'b str) -> ParseResult<'b> {
         let var_name = child[1].as_ident();
         ParseResult::BoolVarDecl(var_name)
     } else if op_name == "int" {
-        assert_eq!(child.len(), 4);
-        let var_name = child[1].as_ident();
-        let low = child[2].as_int();
-        let high = child[3].as_int();
-        ParseResult::IntVarDecl(var_name, Domain::range(low, high))
+        if child.len() == 4 {
+            let var_name = child[1].as_ident();
+            let low = child[2].as_int();
+            let high = child[3].as_int();
+            ParseResult::IntVarDecl(var_name, Domain::range(low, high))
+        } else if child.len() == 3 {
+            let var_name = child[1].as_ident();
+            match &child[2] {
+                SyntaxTree::Node(child) => {
+                    let domain = child.iter().map(|x| x.as_int()).collect::<Vec<_>>();
+                    ParseResult::IntVarWithListDomDecl(var_name, domain)
+                }
+                _ => panic!(),
+            }
+        } else {
+            panic!();
+        }
     } else if op_name == "alldifferent" {
         let exprs = child[1..]
             .iter()

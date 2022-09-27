@@ -98,6 +98,14 @@ impl<'a> IntegratedSolver<'a> {
         self.csp.new_int_var(domain)
     }
 
+    pub fn new_int_var_from_list(&mut self, domain_list: Vec<i32>) -> IntVar {
+        let domain_list = domain_list
+            .into_iter()
+            .map(CheckedInt::new)
+            .collect::<Vec<_>>();
+        self.csp.new_int_var_from_list(domain_list)
+    }
+
     pub fn add_constraint(&mut self, stmt: Stmt) {
         self.csp.add_constraint(stmt)
     }
@@ -389,11 +397,16 @@ mod tests {
     use super::*;
     use crate::util;
 
+    enum DomainOrList {
+        Domain(Domain),
+        DomainList(Vec<CheckedInt>),
+    }
+
     struct IntegrationTester<'a> {
         original_constr: Vec<Stmt>,
         solver: IntegratedSolver<'a>,
         bool_vars: Vec<BoolVar>,
-        int_vars: Vec<(IntVar, Domain)>,
+        int_vars: Vec<(IntVar, DomainOrList)>,
     }
 
     impl<'a> IntegrationTester<'a> {
@@ -418,7 +431,17 @@ mod tests {
 
         fn new_int_var(&mut self, domain: Domain) -> IntVar {
             let ret = self.solver.new_int_var(domain.clone());
-            self.int_vars.push((ret, domain));
+            self.int_vars.push((ret, DomainOrList::Domain(domain)));
+            ret
+        }
+
+        fn new_int_var_from_list(&mut self, domain_list: Vec<i32>) -> IntVar {
+            let l = domain_list
+                .iter()
+                .map(|&x| CheckedInt::new(x))
+                .collect::<Vec<_>>();
+            let ret = self.solver.new_int_var_from_list(domain_list);
+            self.int_vars.push((ret, DomainOrList::DomainList(l)));
             ret
         }
 
@@ -438,7 +461,10 @@ mod tests {
             }
             let mut int_domains = vec![];
             for (_, domain) in &self.int_vars {
-                int_domains.push(domain.enumerate());
+                int_domains.push(match domain {
+                    DomainOrList::Domain(dom) => dom.enumerate(),
+                    DomainOrList::DomainList(list) => list.clone(),
+                });
             }
 
             let mut n_assignment_expected = 0;
@@ -1260,6 +1286,19 @@ mod tests {
         let a = tester.new_int_var(Domain::range(0, 3));
         let b = tester.new_int_var(Domain::range(0, 3));
         let c = tester.new_int_var(Domain::range(1, 4));
+        tester.add_constraint(Stmt::AllDifferent(vec![a.expr(), b.expr(), c.expr()]));
+        tester.add_expr((a.expr() + b.expr()).ge(c.expr()));
+
+        tester.check();
+    }
+
+    #[test]
+    fn test_integration_domain_list1() {
+        let mut tester = IntegrationTester::new();
+
+        let a = tester.new_int_var_from_list(vec![0, 1, 2, 3, 5]);
+        let b = tester.new_int_var_from_list(vec![0, 1, 3, 4, 5]);
+        let c = tester.new_int_var_from_list(vec![0, 2, 3, 4, 5]);
         tester.add_constraint(Stmt::AllDifferent(vec![a.expr(), b.expr(), c.expr()]));
         tester.add_expr((a.expr() + b.expr()).ge(c.expr()));
 

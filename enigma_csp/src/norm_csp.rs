@@ -141,7 +141,7 @@ impl Constraint {
 }
 
 pub(super) enum IntVarRepresentation {
-    Domain(super::csp::Domain),
+    Domain(super::csp::Domain, Option<Vec<CheckedInt>>),
     Binary(BoolLit, CheckedInt, CheckedInt), // condition, false, true (order encoding)
 }
 
@@ -149,7 +149,7 @@ impl IntVarRepresentation {
     #[allow(dead_code)]
     pub(super) fn is_domain(&self) -> bool {
         match self {
-            IntVarRepresentation::Domain(_) => true,
+            IntVarRepresentation::Domain(_, _) => true,
             _ => false,
         }
     }
@@ -157,21 +157,21 @@ impl IntVarRepresentation {
     #[allow(dead_code)]
     fn as_domain(&self) -> &super::csp::Domain {
         match self {
-            IntVarRepresentation::Domain(domain) => domain,
+            IntVarRepresentation::Domain(domain, _) => domain,
             _ => panic!(),
         }
     }
 
     pub(super) fn lower_bound_checked(&self) -> CheckedInt {
         match self {
-            IntVarRepresentation::Domain(domain) => domain.lower_bound_checked(),
+            IntVarRepresentation::Domain(domain, _) => domain.lower_bound_checked(),
             IntVarRepresentation::Binary(_, t, f) => (*t).min(*f),
         }
     }
 
     pub(super) fn upper_bound_checked(&self) -> CheckedInt {
         match self {
-            IntVarRepresentation::Domain(domain) => domain.upper_bound_checked(),
+            IntVarRepresentation::Domain(domain, _) => domain.upper_bound_checked(),
             IntVarRepresentation::Binary(_, t, f) => (*t).max(*f),
         }
     }
@@ -215,7 +215,7 @@ impl NormCSPVars {
 
         for (var, coef) in &linear_sum.term {
             match self.int_var(*var) {
-                IntVarRepresentation::Domain(dom) => ret = ret + dom.clone() * *coef,
+                IntVarRepresentation::Domain(dom, _) => ret = ret + dom.clone() * *coef,
                 IntVarRepresentation::Binary(_, t, f) => {
                     let dom = Domain::range(t.min(f).get(), t.max(f).get());
                     ret = ret + dom * *coef;
@@ -307,7 +307,7 @@ impl NormCSPVars {
                 range = range | self.refine_var(linear_lit.op, &linear_lit.sum, v);
             }
 
-            if let IntVarRepresentation::Domain(domain) = &mut self.int_var[v.0] {
+            if let IntVarRepresentation::Domain(domain, _) = &mut self.int_var[v.0] {
                 status |= domain.refine_lower_bound(range.low);
                 status |= domain.refine_upper_bound(range.high);
             }
@@ -348,8 +348,13 @@ impl NormCSP {
         BoolVar(id)
     }
 
-    pub fn new_int_var(&mut self, domain: super::csp::Domain) -> IntVar {
-        self.vars.new_int_var(IntVarRepresentation::Domain(domain))
+    pub fn new_int_var(
+        &mut self,
+        domain: super::csp::Domain,
+        domain_list: Option<Vec<CheckedInt>>,
+    ) -> IntVar {
+        self.vars
+            .new_int_var(IntVarRepresentation::Domain(domain, domain_list))
     }
 
     pub fn new_binary_int_var(
@@ -478,9 +483,9 @@ mod tests {
     fn test_norm_csp_refinement1() {
         let mut norm_csp = NormCSP::new();
 
-        let a = norm_csp.new_int_var(Domain::range(0, 100));
-        let b = norm_csp.new_int_var(Domain::range(0, 90));
-        let c = norm_csp.new_int_var(Domain::range(0, 80));
+        let a = norm_csp.new_int_var(Domain::range(0, 100), None);
+        let b = norm_csp.new_int_var(Domain::range(0, 90), None);
+        let c = norm_csp.new_int_var(Domain::range(0, 80), None);
 
         let mut constraint = Constraint::new();
         constraint.add_linear(LinearLit::new(
@@ -522,8 +527,8 @@ mod tests {
     fn test_norm_csp_refinement2() {
         let mut norm_csp = NormCSP::new();
 
-        let a = norm_csp.new_int_var(Domain::range(0, 100));
-        let b = norm_csp.new_int_var(Domain::range(-10, 90));
+        let a = norm_csp.new_int_var(Domain::range(0, 100), None);
+        let b = norm_csp.new_int_var(Domain::range(-10, 90), None);
 
         let mut constraint = Constraint::new();
         constraint.add_linear(LinearLit::new(
@@ -557,9 +562,9 @@ mod tests {
     fn test_norm_csp_refinement3() {
         let mut norm_csp = NormCSP::new();
 
-        let a = norm_csp.new_int_var(Domain::range(1, 2));
-        let b = norm_csp.new_int_var(Domain::range(3, 4));
-        let c = norm_csp.new_int_var(Domain::range(7, 8));
+        let a = norm_csp.new_int_var(Domain::range(1, 2), None);
+        let b = norm_csp.new_int_var(Domain::range(3, 4), None);
+        let c = norm_csp.new_int_var(Domain::range(7, 8), None);
 
         let mut constraint1 = Constraint::new();
         constraint1.add_linear(LinearLit::new(

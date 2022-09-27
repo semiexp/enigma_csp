@@ -145,12 +145,14 @@ impl BoolVarData {
 
 pub(super) struct IntVarData {
     pub(super) domain: Domain,
+    pub(super) domain_list: Option<Vec<CheckedInt>>,
 }
 
 impl IntVarData {
-    fn new(domain: Domain) -> IntVarData {
+    fn new(domain: Domain, domain_list: Option<Vec<CheckedInt>>) -> IntVarData {
         IntVarData {
-            domain: domain.clone(),
+            domain,
+            domain_list,
         }
     }
 }
@@ -452,7 +454,22 @@ impl CSP {
 
     pub fn new_int_var(&mut self, domain: Domain) -> IntVar {
         let id = self.vars.int_var.len();
-        self.vars.int_var.push(IntVarData::new(domain));
+        self.vars.int_var.push(IntVarData::new(domain, None));
+        IntVar::new(id)
+    }
+
+    pub fn new_int_var_from_list(&mut self, domain_list: Vec<CheckedInt>) -> IntVar {
+        assert!(domain_list.len() > 0);
+        let mut domain_list = domain_list;
+        domain_list.sort();
+        let domain = Domain {
+            low: domain_list[0],
+            high: domain_list[domain_list.len() - 1],
+        };
+        let id = self.vars.int_var.len();
+        self.vars
+            .int_var
+            .push(IntVarData::new(domain, Some(domain_list)));
         IntVar::new(id)
     }
 

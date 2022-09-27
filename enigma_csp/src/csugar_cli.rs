@@ -49,6 +49,10 @@ pub fn csugar_cli<R: BufRead>(input: &mut R, config: Config) -> (String, PerfSta
                 let var = solver.new_int_var(domain);
                 var_map.add_int_var(name, var);
             }
+            ParseResult::IntVarWithListDomDecl(name, domain_list) => {
+                let var = solver.new_int_var_from_list(domain_list);
+                var_map.add_int_var(name, var);
+            }
             ParseResult::Stmt(stmt) => solver.add_constraint(stmt),
         }
     }
