@@ -311,6 +311,9 @@ fn parse_int_expr(var_map: &VarMap, tree: &SyntaxTree) -> IntExpr {
                     parse_int_expr(var_map, &child[2]),
                     parse_int_expr(var_map, &child[3]),
                 )
+            } else if op_name == "abs" {
+                assert_eq!(child.len(), 2);
+                parse_int_expr(var_map, &child[1]).abs()
             } else {
                 panic!("unknown operator: {}", op_name);
             }

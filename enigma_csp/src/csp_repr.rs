@@ -222,6 +222,7 @@ pub enum IntExpr {
     NVar(super::norm_csp::IntVar),
     Linear(Vec<(Box<IntExpr>, i32)>),
     If(Box<BoolExpr>, Box<IntExpr>, Box<IntExpr>),
+    Abs(Box<IntExpr>),
 }
 
 impl IntExpr {
@@ -247,6 +248,10 @@ impl IntExpr {
 
     pub fn gt(self, rhs: IntExpr) -> BoolExpr {
         BoolExpr::Cmp(CmpOp::Gt, Box::new(self), Box::new(rhs))
+    }
+
+    pub fn abs(self) -> IntExpr {
+        IntExpr::Abs(Box::new(self))
     }
 
     pub fn pretty_print<W: Write>(&self, out: &mut W) -> std::io::Result<()> {
@@ -275,6 +280,11 @@ impl IntExpr {
                 t.pretty_print(out)?;
                 write!(out, " ")?;
                 f.pretty_print(out)?;
+                write!(out, ")")?;
+            }
+            IntExpr::Abs(x) => {
+                write!(out, "(abs ")?;
+                x.pretty_print(out)?;
                 write!(out, ")")?;
             }
         }

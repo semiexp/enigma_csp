@@ -337,6 +337,9 @@ impl CSPVars {
                     None => (),
                 }
             }
+            IntExpr::Abs(x) => {
+                self.constant_folding_int(x);
+            }
         }
     }
 
@@ -665,6 +668,7 @@ impl Assignment {
                 ret
             }
             IntExpr::If(c, t, f) => self.eval_int_expr(if self.eval_bool_expr(c) { t } else { f }),
+            IntExpr::Abs(x) => self.eval_int_expr(x).abs(),
         }
     }
 }

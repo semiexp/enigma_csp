@@ -285,6 +285,7 @@ fn tseitin_transformation_int(
             tseitin_transformation_int(env, extra, t);
             tseitin_transformation_int(env, extra, f);
         }
+        IntExpr::Abs(x) => tseitin_transformation_int(env, extra, x),
     }
 }
 
@@ -535,6 +536,23 @@ fn normalize_int_expr(env: &mut NormalizerEnv, expr: &IntExpr) -> LinearSum {
                 .is_none());
 
             LinearSum::singleton(v)
+        }
+        IntExpr::Abs(x) => {
+            let x = normalize_int_expr(env, x);
+            let dom = env.norm.get_domain_linear_sum(&x);
+            let xvar = env.norm.new_int_var(dom, None);
+            {
+                let mut c = Constraint::new();
+                c.add_linear(LinearLit::new(x - LinearSum::singleton(xvar), CmpOp::Eq));
+                env.norm.add_constraint(c);
+            }
+
+            let aux_expr = IntExpr::If(
+                Box::new(IntExpr::NVar(xvar).ge(IntExpr::Const(0))),
+                Box::new(IntExpr::NVar(xvar)),
+                Box::new(IntExpr::NVar(xvar) * -1),
+            );
+            return normalize_int_expr(env, &aux_expr);
         }
     }
 }
@@ -939,6 +957,17 @@ mod tests {
                 .ite(a.expr(), b.expr() + c.expr())
                 .le(a.expr() - b.expr()),
         );
+
+        tester.check();
+    }
+
+    #[test]
+    fn test_normalization_abs() {
+        let mut tester = NormalizerTester::new();
+
+        let x = tester.new_int_var(Domain::range(-5, 6));
+        let b = tester.new_int_var(Domain::range(-1, 7));
+        tester.add_expr(b.expr().ge(x.expr().abs()));
 
         tester.check();
     }
