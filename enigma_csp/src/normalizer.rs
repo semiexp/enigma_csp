@@ -4,6 +4,7 @@ use super::norm_csp::BoolLit as NBoolLit;
 use super::norm_csp::IntVar as NIntVar;
 use super::norm_csp::{Constraint, ExtraConstraint, LinearLit, LinearSum, NormCSP};
 use crate::arithmetic::{CheckedInt, CmpOp};
+use crate::csp::Domain;
 use crate::util::ConvertMap;
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -286,6 +287,10 @@ fn tseitin_transformation_int(
             tseitin_transformation_int(env, extra, f);
         }
         IntExpr::Abs(x) => tseitin_transformation_int(env, extra, x),
+        IntExpr::Mul(x, y) => {
+            tseitin_transformation_int(env, extra, x);
+            tseitin_transformation_int(env, extra, y);
+        }
     }
 }
 
@@ -553,6 +558,78 @@ fn normalize_int_expr(env: &mut NormalizerEnv, expr: &IntExpr) -> LinearSum {
                 Box::new(IntExpr::NVar(xvar) * -1),
             );
             return normalize_int_expr(env, &aux_expr);
+        }
+        IntExpr::Mul(x, y) => {
+            let x = normalize_int_expr(env, x);
+            let y = normalize_int_expr(env, y);
+
+            if x.is_constant() {
+                return y * x.constant;
+            }
+            if y.is_constant() {
+                return x * y.constant;
+            }
+
+            let xdom = env.norm.get_domain_linear_sum(&x);
+            let xvar = env.norm.new_int_var(xdom.clone(), None);
+            {
+                let mut c = Constraint::new();
+                c.add_linear(LinearLit::new(x - LinearSum::singleton(xvar), CmpOp::Eq));
+                env.norm.add_constraint(c);
+            }
+
+            let ydom = env.norm.get_domain_linear_sum(&y);
+            let yvar = env.norm.new_int_var(ydom.clone(), None);
+            {
+                let mut c = Constraint::new();
+                c.add_linear(LinearLit::new(y - LinearSum::singleton(yvar), CmpOp::Eq));
+                env.norm.add_constraint(c);
+            }
+
+            let xdom_vals = xdom.enumerate();
+            let ydom_vals = ydom.enumerate();
+
+            let mut zdom_sparse = vec![];
+            for &xval in &xdom_vals {
+                for &yval in &ydom_vals {
+                    zdom_sparse.push(xval * yval);
+                }
+            }
+            zdom_sparse.sort();
+            let mut zdom_sparse_filtered = vec![];
+            for i in 0..zdom_sparse.len() {
+                if i == 0 || zdom_sparse[i] != zdom_sparse[i - 1] {
+                    zdom_sparse_filtered.push(zdom_sparse[i]);
+                }
+            }
+            let zvar = env.norm.new_int_var(
+                Domain::range_from_checked(
+                    zdom_sparse_filtered[0],
+                    zdom_sparse_filtered[zdom_sparse_filtered.len() - 1],
+                ),
+                Some(zdom_sparse),
+            );
+
+            for &xval in &xdom_vals {
+                for &yval in &ydom_vals {
+                    let mut c = Constraint::new();
+                    c.add_linear(LinearLit::new(
+                        LinearSum::singleton(xvar) - LinearSum::constant(xval),
+                        CmpOp::Ne,
+                    ));
+                    c.add_linear(LinearLit::new(
+                        LinearSum::singleton(yvar) - LinearSum::constant(yval),
+                        CmpOp::Ne,
+                    ));
+                    c.add_linear(LinearLit::new(
+                        LinearSum::singleton(zvar) - LinearSum::constant(xval * yval),
+                        CmpOp::Eq,
+                    ));
+                    env.norm.add_constraint(c);
+                }
+            }
+
+            LinearSum::singleton(zvar)
         }
     }
 }
@@ -968,6 +1045,18 @@ mod tests {
         let x = tester.new_int_var(Domain::range(-5, 6));
         let b = tester.new_int_var(Domain::range(-1, 7));
         tester.add_expr(b.expr().ge(x.expr().abs()));
+
+        tester.check();
+    }
+
+    #[test]
+    fn test_normalization_mul() {
+        let mut tester = NormalizerTester::new();
+
+        let x = tester.new_int_var(Domain::range(-3, 3));
+        let y = tester.new_int_var(Domain::range(-2, 2));
+        let z = tester.new_int_var(Domain::range(-4, 4));
+        tester.add_expr(z.expr().eq(x.expr() * y.expr()));
 
         tester.check();
     }

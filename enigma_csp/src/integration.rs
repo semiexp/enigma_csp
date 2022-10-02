@@ -1093,6 +1093,19 @@ mod tests {
     }
 
     #[test]
+    fn test_integration_exhaustive_mul1() {
+        let mut tester = IntegrationTester::new();
+
+        let a = tester.new_int_var(Domain::range(-5, 5));
+        let b = tester.new_int_var(Domain::range(-4, 4));
+        let c = tester.new_int_var(Domain::range(-4, 4));
+        let d = tester.new_int_var(Domain::range(-4, 4));
+        tester.add_expr((a.expr() * b.expr()).eq(c.expr() * d.expr() + IntExpr::Const(1)));
+
+        tester.check();
+    }
+
+    #[test]
     fn test_integration_exhaustive_complex1() {
         let mut tester = IntegrationTester::new();
 

@@ -303,7 +303,7 @@ fn parse_int_expr(var_map: &VarMap, tree: &SyntaxTree) -> IntExpr {
                 } else if let IntExpr::Const(c) = rhs {
                     IntExpr::Linear(vec![(Box::new(lhs), c)])
                 } else {
-                    panic!("mul operators whose both operands are non-const are not supported")
+                    IntExpr::Mul(Box::new(lhs), Box::new(rhs))
                 }
             } else if op_name == "if" {
                 assert_eq!(child.len(), 4);

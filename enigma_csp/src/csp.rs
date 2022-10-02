@@ -340,6 +340,11 @@ impl CSPVars {
             IntExpr::Abs(x) => {
                 self.constant_folding_int(x);
             }
+            IntExpr::Mul(x, y) => {
+                self.constant_folding_int(x);
+                self.constant_folding_int(y);
+                // TODO: implement constant folding
+            }
         }
     }
 
@@ -669,6 +674,7 @@ impl Assignment {
             }
             IntExpr::If(c, t, f) => self.eval_int_expr(if self.eval_bool_expr(c) { t } else { f }),
             IntExpr::Abs(x) => self.eval_int_expr(x).abs(),
+            IntExpr::Mul(x, y) => self.eval_int_expr(x) * self.eval_int_expr(y),
         }
     }
 }

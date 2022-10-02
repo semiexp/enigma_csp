@@ -223,6 +223,7 @@ pub enum IntExpr {
     Linear(Vec<(Box<IntExpr>, i32)>),
     If(Box<BoolExpr>, Box<IntExpr>, Box<IntExpr>),
     Abs(Box<IntExpr>),
+    Mul(Box<IntExpr>, Box<IntExpr>),
 }
 
 impl IntExpr {
@@ -287,6 +288,13 @@ impl IntExpr {
                 x.pretty_print(out)?;
                 write!(out, ")")?;
             }
+            IntExpr::Mul(x, y) => {
+                write!(out, "(mul ")?;
+                x.pretty_print(out)?;
+                write!(out, " ")?;
+                y.pretty_print(out)?;
+                write!(out, ")")?;
+            }
         }
         Ok(())
     }
@@ -313,5 +321,13 @@ impl Mul<i32> for IntExpr {
 
     fn mul(self, rhs: i32) -> IntExpr {
         IntExpr::Linear(vec![(Box::new(self), rhs)])
+    }
+}
+
+impl Mul<IntExpr> for IntExpr {
+    type Output = IntExpr;
+
+    fn mul(self, rhs: IntExpr) -> IntExpr {
+        IntExpr::Mul(Box::new(self), Box::new(rhs))
     }
 }
