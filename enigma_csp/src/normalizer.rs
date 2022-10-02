@@ -5,6 +5,7 @@ use super::norm_csp::IntVar as NIntVar;
 use super::norm_csp::{Constraint, ExtraConstraint, LinearLit, LinearSum, NormCSP};
 use crate::arithmetic::{CheckedInt, CmpOp};
 use crate::csp::Domain;
+use crate::norm_csp::IntVarRepresentation;
 use crate::util::ConvertMap;
 
 #[cfg(not(target_arch = "wasm32"))]
@@ -571,27 +572,80 @@ fn normalize_int_expr(env: &mut NormalizerEnv, expr: &IntExpr) -> LinearSum {
             }
 
             let xdom = env.norm.get_domain_linear_sum(&x);
-            let xvar = env.norm.new_int_var(xdom.clone(), None);
-            {
+            let xvar;
+            if let Some(v) = x.as_singleton() {
+                xvar = *v;
+            } else {
+                xvar = env.norm.new_int_var(xdom.clone(), None);
                 let mut c = Constraint::new();
                 c.add_linear(LinearLit::new(x - LinearSum::singleton(xvar), CmpOp::Eq));
                 env.norm.add_constraint(c);
             }
 
             let ydom = env.norm.get_domain_linear_sum(&y);
-            let yvar = env.norm.new_int_var(ydom.clone(), None);
-            {
+            let yvar;
+            if let Some(v) = y.as_singleton() {
+                yvar = *v;
+            } else {
+                yvar = env.norm.new_int_var(ydom.clone(), None);
                 let mut c = Constraint::new();
                 c.add_linear(LinearLit::new(y - LinearSum::singleton(yvar), CmpOp::Eq));
                 env.norm.add_constraint(c);
             }
 
-            let xdom_vals = xdom.enumerate();
-            let ydom_vals = ydom.enumerate();
+            let xdom_vals;
+            {
+                match env.norm.vars.int_var(xvar) {
+                    IntVarRepresentation::Domain(dom, list) => {
+                        if let Some(l) = list {
+                            xdom_vals = l.clone();
+                        } else {
+                            xdom_vals = dom.enumerate();
+                        }
+                    }
+                    IntVarRepresentation::Binary(_, t, f) => {
+                        let t = *t;
+                        let f = *f;
+                        if t < f {
+                            xdom_vals = vec![t, f];
+                        } else if t > f {
+                            xdom_vals = vec![f, t];
+                        } else {
+                            xdom_vals = vec![t];
+                        }
+                    }
+                }
+            }
+            let ydom_vals;
+            {
+                match env.norm.vars.int_var(yvar) {
+                    IntVarRepresentation::Domain(dom, list) => {
+                        if let Some(l) = list {
+                            ydom_vals = l.clone();
+                        } else {
+                            ydom_vals = dom.enumerate();
+                        }
+                    }
+                    IntVarRepresentation::Binary(_, t, f) => {
+                        let t = *t;
+                        let f = *f;
+                        if t < f {
+                            ydom_vals = vec![t, f];
+                        } else if t > f {
+                            ydom_vals = vec![f, t];
+                        } else {
+                            ydom_vals = vec![t];
+                        }
+                    }
+                }
+            }
 
             let mut zdom_sparse = vec![];
             for &xval in &xdom_vals {
                 for &yval in &ydom_vals {
+                    if xvar == yvar && xval != yval {
+                        continue;
+                    }
                     zdom_sparse.push(xval * yval);
                 }
             }
@@ -612,6 +666,9 @@ fn normalize_int_expr(env: &mut NormalizerEnv, expr: &IntExpr) -> LinearSum {
 
             for &xval in &xdom_vals {
                 for &yval in &ydom_vals {
+                    if xvar == yvar && xval != yval {
+                        continue;
+                    }
                     let mut c = Constraint::new();
                     c.add_linear(LinearLit::new(
                         LinearSum::singleton(xvar) - LinearSum::constant(xval),

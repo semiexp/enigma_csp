@@ -290,6 +290,18 @@ impl<T: Ord> LinearSum<T> {
         self.term.is_empty()
     }
 
+    pub fn as_singleton(&self) -> Option<&T> {
+        if self.constant != 0 || self.term.len() != 1 {
+            return None;
+        }
+        let (v, &coef) = self.iter().next().unwrap();
+        if coef == 1 {
+            Some(v)
+        } else {
+            None
+        }
+    }
+
     pub fn len(&self) -> usize {
         self.term.len()
     }
