@@ -171,6 +171,15 @@ pub fn parse<'a, 'b>(var_map: &'a VarMap, input: &'b str) -> ParseResult<'b> {
             .map(|c| parse_int_expr(var_map, c))
             .collect::<Vec<_>>();
         ParseResult::Stmt(Stmt::AllDifferent(exprs))
+    } else if op_name == "circuit" {
+        let mut vars = vec![];
+        for c in &child[1..] {
+            match var_map.get_var(c.as_ident()) {
+                Some(Var::Int(v)) => vars.push(v),
+                _ => panic!(),
+            }
+        }
+        ParseResult::Stmt(Stmt::Circuit(vars))
     } else if op_name == "graph-active-vertices-connected" {
         let num_vertices = child[1].as_usize();
         let num_edges = child[2].as_usize();

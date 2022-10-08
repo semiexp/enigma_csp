@@ -511,6 +511,47 @@ mod tests {
                         }
                     }
                     Stmt::ActiveVerticesConnected(_, _) => todo!(),
+                    Stmt::Circuit(values) => {
+                        let values = values
+                            .iter()
+                            .map(|&v| assignment.get_int(v).unwrap())
+                            .collect::<Vec<_>>();
+                        let n = values.len();
+                        if values.iter().any(|&x| x < 0 || x >= n as i32) {
+                            return false;
+                        }
+                        let values = values.iter().map(|&x| x as usize).collect::<Vec<_>>();
+
+                        let mut cyc_size = 0;
+                        for i in 0..n {
+                            if values[i] != i {
+                                cyc_size += 1;
+                            }
+                        }
+
+                        let mut visited = vec![false; n];
+                        for i in 0..n {
+                            if values[i] != i {
+                                let mut size = 0;
+                                let mut p = i;
+                                while !visited[p] {
+                                    if values[p] == p {
+                                        return false;
+                                    }
+                                    size += 1;
+                                    visited[p] = true;
+                                    p = values[p];
+                                }
+                                if p != i {
+                                    return false;
+                                }
+                                if size != cyc_size {
+                                    return false;
+                                }
+                                break;
+                            }
+                        }
+                    }
                 }
             }
             true
@@ -1336,6 +1377,35 @@ mod tests {
         let c = tester.new_int_var_from_list(vec![0, 2, 3, 4, 5]);
         tester.add_constraint(Stmt::AllDifferent(vec![a.expr(), b.expr(), c.expr()]));
         tester.add_expr((a.expr() + b.expr()).ge(c.expr()));
+
+        tester.check();
+    }
+
+    #[test]
+    fn test_integration_exhaustive_circuit1() {
+        let mut tester = IntegrationTester::new();
+
+        let a = tester.new_int_var(Domain::range(0, 5));
+        let b = tester.new_int_var(Domain::range(-1, 3));
+        let c = tester.new_int_var(Domain::range(0, 3));
+        let d = tester.new_int_var(Domain::range(1, 3));
+
+        tester.add_constraint(Stmt::Circuit(vec![a, b, c, d]));
+
+        tester.check();
+    }
+
+    #[test]
+    fn test_integration_exhaustive_circuit2() {
+        let mut tester = IntegrationTester::new();
+
+        let a = tester.new_int_var_from_list(vec![1, 2, 3, 4]);
+        let b = tester.new_int_var_from_list(vec![0, 2, 3, 4]);
+        let c = tester.new_int_var_from_list(vec![0, 1, 4]);
+        let d = tester.new_int_var_from_list(vec![0, 2, 4]);
+        let e = tester.new_int_var_from_list(vec![0, 1, 2, 3]);
+
+        tester.add_constraint(Stmt::Circuit(vec![a, b, c, d, e]));
 
         tester.check();
     }

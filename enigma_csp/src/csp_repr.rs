@@ -47,6 +47,7 @@ pub enum Stmt {
     Expr(BoolExpr),
     AllDifferent(Vec<IntExpr>),
     ActiveVerticesConnected(Vec<BoolExpr>, Vec<(usize, usize)>),
+    Circuit(Vec<IntVar>),
 }
 
 impl Stmt {
@@ -78,6 +79,13 @@ impl Stmt {
                     write!(out, "{}--{}", u, v)?;
                 }
                 write!(out, "])")?;
+            }
+            Stmt::Circuit(vars) => {
+                write!(out, "(circuit")?;
+                for v in vars {
+                    write!(out, " <i{}>", v.0)?;
+                }
+                write!(out, ")")?;
             }
         }
         Ok(())

@@ -203,6 +203,7 @@ fn normalize_stmt(env: &mut NormalizerEnv, stmt: Stmt) {
                     edges,
                 ));
         }
+        Stmt::Circuit(vars) => normalize_circuit(env, vars),
     }
     if env.config.verbose {
         for i in num_constrs_before_norm..env.norm.constraints.len() {
@@ -691,6 +692,148 @@ fn normalize_int_expr(env: &mut NormalizerEnv, expr: &IntExpr) -> LinearSum {
     }
 }
 
+fn normalize_circuit(env: &mut NormalizerEnv, vars: Vec<IntVar>) {
+    let n = vars.len();
+
+    let mut edges = vec![];
+    let mut out_edges: Vec<Vec<usize>> = vec![vec![]; n];
+    let mut in_edges: Vec<Vec<usize>> = vec![vec![]; n];
+    let mut self_edge: Vec<Option<NBoolLit>> = vec![None; n];
+
+    for i in 0..n {
+        let nv = env.convert_int_var(vars[i]);
+        let mut valid_domain = vec![];
+        let mut has_out_of_range = false;
+        match env.norm.vars.int_var(nv) {
+            IntVarRepresentation::Domain(domain, list) => {
+                if let Some(l) = list {
+                    for &v in l {
+                        if v >= 0 && v < n as i32 {
+                            valid_domain.push(v);
+                        } else {
+                            has_out_of_range = true;
+                        }
+                    }
+                } else {
+                    for v in domain.enumerate() {
+                        if v >= 0 && v < n as i32 {
+                            valid_domain.push(v);
+                        } else {
+                            has_out_of_range = true;
+                        }
+                    }
+                }
+            }
+            IntVarRepresentation::Binary(_, t, f) => {
+                if *t >= 0 && *t < n as i32 {
+                    valid_domain.push(*t);
+                } else {
+                    has_out_of_range = true;
+                }
+                if *f >= 0 && *f < n as i32 {
+                    valid_domain.push(*f);
+                } else {
+                    has_out_of_range = true;
+                }
+            }
+        }
+        if has_out_of_range {
+            normalize_and_register_expr(env, vars[i].expr().ge(IntExpr::Const(0)));
+            normalize_and_register_expr(env, vars[i].expr().le(IntExpr::Const(n as i32 - 1)));
+        }
+        for j in valid_domain {
+            let j = j.get() as usize;
+
+            let v = env.norm.new_bool_var();
+            let lit = NBoolLit::new(v, false);
+            normalize_and_register_expr(
+                env,
+                BoolExpr::NVar(v).iff(vars[i].expr().eq(IntExpr::Const(j as i32))),
+            );
+
+            if i != j {
+                out_edges[i].push(edges.len());
+                in_edges[j].push(edges.len());
+                edges.push((i, j, lit));
+            } else {
+                self_edge[i] = Some(lit);
+            }
+        }
+    }
+
+    for i in 0..n {
+        let mut in_lits = in_edges[i].iter().map(|&e| edges[e].2).collect::<Vec<_>>();
+        in_lits.extend(self_edge[i]);
+
+        for p in 0..in_lits.len() {
+            for q in (p + 1)..in_lits.len() {
+                let c = Constraint {
+                    bool_lit: vec![!in_lits[p], !in_lits[q]],
+                    linear_lit: vec![],
+                };
+                env.norm.add_constraint(c)
+            }
+        }
+        let c = Constraint {
+            bool_lit: in_lits,
+            linear_lit: vec![],
+        };
+        env.norm.add_constraint(c);
+    }
+
+    let mut edges_undir = edges
+        .iter()
+        .map(|&(s, t, l)| ((s.min(t), s.max(t)), l))
+        .collect::<Vec<_>>();
+    edges_undir.sort_by(|(p, _), (q, _)| p.cmp(q));
+
+    let mut edges_undir_dedup = vec![];
+    {
+        let mut i = 0;
+        while i < edges_undir.len() {
+            if i + 1 < edges_undir.len() && edges_undir[i].0 == edges_undir[i + 1].0 {
+                let lit1 = edges_undir[i].1;
+                assert!(!lit1.negated);
+                let lit2 = edges_undir[i + 1].1;
+                assert!(!lit2.negated);
+                let v = env.norm.new_bool_var();
+                normalize_and_register_expr(
+                    env,
+                    BoolExpr::NVar(v).iff(BoolExpr::NVar(lit1.var) | BoolExpr::NVar(lit2.var)),
+                );
+                edges_undir_dedup.push((edges_undir[i].0, NBoolLit::new(v, false)));
+                i += 2;
+            } else {
+                edges_undir_dedup.push(edges_undir[i]);
+                i += 1;
+            }
+        }
+    }
+    let mut adj_edges: Vec<Vec<usize>> = vec![vec![]; n];
+    for (i, &((u, v), _)) in edges_undir_dedup.iter().enumerate() {
+        adj_edges[u].push(i);
+        adj_edges[v].push(i);
+    }
+    let mut line_graph_edges: Vec<(usize, usize)> = vec![];
+    for i in 0..n {
+        for j in 0..adj_edges[i].len() {
+            for k in 0..j {
+                line_graph_edges.push((adj_edges[i][j], adj_edges[i][k]));
+            }
+        }
+    }
+    let line_graph_vertices = edges_undir_dedup
+        .iter()
+        .map(|&(_, l)| l)
+        .collect::<Vec<_>>();
+
+    env.norm
+        .add_extra_constraint(ExtraConstraint::ActiveVerticesConnected(
+            line_graph_vertices,
+            line_graph_edges,
+        ));
+}
+
 #[cfg(test)]
 mod tests {
     use std::collections::BTreeSet;
@@ -890,6 +1033,46 @@ mod tests {
                         }
                     }
                     Stmt::ActiveVerticesConnected(_, _) => todo!(),
+                    Stmt::Circuit(vars) => {
+                        let values = vars
+                            .iter()
+                            .map(|&v| assignment.get_int(v).unwrap())
+                            .collect::<Vec<_>>();
+                        for i in 0..values.len() {
+                            if values[i] < 0 || values[i] as usize >= values.len() {
+                                return false;
+                            }
+                        }
+                        let values = values.into_iter().map(|x| x as usize).collect::<Vec<_>>();
+                        let mut expected_cyc_len = 0;
+                        for i in 0..values.len() {
+                            if values[i] != i {
+                                expected_cyc_len += 1;
+                            }
+                        }
+                        let mut visited = vec![false; values.len()];
+                        for i in 0..values.len() {
+                            if values[i] != i {
+                                let mut cyc_len = 0;
+                                let mut p = i;
+                                while !visited[p] {
+                                    if p == values[p] {
+                                        return false;
+                                    }
+                                    visited[p] = true;
+                                    p = values[p];
+                                    cyc_len += 1;
+                                }
+                                if p != i {
+                                    return false;
+                                }
+                                if expected_cyc_len != cyc_len {
+                                    return false;
+                                }
+                                break;
+                            }
+                        }
+                    }
                 }
             }
             true
@@ -1148,6 +1331,17 @@ mod tests {
         let b = tester.new_int_var(Domain::range(0, 3));
         let c = tester.new_int_var(Domain::range(0, 3));
         tester.add_constraint(Stmt::AllDifferent(vec![a.expr(), b.expr(), c.expr()]));
+        tester.check();
+    }
+
+    #[test]
+    fn test_normalization_circuit() {
+        let mut tester = NormalizerTester::new();
+
+        let a = tester.new_int_var(Domain::range(0, 2));
+        let b = tester.new_int_var(Domain::range(0, 2));
+        let c = tester.new_int_var(Domain::range(-1, 2));
+        tester.add_constraint(Stmt::Circuit(vec![a, b, c]));
         tester.check();
     }
 }
