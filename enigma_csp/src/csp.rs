@@ -1,110 +1,10 @@
 use crate::arithmetic::CheckedInt;
+use crate::domain::Domain;
 use crate::util::{ConvertMapIndex, UpdateStatus};
 use std::collections::{btree_map, BTreeMap};
-use std::ops::{Add, BitOr, Index, IndexMut, Mul};
+use std::ops::{Index, IndexMut};
 
 pub use super::csp_repr::{BoolExpr, BoolVar, IntExpr, IntVar, Stmt};
-
-#[derive(Clone, PartialEq, Eq, Debug)]
-pub struct Domain {
-    low: CheckedInt,
-    high: CheckedInt,
-}
-
-impl Domain {
-    pub fn range(low: i32, high: i32) -> Domain {
-        Domain {
-            low: CheckedInt::new(low),
-            high: CheckedInt::new(high),
-        }
-    }
-
-    pub(crate) fn range_from_checked(low: CheckedInt, high: CheckedInt) -> Domain {
-        Domain { low, high }
-    }
-
-    pub(crate) fn enumerate(&self) -> Vec<CheckedInt> {
-        (self.low.get()..=self.high.get())
-            .map(CheckedInt::new)
-            .collect::<Vec<_>>()
-    }
-
-    pub(crate) fn lower_bound_checked(&self) -> CheckedInt {
-        self.low
-    }
-
-    pub(crate) fn upper_bound_checked(&self) -> CheckedInt {
-        self.high
-    }
-
-    pub(crate) fn as_constant(&self) -> Option<CheckedInt> {
-        if self.low == self.high {
-            Some(self.low)
-        } else {
-            None
-        }
-    }
-
-    pub fn is_infeasible(&self) -> bool {
-        self.low > self.high
-    }
-
-    pub(crate) fn refine_upper_bound(&mut self, v: CheckedInt) -> UpdateStatus {
-        if self.high <= v {
-            UpdateStatus::NotUpdated
-        } else {
-            self.high = v;
-            if self.is_infeasible() {
-                UpdateStatus::Unsatisfiable
-            } else {
-                UpdateStatus::Updated
-            }
-        }
-    }
-
-    pub(crate) fn refine_lower_bound(&mut self, v: CheckedInt) -> UpdateStatus {
-        if self.low >= v {
-            UpdateStatus::NotUpdated
-        } else {
-            self.low = v;
-            if self.is_infeasible() {
-                UpdateStatus::Unsatisfiable
-            } else {
-                UpdateStatus::Updated
-            }
-        }
-    }
-}
-
-impl Add<Domain> for Domain {
-    type Output = Domain;
-
-    fn add(self, rhs: Domain) -> Domain {
-        Domain::range_from_checked(self.low + rhs.low, self.high + rhs.high)
-    }
-}
-
-impl Mul<CheckedInt> for Domain {
-    type Output = Domain;
-
-    fn mul(self, rhs: CheckedInt) -> Domain {
-        if rhs == 0 {
-            Domain::range(0, 0)
-        } else if rhs > 0 {
-            Domain::range_from_checked(self.low * rhs, self.high * rhs)
-        } else {
-            Domain::range_from_checked(self.high * rhs, self.low * rhs)
-        }
-    }
-}
-
-impl BitOr<Domain> for Domain {
-    type Output = Domain;
-
-    fn bitor(self, rhs: Domain) -> Domain {
-        Domain::range_from_checked(self.low.min(rhs.low), self.high.max(rhs.high))
-    }
-}
 
 pub(super) struct BoolVarData {
     possibility_mask: u8,
@@ -145,15 +45,11 @@ impl BoolVarData {
 
 pub(super) struct IntVarData {
     pub(super) domain: Domain,
-    pub(super) domain_list: Option<Vec<CheckedInt>>,
 }
 
 impl IntVarData {
-    fn new(domain: Domain, domain_list: Option<Vec<CheckedInt>>) -> IntVarData {
-        IntVarData {
-            domain,
-            domain_list,
-        }
+    fn new(domain: Domain) -> IntVarData {
+        IntVarData { domain }
     }
 }
 
@@ -462,7 +358,7 @@ impl CSP {
 
     pub fn new_int_var(&mut self, domain: Domain) -> IntVar {
         let id = self.vars.int_var.len();
-        self.vars.int_var.push(IntVarData::new(domain, None));
+        self.vars.int_var.push(IntVarData::new(domain));
         IntVar::new(id)
     }
 
@@ -470,14 +366,10 @@ impl CSP {
         assert!(domain_list.len() > 0);
         let mut domain_list = domain_list;
         domain_list.sort();
-        let domain = Domain {
-            low: domain_list[0],
-            high: domain_list[domain_list.len() - 1],
-        };
+        domain_list.dedup();
+        let domain = Domain::enumerative_from_checked(domain_list.clone());
         let id = self.vars.int_var.len();
-        self.vars
-            .int_var
-            .push(IntVarData::new(domain, Some(domain_list)));
+        self.vars.int_var.push(IntVarData::new(domain));
         IntVar::new(id)
     }
 

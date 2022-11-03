@@ -171,12 +171,8 @@ impl EncodeMap {
     ) {
         if self.int_map[var].is_none() {
             match norm_vars.int_var(var) {
-                IntVarRepresentation::Domain(domain, domain_list) => {
-                    let domain = if let Some(l) = domain_list {
-                        l.clone()
-                    } else {
-                        domain.enumerate()
-                    };
+                IntVarRepresentation::Domain(domain) => {
+                    let domain = domain.enumerate();
                     assert_ne!(domain.len(), 0);
                     let lits = sat.new_vars_as_lits(domain.len() - 1);
                     for i in 1..lits.len() {
@@ -205,12 +201,8 @@ impl EncodeMap {
     ) {
         if self.int_map[var].is_none() {
             match norm_vars.int_var(var) {
-                IntVarRepresentation::Domain(domain, domain_list) => {
-                    let domain = if let Some(l) = domain_list {
-                        l.clone()
-                    } else {
-                        domain.enumerate()
-                    };
+                IntVarRepresentation::Domain(domain) => {
+                    let domain = domain.enumerate();
                     assert_ne!(domain.len(), 0);
                     let lits = sat.new_vars_as_lits(domain.len());
                     sat.add_clause(&lits);
@@ -309,7 +301,7 @@ pub fn encode(norm: &mut NormCSP, sat: &mut SAT, map: &mut EncodeMap, config: &C
     if config.use_direct_encoding {
         for var in norm.unencoded_int_vars() {
             let maybe_direct_encoding = match norm.vars.int_var(var) {
-                IntVarRepresentation::Domain(_, _) => true,
+                IntVarRepresentation::Domain(_) => true,
                 IntVarRepresentation::Binary(_, _, _) => config.direct_encoding_for_binary_vars,
             };
             if maybe_direct_encoding {
@@ -779,7 +771,7 @@ fn decompose_linear_lit(env: &mut EncoderEnv, lit: &LinearLit) -> Vec<LinearLit>
 
             let aux_var = env
                 .norm_vars
-                .new_int_var(IntVarRepresentation::Domain(aux_dom, None));
+                .new_int_var(IntVarRepresentation::Domain(aux_dom));
             env.map
                 .convert_int_var_order_encoding(&mut env.norm_vars, &mut env.sat, aux_var);
 
@@ -1285,7 +1277,7 @@ fn encode_linear_ne_direct(env: &EncoderEnv, sum: &LinearSum) -> ClauseSet {
 #[cfg(test)]
 mod tests {
     use super::super::{
-        config::Config, csp::Domain, norm_csp::IntVarRepresentation, norm_csp::NormCSPVars,
+        config::Config, domain::Domain, norm_csp::IntVarRepresentation, norm_csp::NormCSPVars,
         sat::SAT,
     };
     use super::*;
@@ -1329,7 +1321,7 @@ mod tests {
         fn add_int_var(&mut self, domain: Domain, is_direct_encoding: bool) -> IntVar {
             let v = self
                 .norm_vars
-                .new_int_var(IntVarRepresentation::Domain(domain, None));
+                .new_int_var(IntVarRepresentation::Domain(domain));
 
             if is_direct_encoding {
                 self.map
@@ -1376,13 +1368,7 @@ mod tests {
             let domains = int_vars
                 .iter()
                 .map(|&v| match self.norm_vars.int_var(v) {
-                    IntVarRepresentation::Domain(domain, domain_list) => {
-                        if let Some(l) = domain_list {
-                            l.clone()
-                        } else {
-                            domain.enumerate()
-                        }
-                    }
+                    IntVarRepresentation::Domain(domain) => domain.enumerate(),
                     IntVarRepresentation::Binary(_, t, f) => vec![*t, *f],
                 })
                 .collect::<Vec<_>>();

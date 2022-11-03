@@ -4,7 +4,7 @@ use super::norm_csp::BoolLit as NBoolLit;
 use super::norm_csp::IntVar as NIntVar;
 use super::norm_csp::{Constraint, ExtraConstraint, LinearLit, LinearSum, NormCSP};
 use crate::arithmetic::{CheckedInt, CmpOp};
-use crate::csp::Domain;
+use crate::domain::Domain;
 use crate::norm_csp::IntVarRepresentation;
 use crate::util::ConvertMap;
 
@@ -75,7 +75,7 @@ impl NormalizeMap {
             Some(x) => x,
             None => {
                 let var_desc = csp_vars.int_var(var);
-                let ret = norm.new_int_var(var_desc.domain.clone(), var_desc.domain_list.clone());
+                let ret = norm.new_int_var(var_desc.domain.clone());
                 self.int_map[var] = Some(ret);
                 ret
             }
@@ -516,7 +516,7 @@ fn normalize_int_expr(env: &mut NormalizerEnv, expr: &IntExpr) -> LinearSum {
             }
 
             let dom = env.norm.get_domain_linear_sum(&t) | env.norm.get_domain_linear_sum(&f);
-            let v = env.norm.new_int_var(dom, None);
+            let v = env.norm.new_int_var(dom);
 
             let mut constr1 = normalize_bool_expr(env, c, false);
             {
@@ -547,7 +547,7 @@ fn normalize_int_expr(env: &mut NormalizerEnv, expr: &IntExpr) -> LinearSum {
         IntExpr::Abs(x) => {
             let x = normalize_int_expr(env, x);
             let dom = env.norm.get_domain_linear_sum(&x);
-            let xvar = env.norm.new_int_var(dom, None);
+            let xvar = env.norm.new_int_var(dom);
             {
                 let mut c = Constraint::new();
                 c.add_linear(LinearLit::new(x - LinearSum::singleton(xvar), CmpOp::Eq));
@@ -577,7 +577,7 @@ fn normalize_int_expr(env: &mut NormalizerEnv, expr: &IntExpr) -> LinearSum {
             if let Some(v) = x.as_singleton() {
                 xvar = *v;
             } else {
-                xvar = env.norm.new_int_var(xdom.clone(), None);
+                xvar = env.norm.new_int_var(xdom.clone());
                 let mut c = Constraint::new();
                 c.add_linear(LinearLit::new(x - LinearSum::singleton(xvar), CmpOp::Eq));
                 env.norm.add_constraint(c);
@@ -588,7 +588,7 @@ fn normalize_int_expr(env: &mut NormalizerEnv, expr: &IntExpr) -> LinearSum {
             if let Some(v) = y.as_singleton() {
                 yvar = *v;
             } else {
-                yvar = env.norm.new_int_var(ydom.clone(), None);
+                yvar = env.norm.new_int_var(ydom.clone());
                 let mut c = Constraint::new();
                 c.add_linear(LinearLit::new(y - LinearSum::singleton(yvar), CmpOp::Eq));
                 env.norm.add_constraint(c);
@@ -597,12 +597,8 @@ fn normalize_int_expr(env: &mut NormalizerEnv, expr: &IntExpr) -> LinearSum {
             let xdom_vals;
             {
                 match env.norm.vars.int_var(xvar) {
-                    IntVarRepresentation::Domain(dom, list) => {
-                        if let Some(l) = list {
-                            xdom_vals = l.clone();
-                        } else {
-                            xdom_vals = dom.enumerate();
-                        }
+                    IntVarRepresentation::Domain(dom) => {
+                        xdom_vals = dom.enumerate();
                     }
                     IntVarRepresentation::Binary(_, t, f) => {
                         let t = *t;
@@ -620,12 +616,8 @@ fn normalize_int_expr(env: &mut NormalizerEnv, expr: &IntExpr) -> LinearSum {
             let ydom_vals;
             {
                 match env.norm.vars.int_var(yvar) {
-                    IntVarRepresentation::Domain(dom, list) => {
-                        if let Some(l) = list {
-                            ydom_vals = l.clone();
-                        } else {
-                            ydom_vals = dom.enumerate();
-                        }
+                    IntVarRepresentation::Domain(dom) => {
+                        ydom_vals = dom.enumerate();
                     }
                     IntVarRepresentation::Binary(_, t, f) => {
                         let t = *t;
@@ -651,19 +643,10 @@ fn normalize_int_expr(env: &mut NormalizerEnv, expr: &IntExpr) -> LinearSum {
                 }
             }
             zdom_sparse.sort();
-            let mut zdom_sparse_filtered = vec![];
-            for i in 0..zdom_sparse.len() {
-                if i == 0 || zdom_sparse[i] != zdom_sparse[i - 1] {
-                    zdom_sparse_filtered.push(zdom_sparse[i]);
-                }
-            }
-            let zvar = env.norm.new_int_var(
-                Domain::range_from_checked(
-                    zdom_sparse_filtered[0],
-                    zdom_sparse_filtered[zdom_sparse_filtered.len() - 1],
-                ),
-                Some(zdom_sparse),
-            );
+            zdom_sparse.dedup();
+            let zvar = env
+                .norm
+                .new_int_var(Domain::enumerative_from_checked(zdom_sparse));
 
             for &xval in &xdom_vals {
                 for &yval in &ydom_vals {
@@ -705,22 +688,12 @@ fn normalize_circuit(env: &mut NormalizerEnv, vars: Vec<IntVar>) {
         let mut valid_domain = vec![];
         let mut has_out_of_range = false;
         match env.norm.vars.int_var(nv) {
-            IntVarRepresentation::Domain(domain, list) => {
-                if let Some(l) = list {
-                    for &v in l {
-                        if v >= 0 && v < n as i32 {
-                            valid_domain.push(v);
-                        } else {
-                            has_out_of_range = true;
-                        }
-                    }
-                } else {
-                    for v in domain.enumerate() {
-                        if v >= 0 && v < n as i32 {
-                            valid_domain.push(v);
-                        } else {
-                            has_out_of_range = true;
-                        }
+            IntVarRepresentation::Domain(domain) => {
+                for v in domain.enumerate() {
+                    if v >= 0 && v < n as i32 {
+                        valid_domain.push(v);
+                    } else {
+                        has_out_of_range = true;
                     }
                 }
             }
@@ -839,7 +812,7 @@ mod tests {
     use std::collections::BTreeSet;
 
     use super::super::csp;
-    use super::super::csp::Domain;
+    use super::super::domain::Domain;
     use super::super::norm_csp;
     use super::super::norm_csp::BoolVar as NBoolVar;
     use super::super::norm_csp::IntVarRepresentation;
@@ -949,12 +922,8 @@ mod tests {
                     IntVarRepresentation::Binary(_, t, f) => {
                         unfixed_int_domains.push(vec![(*t).min(*f), (*t).max(*f)]);
                     }
-                    &IntVarRepresentation::Domain(domain, domain_list) => {
-                        if let Some(l) = domain_list {
-                            unfixed_int_domains.push(l.clone());
-                        } else {
-                            unfixed_int_domains.push(domain.enumerate());
-                        }
+                    &IntVarRepresentation::Domain(domain) => {
+                        unfixed_int_domains.push(domain.enumerate());
                     }
                 }
             }

@@ -2,12 +2,13 @@ use crate::arithmetic::CheckedInt;
 
 use super::config::Config;
 use super::csp::{
-    Assignment, BoolExpr, BoolVar, BoolVarStatus, Domain, IntExpr, IntVar, IntVarStatus, Stmt, CSP,
+    Assignment, BoolExpr, BoolVar, BoolVarStatus, IntExpr, IntVar, IntVarStatus, Stmt, CSP,
 };
 use super::encoder::{encode, EncodeMap};
 use super::norm_csp::NormCSP;
 use super::normalizer::{normalize, NormalizeMap};
 use super::sat::{SATModel, SAT};
+use crate::domain::Domain;
 use std::cell::Cell;
 
 #[derive(Clone, Debug)]

@@ -11,7 +11,8 @@ use nom::{
     Finish, IResult,
 };
 
-use super::csp::{BoolExpr, BoolVar, Domain, IntExpr, IntVar, Stmt};
+use super::csp::{BoolExpr, BoolVar, IntExpr, IntVar, Stmt};
+use super::domain::Domain;
 
 #[derive(PartialEq, Eq, Debug)]
 enum SyntaxTree<'a> {
