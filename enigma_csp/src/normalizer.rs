@@ -177,6 +177,46 @@ fn normalize_stmt(env: &mut NormalizerEnv, stmt: Stmt) {
                     normalize_and_register_expr(env, diff_expr);
                 }
             }
+            let is_all_var = _exprs.iter().all(|e| match e {
+                IntExpr::Var(_) => true,
+                _ => false,
+            });
+            if env.config.alldifferent_bijection_constraints && is_all_var && _exprs.len() > 0 {
+                let mut domain: Option<Vec<CheckedInt>> = None;
+                let mut isok = true;
+                for e in &_exprs {
+                    if let IntExpr::Var(v) = e {
+                        let var_data = env.csp_vars.int_var(*v);
+                        let d = var_data.domain.enumerate();
+                        if let Some(domain) = &domain {
+                            if domain != &d {
+                                isok = false;
+                                break;
+                            }
+                        } else {
+                            domain = Some(d);
+                        }
+                    }
+                }
+                if isok {
+                    let domain = domain.unwrap();
+                    if domain.len() == _exprs.len() {
+                        for &value in &domain {
+                            let e = _exprs
+                                .iter()
+                                .map(|e| {
+                                    Box::new(BoolExpr::Cmp(
+                                        CmpOp::Eq,
+                                        Box::new(e.clone()),
+                                        Box::new(IntExpr::Const(value.get())),
+                                    ))
+                                })
+                                .collect::<Vec<_>>();
+                            normalize_and_register_expr(env, BoolExpr::Or(e));
+                        }
+                    }
+                }
+            }
         }
         Stmt::ActiveVerticesConnected(vertices, edges) => {
             let mut vertices_converted = vec![];

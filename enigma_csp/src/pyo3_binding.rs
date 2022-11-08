@@ -112,6 +112,17 @@ impl PyConfig {
     }
 
     #[getter]
+    fn get_alldifferent_bijection_constraints(&self) -> PyResult<bool> {
+        Ok(self.config.alldifferent_bijection_constraints)
+    }
+
+    #[setter]
+    fn set_alldifferent_bijection_constraints(&mut self, value: bool) -> PyResult<()> {
+        self.config.alldifferent_bijection_constraints = value;
+        Ok(())
+    }
+
+    #[getter]
     fn get_glucose_random_seed(&self) -> PyResult<Option<f64>> {
         Ok(self.config.glucose_random_seed)
     }

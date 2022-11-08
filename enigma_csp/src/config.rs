@@ -13,6 +13,7 @@ pub struct Config {
     pub use_direct_encoding: bool,
     pub direct_encoding_for_binary_vars: bool,
     pub merge_equivalent_variables: bool,
+    pub alldifferent_bijection_constraints: bool,
     pub glucose_random_seed: Option<f64>,
     pub glucose_rnd_init_act: bool,
     pub verbose: bool,
@@ -30,6 +31,7 @@ impl Config {
             use_direct_encoding: true,
             direct_encoding_for_binary_vars: false,
             merge_equivalent_variables: false,
+            alldifferent_bijection_constraints: false,
             glucose_random_seed: None,
             glucose_rnd_init_act: false,
             verbose: false,
@@ -66,6 +68,11 @@ impl Config {
                 &mut config.merge_equivalent_variables,
                 "merge-equivalent-variables",
                 "merge equivalent variables (which is caused by, for example, (iff x y))",
+            ),
+            (
+                &mut config.alldifferent_bijection_constraints,
+                "alldifferent-bijection-constraints",
+                "add auxiliary constraints for bijective alldifferent constraints",
             ),
             (&mut config.verbose, "verbose", "show verbose outputs"),
         ];
