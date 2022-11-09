@@ -92,6 +92,7 @@ impl DirectEncoding {
 /// `low` and `high` represent the range of the value after applying the offset.
 struct LogEncoding {
     lits: Vec<Lit>,
+    range: Range,
 }
 
 struct Encoding {
@@ -145,6 +146,8 @@ impl Encoding {
             order_encoding.range()
         } else if let Some(direct_encoding) = &self.direct_encoding {
             direct_encoding.range()
+        } else if let Some(log_encoding) = &self.log_encoding {
+            log_encoding.range
         } else {
             panic!();
         }
@@ -306,7 +309,7 @@ impl EncodeMap {
                         }
                     }
 
-                    self.int_map[var] = Some(Encoding::log_encoding(LogEncoding { lits }));
+                    self.int_map[var] = Some(Encoding::log_encoding(LogEncoding { lits, range: Range::new(low, high) }));
                 }
                 IntVarRepresentation::Binary(_, _, _) => {
                     unimplemented!();
@@ -527,7 +530,13 @@ fn encode_constraint(env: &mut EncoderEnv, constr: Constraint) {
                 simplified_linears.push(decompose_linear_lit(env, &linear_lit));
             }
             EncoderKind::Log => {
-                simplified_linears.push(vec![linear_lit]);
+                let normalized = match linear_lit.op {
+                    CmpOp::Eq | CmpOp::Ne | CmpOp::Ge => linear_lit,
+                    CmpOp::Le => LinearLit::new(linear_lit.sum * -1, CmpOp::Ge),
+                    CmpOp::Lt => LinearLit::new(linear_lit.sum * -1 + (-1), CmpOp::Ge),
+                    CmpOp::Gt => LinearLit::new(linear_lit.sum + (-1), CmpOp::Ge),
+                };
+                simplified_linears.push(vec![normalized]);
             }
         }
     }
@@ -571,9 +580,7 @@ fn encode_constraint(env: &mut EncoderEnv, constr: Constraint) {
                     }
                 }
                 EncoderKind::Log => {
-                    if !(linear_lit.op == CmpOp::Eq || linear_lit.op == CmpOp::Ne) {
-                        unimplemented!();
-                    }
+                    assert!(linear_lit.op == CmpOp::Eq || linear_lit.op == CmpOp::Ne || linear_lit.op == CmpOp::Ge);
                     let encoded = encode_linear_log(env, &linear_lit.sum, linear_lit.op);
                     for i in 0..encoded.len() {
                         env.sat.add_clause(&encoded[i]);
@@ -612,9 +619,7 @@ fn encode_constraint(env: &mut EncoderEnv, constr: Constraint) {
                     encoded_conjunction.append(encoded);
                 }
                 EncoderKind::Log => {
-                    if !(linear_lit.op == CmpOp::Eq || linear_lit.op == CmpOp::Ne) {
-                        unimplemented!();
-                    }
+                    assert!(linear_lit.op == CmpOp::Eq || linear_lit.op == CmpOp::Ne || linear_lit.op == CmpOp::Ge);
                     let encoded = encode_linear_log(env, &linear_lit.sum, linear_lit.op);
                     encoded_conjunction.append(encoded);
                 }
@@ -1501,7 +1506,49 @@ fn encode_linear_log(env: &mut EncoderEnv, sum: &LinearSum, op: CmpOp) -> Clause
             }
             clause_set.push(&clause);
         }
-        CmpOp::Ge => unimplemented!(),
+        CmpOp::Ge => {
+            let mut sub: Option<Lit> = None;
+            for i in 0..(sum_positive.len().min(sum_negative.len())) {
+                let sub_next = env.sat.new_var().as_lit(false);
+                let p = sum_positive[i];
+                let n = sum_negative[i];
+
+                if let Some(sub) = sub {
+                    // sub_next <=> (p & !n) | (p & n & sub) | (!p & !n & sub)
+                    // sub_next <=> (!n | sub) & (p | !n) & (p | sub)
+                    clause_set.push(&[!sub_next, !n, sub]);
+                    clause_set.push(&[!sub_next, p, !n]);
+                    clause_set.push(&[!sub_next, p, sub]);
+                    clause_set.push(&[!p, n, sub_next]);
+                    clause_set.push(&[!p, !n, !sub, sub_next]);
+                    clause_set.push(&[p, n, !sub, sub_next]);
+                } else {
+                    // sub_next <=> p | !n
+                    clause_set.push(&[!sub_next, p, !n]);
+                    clause_set.push(&[!p, sub_next]);
+                    clause_set.push(&[n, sub_next]);
+                }
+                sub = Some(sub_next);
+            }
+
+            if sum_positive.len() <= sum_negative.len() {
+                if let Some(sub) = sub {
+                    clause_set.push(&[sub]);
+                }
+                for i in sum_positive.len()..sum_negative.len() {
+                    clause_set.push(&[!sum_negative[i]]);
+                }
+            } else {
+                let mut clause = vec![];
+                if let Some(sub) = sub {
+                    clause.push(sub);
+                }
+                for i in sum_negative.len()..sum_positive.len() {
+                    clause.push(sum_positive[i]);
+                }
+                clause_set.push(&clause);
+            }
+        },
         CmpOp::Gt | CmpOp::Le | CmpOp::Lt => panic!(),
     }
 
@@ -1993,4 +2040,64 @@ mod tests {
 
         tester.run_check(&lits);
     }
+
+    #[test]
+    fn test_encode_linear_ge_log_encoding_1() {
+        let mut tester = EncoderTester::new();
+
+        let x = tester.add_int_var_log_encoding(Domain::range(2, 11));
+        let y = tester.add_int_var_log_encoding(Domain::range(3, 8));
+        let z = tester.add_int_var_log_encoding(Domain::range(1, 22));
+
+        let lits = [LinearLit::new(
+            linear_sum(&[(x, 1), (y, 2), (z, -1)], 0),
+            CmpOp::Ge,
+        )];
+        {
+            let clause_set = encode_linear_log(&mut tester.env(), &lits[0].sum, CmpOp::Ge);
+            tester.add_clause_set(clause_set);
+        }
+
+        tester.run_check(&lits);
+    }
+
+    #[test]
+    fn test_encode_linear_ge_log_encoding_2() {
+        let mut tester = EncoderTester::new();
+
+        let x = tester.add_int_var_log_encoding(Domain::range(17, 28));
+        let y = tester.add_int_var_log_encoding(Domain::range(35, 50));
+        let z = tester.add_int_var_log_encoding(Domain::range(90, 107));
+
+        let lits = [LinearLit::new(
+            linear_sum(&[(x, 1), (y, 2), (z, -1)], -1),
+            CmpOp::Ge,
+        )];
+        {
+            let clause_set = encode_linear_log(&mut tester.env(), &lits[0].sum, CmpOp::Ge);
+            tester.add_clause_set(clause_set);
+        }
+
+        tester.run_check(&lits);
+    }
+
+    #[test]
+    fn test_encode_linear_log_encoding_operators() {
+        for op in [CmpOp::Gt, CmpOp::Le, CmpOp::Lt] {
+            let mut tester = EncoderTester::new();
+
+            let x = tester.add_int_var_log_encoding(Domain::range(2, 11));
+            let y = tester.add_int_var_log_encoding(Domain::range(3, 8));
+            let z = tester.add_int_var_log_encoding(Domain::range(1, 22));
+
+            let lits = vec![LinearLit::new(
+                linear_sum(&[(x, 1), (y, 2), (z, -1)], 0),
+                op,
+            )];
+            encode_constraint(&mut tester.env(), Constraint { bool_lit: vec![], linear_lit: lits.clone() });
+
+            tester.run_check(&lits);
+        }
+    }
+
 }
