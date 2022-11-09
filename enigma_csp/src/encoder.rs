@@ -571,10 +571,10 @@ fn encode_constraint(env: &mut EncoderEnv, constr: Constraint) {
                     }
                 }
                 EncoderKind::Log => {
-                    if linear_lit.op != CmpOp::Eq {
+                    if !(linear_lit.op == CmpOp::Eq || linear_lit.op == CmpOp::Ne) {
                         unimplemented!();
                     }
-                    let encoded = encode_linear_eq_log(env, &linear_lit.sum);
+                    let encoded = encode_linear_log(env, &linear_lit.sum, linear_lit.op);
                     for i in 0..encoded.len() {
                         env.sat.add_clause(&encoded[i]);
                     }
@@ -612,10 +612,10 @@ fn encode_constraint(env: &mut EncoderEnv, constr: Constraint) {
                     encoded_conjunction.append(encoded);
                 }
                 EncoderKind::Log => {
-                    if linear_lit.op != CmpOp::Eq {
+                    if !(linear_lit.op == CmpOp::Eq || linear_lit.op == CmpOp::Ne) {
                         unimplemented!();
                     }
-                    let encoded = encode_linear_eq_log(env, &linear_lit.sum);
+                    let encoded = encode_linear_log(env, &linear_lit.sum, linear_lit.op);
                     encoded_conjunction.append(encoded);
                 }
             }
@@ -1410,7 +1410,7 @@ fn encode_linear_ne_direct(env: &EncoderEnv, sum: &LinearSum) -> ClauseSet {
     clauses_buf
 }
 
-fn encode_linear_eq_log(env: &mut EncoderEnv, sum: &LinearSum) -> ClauseSet {
+fn encode_linear_log(env: &mut EncoderEnv, sum: &LinearSum, op: CmpOp) -> ClauseSet {
     // TODO: some clauses should be directly added to `env`
     let mut values_positive = vec![];
     let mut values_negative = vec![];
@@ -1462,18 +1462,47 @@ fn encode_linear_eq_log(env: &mut EncoderEnv, sum: &LinearSum) -> ClauseSet {
     clause_set.append(aux_clauses1);
     clause_set.append(aux_clauses2);
 
-    for i in 0..(sum_positive.len().max(sum_negative.len())) {
-        if i >= sum_positive.len() {
-            clause_set.push(&[!sum_negative[i]]);
-        } else if i >= sum_negative.len() {
-            clause_set.push(&[!sum_positive[i]]);
-        } else {
-            let p = sum_positive[i];
-            let n = sum_negative[i];
+    match op {
+        CmpOp::Eq => {
+            for i in 0..(sum_positive.len().max(sum_negative.len())) {
+                if i >= sum_positive.len() {
+                    clause_set.push(&[!sum_negative[i]]);
+                } else if i >= sum_negative.len() {
+                    clause_set.push(&[!sum_positive[i]]);
+                } else {
+                    let p = sum_positive[i];
+                    let n = sum_negative[i];
 
-            clause_set.push(&[p, !n]);
-            clause_set.push(&[!p, n]);
+                    clause_set.push(&[p, !n]);
+                    clause_set.push(&[!p, n]);
+                }
+            }
         }
+        CmpOp::Ne => {
+            let mut clause = vec![];
+            for i in 0..(sum_positive.len().max(sum_negative.len())) {
+                if i >= sum_positive.len() {
+                    clause.push(sum_negative[i]);
+                } else if i >= sum_negative.len() {
+                    clause.push(sum_positive[i]);
+                } else {
+                    let aux = env.sat.new_var().as_lit(false);
+                    clause.push(aux);
+
+                    let p = sum_positive[i];
+                    let n = sum_negative[i];
+                    // aux <=> (p ^ n)
+                    // aux <=> ((p | n) & (!p | !n))
+                    clause_set.push(&[!aux, p, n]);
+                    clause_set.push(&[!aux, !p, !n]);
+                    clause_set.push(&[aux, p, !n]);
+                    clause_set.push(&[aux, !p, n]);
+                }
+            }
+            clause_set.push(&clause);
+        }
+        CmpOp::Ge => unimplemented!(),
+        CmpOp::Gt | CmpOp::Le | CmpOp::Lt => panic!(),
     }
 
     clause_set
@@ -1897,7 +1926,7 @@ mod tests {
             CmpOp::Eq,
         )];
         {
-            let clause_set = encode_linear_eq_log(&mut tester.env(), &lits[0].sum);
+            let clause_set = encode_linear_log(&mut tester.env(), &lits[0].sum, CmpOp::Eq);
             tester.add_clause_set(clause_set);
         }
 
@@ -1917,7 +1946,7 @@ mod tests {
             CmpOp::Eq,
         )];
         {
-            let clause_set = encode_linear_eq_log(&mut tester.env(), &lits[0].sum);
+            let clause_set = encode_linear_log(&mut tester.env(), &lits[0].sum, CmpOp::Eq);
             tester.add_clause_set(clause_set);
         }
 
@@ -1938,7 +1967,27 @@ mod tests {
             CmpOp::Eq,
         )];
         {
-            let clause_set = encode_linear_eq_log(&mut tester.env(), &lits[0].sum);
+            let clause_set = encode_linear_log(&mut tester.env(), &lits[0].sum, CmpOp::Eq);
+            tester.add_clause_set(clause_set);
+        }
+
+        tester.run_check(&lits);
+    }
+
+    #[test]
+    fn test_encode_linear_ne_log_encoding() {
+        let mut tester = EncoderTester::new();
+
+        let x = tester.add_int_var_log_encoding(Domain::range(2, 7));
+        let y = tester.add_int_var_log_encoding(Domain::range(3, 8));
+        let z = tester.add_int_var_log_encoding(Domain::range(1, 5));
+
+        let lits = [LinearLit::new(
+            linear_sum(&[(x, 1), (y, 2), (z, -3)], 0),
+            CmpOp::Ne,
+        )];
+        {
+            let clause_set = encode_linear_log(&mut tester.env(), &lits[0].sum, CmpOp::Ne);
             tester.add_clause_set(clause_set);
         }
 
