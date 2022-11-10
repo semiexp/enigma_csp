@@ -309,7 +309,10 @@ impl EncodeMap {
                         }
                     }
 
-                    self.int_map[var] = Some(Encoding::log_encoding(LogEncoding { lits, range: Range::new(low, high) }));
+                    self.int_map[var] = Some(Encoding::log_encoding(LogEncoding {
+                        lits,
+                        range: Range::new(low, high),
+                    }));
                 }
                 IntVarRepresentation::Binary(_, _, _) => {
                     unimplemented!();
@@ -580,7 +583,11 @@ fn encode_constraint(env: &mut EncoderEnv, constr: Constraint) {
                     }
                 }
                 EncoderKind::Log => {
-                    assert!(linear_lit.op == CmpOp::Eq || linear_lit.op == CmpOp::Ne || linear_lit.op == CmpOp::Ge);
+                    assert!(
+                        linear_lit.op == CmpOp::Eq
+                            || linear_lit.op == CmpOp::Ne
+                            || linear_lit.op == CmpOp::Ge
+                    );
                     let encoded = encode_linear_log(env, &linear_lit.sum, linear_lit.op);
                     for i in 0..encoded.len() {
                         env.sat.add_clause(&encoded[i]);
@@ -619,7 +626,11 @@ fn encode_constraint(env: &mut EncoderEnv, constr: Constraint) {
                     encoded_conjunction.append(encoded);
                 }
                 EncoderKind::Log => {
-                    assert!(linear_lit.op == CmpOp::Eq || linear_lit.op == CmpOp::Ne || linear_lit.op == CmpOp::Ge);
+                    assert!(
+                        linear_lit.op == CmpOp::Eq
+                            || linear_lit.op == CmpOp::Ne
+                            || linear_lit.op == CmpOp::Ge
+                    );
                     let encoded = encode_linear_log(env, &linear_lit.sum, linear_lit.op);
                     encoded_conjunction.append(encoded);
                 }
@@ -1548,7 +1559,7 @@ fn encode_linear_log(env: &mut EncoderEnv, sum: &LinearSum, op: CmpOp) -> Clause
                 }
                 clause_set.push(&clause);
             }
-        },
+        }
         CmpOp::Gt | CmpOp::Le | CmpOp::Lt => panic!(),
     }
 
@@ -1686,6 +1697,72 @@ fn log_encoding_adder(
     (clause_set, result)
 }
 
+#[allow(unused)]
+fn encode_mul_log(env: &mut EncoderEnv, x: IntVar, y: IntVar, m: IntVar) -> ClauseSet {
+    let x_repr = env.map.int_map[x]
+        .as_ref()
+        .unwrap()
+        .log_encoding
+        .as_ref()
+        .unwrap()
+        .lits
+        .clone();
+    let y_repr = env.map.int_map[y]
+        .as_ref()
+        .unwrap()
+        .log_encoding
+        .as_ref()
+        .unwrap()
+        .lits
+        .clone();
+    let m_repr = env.map.int_map[m]
+        .as_ref()
+        .unwrap()
+        .log_encoding
+        .as_ref()
+        .unwrap()
+        .lits
+        .clone();
+    let m_repr_len = m_repr.len();
+
+    let (mut clause_set, m_all) = log_encoding_multiplier(env, x_repr, y_repr, m_repr);
+
+    for i in m_repr_len..m_all.len() {
+        clause_set.push(&[!m_all[i]]);
+    }
+    clause_set
+}
+
+fn log_encoding_multiplier(
+    env: &mut EncoderEnv,
+    value1: Vec<Lit>,
+    value2: Vec<Lit>,
+    result: Vec<Lit>,
+) -> (ClauseSet, Vec<Lit>) {
+    let mut clause_set = ClauseSet::new();
+
+    let mut sum_values = vec![];
+    for i in 0..value1.len() {
+        let mut row = vec![];
+        for j in 0..value2.len() {
+            let x = value1[i];
+            let y = value2[j];
+            let m = env.sat.new_var().as_lit(false);
+            row.push(m);
+
+            // m <=> (x & y)
+            clause_set.push(&[!m, x]);
+            clause_set.push(&[!m, y]);
+            clause_set.push(&[!x, !y, m]);
+        }
+        sum_values.push((i, row));
+    }
+
+    let (new_clause_set, ret) = log_encoding_adder(env, sum_values, vec![], result);
+    clause_set.append(new_clause_set);
+    (clause_set, ret)
+}
+
 // TODO: add tests for ClauseSet
 #[cfg(test)]
 mod tests {
@@ -1787,6 +1864,7 @@ mod tests {
         fn enumerate_valid_assignments_by_literals(
             &self,
             lits: &[LinearLit],
+            mul: &[(IntVar, IntVar, IntVar)],
         ) -> Vec<Vec<CheckedInt>> {
             let int_vars = self.norm_vars.int_vars_iter().collect::<Vec<_>>();
             let domains = int_vars
@@ -1812,6 +1890,14 @@ mod tests {
                             return false;
                         }
                     }
+                    for &(x, y, m) in mul {
+                        let xi = int_vars.iter().position(|&v| v == x).unwrap();
+                        let yi = int_vars.iter().position(|&v| v == y).unwrap();
+                        let mi = int_vars.iter().position(|&v| v == m).unwrap();
+                        if assignment[xi] * assignment[yi] != assignment[mi] {
+                            return false;
+                        }
+                    }
                     true
                 })
                 .collect();
@@ -1819,7 +1905,16 @@ mod tests {
         }
 
         fn run_check(mut self, lits: &[LinearLit]) {
-            let mut result_by_literals = self.enumerate_valid_assignments_by_literals(lits);
+            let mut result_by_literals = self.enumerate_valid_assignments_by_literals(lits, &[]);
+            result_by_literals.sort();
+            let mut result_by_sat = self.enumerate_valid_assignments_by_sat();
+            result_by_sat.sort();
+
+            assert_eq!(result_by_literals, result_by_sat);
+        }
+
+        fn run_check_with_mul(mut self, lits: &[LinearLit], mul: &[(IntVar, IntVar, IntVar)]) {
+            let mut result_by_literals = self.enumerate_valid_assignments_by_literals(lits, mul);
             result_by_literals.sort();
             let mut result_by_sat = self.enumerate_valid_assignments_by_sat();
             result_by_sat.sort();
@@ -2094,10 +2189,31 @@ mod tests {
                 linear_sum(&[(x, 1), (y, 2), (z, -1)], 0),
                 op,
             )];
-            encode_constraint(&mut tester.env(), Constraint { bool_lit: vec![], linear_lit: lits.clone() });
+            encode_constraint(
+                &mut tester.env(),
+                Constraint {
+                    bool_lit: vec![],
+                    linear_lit: lits.clone(),
+                },
+            );
 
             tester.run_check(&lits);
         }
     }
 
+    #[test]
+    fn test_encode_mul_log() {
+        let mut tester = EncoderTester::new();
+
+        let x = tester.add_int_var_log_encoding(Domain::range(19, 33));
+        let y = tester.add_int_var_log_encoding(Domain::range(31, 37));
+        let z = tester.add_int_var_log_encoding(Domain::range(1000, 1030));
+
+        {
+            let clause_set = encode_mul_log(&mut tester.env(), x, y, z);
+            tester.add_clause_set(clause_set);
+        }
+
+        tester.run_check_with_mul(&[], &[(x, y, z)]);
+    }
 }
