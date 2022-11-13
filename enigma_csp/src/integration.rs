@@ -455,6 +455,11 @@ mod tests {
             self.solver.add_constraint(stmt);
         }
 
+        fn check_expect(self, n_assignment_expected: usize) {
+            let n_assignment = self.solver.enumerate_valid_assignments().len();
+            assert_eq!(n_assignment, n_assignment_expected);
+        }
+
         fn check(self) {
             let mut bool_domains = vec![];
             for _ in &self.bool_vars {
@@ -486,8 +491,7 @@ mod tests {
                 }
             }
 
-            let n_assignment = self.solver.enumerate_valid_assignments().len();
-            assert_eq!(n_assignment, n_assignment_expected);
+            self.check_expect(n_assignment_expected);
         }
 
         fn is_satisfied_csp(&self, assignment: &csp::Assignment) -> bool {
@@ -1145,6 +1149,21 @@ mod tests {
         tester.add_expr((a.expr() * b.expr()).eq(c.expr() * d.expr() + IntExpr::Const(1)));
 
         tester.check();
+    }
+
+    #[test]
+    fn test_integration_exhaustive_mul2() {
+        let mut tester = IntegrationTester::new();
+        let mut config = Config::default();
+        config.force_use_log_encoding = true;
+        tester.set_config(config);
+
+        let a = tester.new_int_var(Domain::range(1, 100));
+        let b = tester.new_int_var(Domain::range(1, 100));
+        let c = tester.new_int_var(Domain::range(1, 100));
+        tester.add_expr((a.expr() * a.expr() + b.expr() * b.expr()).eq(c.expr() * c.expr()));
+
+        tester.check_expect(104);
     }
 
     #[test]
