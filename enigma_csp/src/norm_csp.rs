@@ -318,6 +318,7 @@ impl NormCSPVars {
 
 pub enum ExtraConstraint {
     ActiveVerticesConnected(Vec<BoolLit>, Vec<(usize, usize)>),
+    Mul(IntVar, IntVar, IntVar),
 }
 
 pub struct NormCSP {
@@ -439,6 +440,10 @@ impl Assignment {
 
     pub fn get_bool(&self, var: BoolVar) -> Option<bool> {
         self.bool_val.get(&var).copied()
+    }
+
+    pub fn get_int(&self, var: IntVar) -> Option<CheckedInt> {
+        self.int_val.get(&var).copied()
     }
 
     pub fn eval_constraint(&self, constr: &Constraint) -> bool {

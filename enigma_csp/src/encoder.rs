@@ -1,5 +1,5 @@
 use std::cmp::Reverse;
-use std::collections::{BTreeSet, BinaryHeap};
+use std::collections::{BTreeSet, BinaryHeap, VecDeque};
 use std::ops::Index;
 
 use super::config::Config;
@@ -424,7 +424,9 @@ pub fn encode(norm: &mut NormCSP, sat: &mut SAT, map: &mut EncodeMap, config: &C
         }
     }
     for var in norm.unencoded_int_vars() {
-        if direct_encoding_vars.contains(&var) {
+        if config.force_use_log_encoding {
+            map.convert_int_var_log_encoding(&mut norm.vars, sat, var);
+        } else if direct_encoding_vars.contains(&var) {
             map.convert_int_var_direct_encoding(&mut norm.vars, sat, var);
         } else {
             map.convert_int_var_order_encoding(&mut norm.vars, sat, var);
@@ -452,6 +454,12 @@ pub fn encode(norm: &mut NormCSP, sat: &mut SAT, map: &mut EncodeMap, config: &C
                     .map(|l| env.convert_bool_lit(l))
                     .collect::<Vec<_>>();
                 env.sat.add_active_vertices_connected(lits, edges);
+            }
+            ExtraConstraint::Mul(x, y, m) => {
+                let clauses = encode_mul_log(&mut env, x, y, m);
+                for i in 0..clauses.len() {
+                    env.sat.add_clause(&clauses[i]);
+                }
             }
         }
     }
@@ -539,7 +547,7 @@ fn encode_constraint(env: &mut EncoderEnv, constr: Constraint) {
                     CmpOp::Lt => LinearLit::new(linear_lit.sum * -1 + (-1), CmpOp::Ge),
                     CmpOp::Gt => LinearLit::new(linear_lit.sum + (-1), CmpOp::Ge),
                 };
-                simplified_linears.push(vec![normalized]);
+                simplified_linears.push(decompose_linear_lit_log(env, &normalized));
             }
         }
     }
@@ -949,6 +957,96 @@ fn decompose_linear_lit(env: &mut EncoderEnv, lit: &LinearLit) -> Vec<LinearLit>
         sum.add_coef(var, coef);
     }
     ret.push(LinearLit::new(sum, lit.op));
+    ret
+}
+
+fn decompose_linear_lit_log(env: &mut EncoderEnv, lit: &LinearLit) -> Vec<LinearLit> {
+    assert!(lit.op == CmpOp::Ge || lit.op == CmpOp::Eq || lit.op == CmpOp::Ne);
+    let op_for_aux_lits = if lit.op == CmpOp::Ge {
+        CmpOp::Ge
+    } else {
+        CmpOp::Eq
+    };
+
+    let mut queue_positive = VecDeque::new();
+    let mut queue_negative = VecDeque::new();
+    for (&var, &coef) in &lit.sum.term {
+        if coef > 0 {
+            queue_positive.push_back((var, coef));
+        } else if coef < 0 {
+            queue_negative.push_back((var, coef));
+        } else {
+            panic!();
+        }
+    }
+
+    let mut ret = vec![];
+
+    const N_MAX_TERM: usize = 6;
+    while queue_positive.len() + queue_negative.len() > N_MAX_TERM {
+        let target_queue;
+        let another_queue;
+        let selecting_negative;
+        if queue_positive.len() > queue_negative.len() {
+            target_queue = &mut queue_positive;
+            another_queue = &mut queue_negative;
+            selecting_negative = false;
+        } else {
+            target_queue = &mut queue_negative;
+            another_queue = &mut queue_positive;
+            selecting_negative = true;
+        }
+
+        let n_pack = N_MAX_TERM.min(target_queue.len());
+
+        let mut aux_sum = LinearSum::new();
+        for _ in 0..n_pack {
+            let (var, coef) = target_queue.pop_front().unwrap();
+            aux_sum.add_coef(var, coef);
+        }
+        let mut aux_dom = env.norm_vars.get_domain_linear_sum(&aux_sum);
+
+        let mut rem_sum = LinearSum::new();
+        for &(var, coef) in target_queue.iter() {
+            rem_sum.add_coef(var, coef);
+        }
+        for &(var, coef) in another_queue.iter() {
+            rem_sum.add_coef(var, coef);
+        }
+        let rem_dom = env.norm_vars.get_domain_linear_sum(&rem_sum);
+        aux_dom.refine_upper_bound(-(lit.sum.constant + rem_dom.lower_bound_checked()));
+        aux_dom.refine_lower_bound(-(lit.sum.constant + rem_dom.upper_bound_checked()));
+        if selecting_negative {
+            aux_dom = aux_dom * CheckedInt::new(-1);
+        }
+
+        let aux_var = env
+            .norm_vars
+            .new_int_var(IntVarRepresentation::Domain(aux_dom));
+        env.map
+            .convert_int_var_log_encoding(&mut env.norm_vars, &mut env.sat, aux_var);
+
+        aux_sum.add_coef(
+            aux_var,
+            CheckedInt::new(if selecting_negative { 1 } else { -1 }),
+        );
+        ret.push(LinearLit::new(aux_sum, op_for_aux_lits));
+
+        target_queue.push_back((
+            aux_var,
+            CheckedInt::new(if selecting_negative { -1 } else { 1 }),
+        ));
+    }
+
+    let mut sum = LinearSum::constant(lit.sum.constant);
+    for &(var, coef) in &queue_positive {
+        sum.add_coef(var, coef);
+    }
+    for &(var, coef) in &queue_negative {
+        sum.add_coef(var, coef);
+    }
+    ret.push(LinearLit::new(sum, lit.op));
+
     ret
 }
 
