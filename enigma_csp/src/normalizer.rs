@@ -634,125 +634,45 @@ fn normalize_int_expr(env: &mut NormalizerEnv, expr: &IntExpr) -> LinearSum {
                 env.norm.add_constraint(c);
             }
 
-            if env.config.force_use_log_encoding {
-                let xdom_low;
-                let xdom_high;
-                match env.norm.vars.int_var(xvar) {
-                    IntVarRepresentation::Domain(dom) => {
-                        xdom_low = dom.lower_bound_checked();
-                        xdom_high = dom.upper_bound_checked();
-                    }
-                    IntVarRepresentation::Binary(_, t, f) => {
-                        xdom_low = *t.min(f);
-                        xdom_high = *t.max(f);
-                    }
+            let xdom_low;
+            let xdom_high;
+            match env.norm.vars.int_var(xvar) {
+                IntVarRepresentation::Domain(dom) => {
+                    xdom_low = dom.lower_bound_checked();
+                    xdom_high = dom.upper_bound_checked();
                 }
-                let ydom_low;
-                let ydom_high;
-                match env.norm.vars.int_var(yvar) {
-                    IntVarRepresentation::Domain(dom) => {
-                        ydom_low = dom.lower_bound_checked();
-                        ydom_high = dom.upper_bound_checked();
-                    }
-                    IntVarRepresentation::Binary(_, t, f) => {
-                        ydom_low = *t.min(f);
-                        ydom_high = *t.max(f);
-                    }
+                IntVarRepresentation::Binary(_, t, f) => {
+                    xdom_low = *t.min(f);
+                    xdom_high = *t.max(f);
                 }
-                let edges = [
-                    xdom_low * ydom_low,
-                    xdom_low * ydom_high,
-                    xdom_high * ydom_low,
-                    xdom_high * ydom_high,
-                ];
-                let zdom_low = *edges.iter().min().unwrap();
-                let zdom_high = *edges.iter().max().unwrap();
-                let zvar = env
-                    .norm
-                    .new_int_var(Domain::range_from_checked(zdom_low, zdom_high));
-
-                env.norm
-                    .add_extra_constraint(ExtraConstraint::Mul(xvar, yvar, zvar));
-                LinearSum::singleton(zvar)
-            } else {
-                let xdom_vals;
-                {
-                    match env.norm.vars.int_var(xvar) {
-                        IntVarRepresentation::Domain(dom) => {
-                            xdom_vals = dom.enumerate();
-                        }
-                        IntVarRepresentation::Binary(_, t, f) => {
-                            let t = *t;
-                            let f = *f;
-                            if t < f {
-                                xdom_vals = vec![t, f];
-                            } else if t > f {
-                                xdom_vals = vec![f, t];
-                            } else {
-                                xdom_vals = vec![t];
-                            }
-                        }
-                    }
-                }
-                let ydom_vals;
-                {
-                    match env.norm.vars.int_var(yvar) {
-                        IntVarRepresentation::Domain(dom) => {
-                            ydom_vals = dom.enumerate();
-                        }
-                        IntVarRepresentation::Binary(_, t, f) => {
-                            let t = *t;
-                            let f = *f;
-                            if t < f {
-                                ydom_vals = vec![t, f];
-                            } else if t > f {
-                                ydom_vals = vec![f, t];
-                            } else {
-                                ydom_vals = vec![t];
-                            }
-                        }
-                    }
-                }
-
-                let mut zdom_sparse = vec![];
-                for &xval in &xdom_vals {
-                    for &yval in &ydom_vals {
-                        if xvar == yvar && xval != yval {
-                            continue;
-                        }
-                        zdom_sparse.push(xval * yval);
-                    }
-                }
-                zdom_sparse.sort();
-                zdom_sparse.dedup();
-                let zvar = env
-                    .norm
-                    .new_int_var(Domain::enumerative_from_checked(zdom_sparse));
-
-                for &xval in &xdom_vals {
-                    for &yval in &ydom_vals {
-                        if xvar == yvar && xval != yval {
-                            continue;
-                        }
-                        let mut c = Constraint::new();
-                        c.add_linear(LinearLit::new(
-                            LinearSum::singleton(xvar) - LinearSum::constant(xval),
-                            CmpOp::Ne,
-                        ));
-                        c.add_linear(LinearLit::new(
-                            LinearSum::singleton(yvar) - LinearSum::constant(yval),
-                            CmpOp::Ne,
-                        ));
-                        c.add_linear(LinearLit::new(
-                            LinearSum::singleton(zvar) - LinearSum::constant(xval * yval),
-                            CmpOp::Eq,
-                        ));
-                        env.norm.add_constraint(c);
-                    }
-                }
-
-                LinearSum::singleton(zvar)
             }
+            let ydom_low;
+            let ydom_high;
+            match env.norm.vars.int_var(yvar) {
+                IntVarRepresentation::Domain(dom) => {
+                    ydom_low = dom.lower_bound_checked();
+                    ydom_high = dom.upper_bound_checked();
+                }
+                IntVarRepresentation::Binary(_, t, f) => {
+                    ydom_low = *t.min(f);
+                    ydom_high = *t.max(f);
+                }
+            }
+            let edges = [
+                xdom_low * ydom_low,
+                xdom_low * ydom_high,
+                xdom_high * ydom_low,
+                xdom_high * ydom_high,
+            ];
+            let zdom_low = *edges.iter().min().unwrap();
+            let zdom_high = *edges.iter().max().unwrap();
+            let zvar = env
+                .norm
+                .new_int_var(Domain::range_from_checked(zdom_low, zdom_high));
+
+            env.norm
+                .add_extra_constraint(ExtraConstraint::Mul(xvar, yvar, zvar));
+            LinearSum::singleton(zvar)
         }
     }
 }

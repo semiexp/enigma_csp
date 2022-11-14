@@ -36,6 +36,19 @@ impl Domain {
         }
     }
 
+    pub(crate) fn num_candidates(&self) -> usize {
+        match self {
+            &Domain::Range(low, high) => {
+                if low <= high {
+                    (high - low).get() as usize + 1
+                } else {
+                    0
+                }
+            }
+            Domain::Enumerative(cands) => cands.len(),
+        }
+    }
+
     pub(crate) fn lower_bound_checked(&self) -> CheckedInt {
         match self {
             Domain::Range(low, _) => *low,

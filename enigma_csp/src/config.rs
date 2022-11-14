@@ -11,6 +11,7 @@ pub struct Config {
     pub native_linear_encoding_terms: usize,
     pub native_linear_encoding_domain_product_threshold: usize,
     pub use_direct_encoding: bool,
+    pub use_log_encoding: bool,
     pub force_use_log_encoding: bool,
     pub direct_encoding_for_binary_vars: bool,
     pub merge_equivalent_variables: bool,
@@ -30,6 +31,7 @@ impl Config {
             native_linear_encoding_terms: 4,
             native_linear_encoding_domain_product_threshold: 20,
             use_direct_encoding: true,
+            use_log_encoding: true,
             force_use_log_encoding: false,
             direct_encoding_for_binary_vars: false,
             merge_equivalent_variables: false,
@@ -65,6 +67,11 @@ impl Config {
                 &mut config.use_direct_encoding,
                 "direct-encoding",
                 "use direct encoding if applicable",
+            ),
+            (
+                &mut config.use_log_encoding,
+                "log-encoding",
+                "use log encoding if applicable",
             ),
             (
                 &mut config.force_use_log_encoding,

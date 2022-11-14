@@ -1,5 +1,5 @@
 use std::cmp::Reverse;
-use std::collections::{BTreeSet, BinaryHeap, VecDeque};
+use std::collections::{BTreeMap, BTreeSet, BinaryHeap, VecDeque};
 use std::ops::Index;
 
 use super::config::Config;
@@ -400,36 +400,18 @@ impl<'a, 'b, 'c, 'd> EncoderEnv<'a, 'b, 'c, 'd> {
 }
 
 pub fn encode(norm: &mut NormCSP, sat: &mut SAT, map: &mut EncodeMap, config: &Config) {
-    let mut direct_encoding_vars = BTreeSet::<IntVar>::new();
-    if config.use_direct_encoding {
-        for var in norm.unencoded_int_vars() {
-            let maybe_direct_encoding = match norm.vars.int_var(var) {
-                IntVarRepresentation::Domain(_) => true,
-                IntVarRepresentation::Binary(_, _, _) => config.direct_encoding_for_binary_vars,
-            };
-            if maybe_direct_encoding {
-                direct_encoding_vars.insert(var);
-            }
-        }
-        for constr in &norm.constraints {
-            for lit in &constr.linear_lit {
-                // TODO: use direct encoding for more complex cases
-                let is_simple = (lit.op == CmpOp::Eq || lit.op == CmpOp::Ne) && lit.sum.len() <= 2;
-                if !is_simple {
-                    for (v, _) in lit.sum.iter() {
-                        direct_encoding_vars.remove(v);
-                    }
-                }
-            }
-        }
-    }
-    for var in norm.unencoded_int_vars() {
-        if config.force_use_log_encoding {
-            map.convert_int_var_log_encoding(&mut norm.vars, sat, var);
-        } else if direct_encoding_vars.contains(&var) {
-            map.convert_int_var_direct_encoding(&mut norm.vars, sat, var);
-        } else {
-            map.convert_int_var_order_encoding(&mut norm.vars, sat, var);
+    let new_vars = norm.unencoded_int_vars().collect::<Vec<_>>();
+    let constrs = std::mem::replace(&mut norm.constraints, vec![]);
+    let extra_constrs = std::mem::replace(&mut norm.extra_constraints, vec![]);
+
+    let scheme =
+        decide_encode_schemes(config, &norm.vars, map, &new_vars, &constrs, &extra_constrs);
+
+    for &var in &new_vars {
+        match scheme.get(&var).unwrap() {
+            EncodeScheme::Direct => map.convert_int_var_direct_encoding(&mut norm.vars, sat, var),
+            EncodeScheme::Order => map.convert_int_var_order_encoding(&mut norm.vars, sat, var),
+            EncodeScheme::Log => map.convert_int_var_log_encoding(&mut norm.vars, sat, var),
         }
     }
 
@@ -440,12 +422,10 @@ pub fn encode(norm: &mut NormCSP, sat: &mut SAT, map: &mut EncodeMap, config: &C
         config,
     };
 
-    let constrs = std::mem::replace(&mut norm.constraints, vec![]);
     for constr in constrs {
         encode_constraint(&mut env, constr);
     }
 
-    let extra_constrs = std::mem::replace(&mut norm.extra_constraints, vec![]);
     for constr in extra_constrs {
         match constr {
             ExtraConstraint::ActiveVerticesConnected(vertices, edges) => {
@@ -456,14 +436,149 @@ pub fn encode(norm: &mut NormCSP, sat: &mut SAT, map: &mut EncodeMap, config: &C
                 env.sat.add_active_vertices_connected(lits, edges);
             }
             ExtraConstraint::Mul(x, y, m) => {
-                let clauses = encode_mul_log(&mut env, x, y, m);
-                for i in 0..clauses.len() {
-                    env.sat.add_clause(&clauses[i]);
+                let x_log = env.map.int_map[x].as_ref().unwrap().log_encoding.is_some();
+                let y_log = env.map.int_map[y].as_ref().unwrap().log_encoding.is_some();
+                let m_log = env.map.int_map[m].as_ref().unwrap().log_encoding.is_some();
+
+                if x_log && y_log && m_log {
+                    let clauses = encode_mul_log(&mut env, x, y, m);
+                    for i in 0..clauses.len() {
+                        env.sat.add_clause(&clauses[i]);
+                    }
+                } else {
+                    // TODO: constrain the domain of m if m is encoded by order or direct
+                    encode_mul_naive(&mut env, x, y, m);
                 }
             }
         }
     }
     norm.num_encoded_vars = norm.vars.int_var.len();
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+enum EncodeScheme {
+    Order,
+    Direct,
+    Log,
+}
+
+fn decide_encode_schemes(
+    config: &Config,
+    norm_vars: &NormCSPVars,
+    _map: &EncodeMap,
+    new_vars: &[IntVar],
+    new_constraints: &[Constraint],
+    new_ext_constraints: &[ExtraConstraint],
+) -> BTreeMap<IntVar, EncodeScheme> {
+    // TODO: consider already encoded variables
+
+    if config.force_use_log_encoding {
+        let mut ret = BTreeMap::new();
+        for &var in new_vars {
+            ret.insert(var, EncodeScheme::Log);
+        }
+        return ret;
+    }
+
+    let mut scheme = BTreeMap::new();
+
+    if config.use_log_encoding {
+        // Values with large domain must be log-encoded
+        for &var in new_vars {
+            let repr = norm_vars.int_var(var);
+            match repr {
+                IntVarRepresentation::Domain(domain) => {
+                    if domain.num_candidates() > 500 {
+                        // TODO: make this configurable
+                        scheme.insert(var, EncodeScheme::Log);
+                    }
+                }
+                _ => (),
+            }
+        }
+
+        // Values cooccurring with log-encoded ones in some constraints must be log-encoded
+        loop {
+            let mut updated = false;
+
+            for constraint in new_constraints {
+                for lit in &constraint.linear_lit {
+                    let has_log = lit.sum.iter().any(|(var, _)| {
+                        scheme.get(&var).map_or(false, |&x| x == EncodeScheme::Log)
+                    });
+                    if has_log {
+                        for (var, _) in lit.sum.iter() {
+                            if !scheme.contains_key(var) {
+                                scheme.insert(*var, EncodeScheme::Log);
+                                updated = true;
+                            }
+                        }
+                    }
+                }
+            }
+            for ext_constraint in new_ext_constraints {
+                match ext_constraint {
+                    ExtraConstraint::ActiveVerticesConnected(_, _) => (),
+                    ExtraConstraint::Mul(a, b, m) => {
+                        let vars = [*a, *b, *m];
+                        let has_log = vars
+                            .iter()
+                            .any(|var| scheme.get(&var).map_or(false, |&x| x == EncodeScheme::Log));
+                        if has_log {
+                            for var in &vars {
+                                if !scheme.contains_key(var) {
+                                    scheme.insert(*var, EncodeScheme::Log);
+                                    updated = true;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            if !updated {
+                break;
+            }
+        }
+    }
+
+    if config.use_direct_encoding {
+        let mut direct_encoding_vars = BTreeSet::<IntVar>::new();
+        for &var in new_vars {
+            let maybe_direct_encoding = match norm_vars.int_var(var) {
+                IntVarRepresentation::Domain(_) => true,
+                IntVarRepresentation::Binary(_, _, _) => config.direct_encoding_for_binary_vars,
+            };
+            if maybe_direct_encoding && !scheme.get(&var).map_or(false, |&x| x == EncodeScheme::Log)
+            {
+                direct_encoding_vars.insert(var);
+            }
+        }
+        for constr in new_constraints {
+            for lit in &constr.linear_lit {
+                // TODO: use direct encoding for more complex cases
+                let is_simple = (lit.op == CmpOp::Eq || lit.op == CmpOp::Ne) && lit.sum.len() <= 2;
+                if !is_simple {
+                    for (v, _) in lit.sum.iter() {
+                        direct_encoding_vars.remove(v);
+                    }
+                }
+            }
+        }
+        for &var in &direct_encoding_vars {
+            scheme.insert(var, EncodeScheme::Direct);
+        }
+    }
+
+    let mut ret = BTreeMap::new();
+    for &var in new_vars {
+        ret.insert(
+            var,
+            scheme.get(&var).cloned().unwrap_or(EncodeScheme::Order),
+        );
+    }
+
+    ret
 }
 
 fn is_unsatisfiable_linear(env: &EncoderEnv, linear_lit: &LinearLit) -> bool {
@@ -1795,7 +1910,34 @@ fn log_encoding_adder(
     (clause_set, result)
 }
 
-#[allow(unused)]
+fn encode_mul_naive(env: &mut EncoderEnv, x: IntVar, y: IntVar, m: IntVar) {
+    let x_range = env.map.int_map[x].as_ref().unwrap().range();
+    let y_range = env.map.int_map[y].as_ref().unwrap().range();
+
+    for i in x_range.low.get()..=x_range.high.get() {
+        let i = CheckedInt::new(i);
+        for j in y_range.low.get()..=y_range.high.get() {
+            let j = CheckedInt::new(j);
+
+            let mut c = Constraint::new();
+            c.add_linear(LinearLit::new(
+                LinearSum::singleton(x) - LinearSum::constant(i),
+                CmpOp::Ne,
+            ));
+            c.add_linear(LinearLit::new(
+                LinearSum::singleton(y) - LinearSum::constant(j),
+                CmpOp::Ne,
+            ));
+            c.add_linear(LinearLit::new(
+                LinearSum::singleton(m) - LinearSum::constant(i * j),
+                CmpOp::Eq,
+            ));
+
+            encode_constraint(env, c);
+        }
+    }
+}
+
 fn encode_mul_log(env: &mut EncoderEnv, x: IntVar, y: IntVar, m: IntVar) -> ClauseSet {
     let x_repr = env.map.int_map[x]
         .as_ref()
