@@ -484,11 +484,34 @@ fn decide_encode_schemes(
 
     if config.use_log_encoding {
         // Values with large domain must be log-encoded
+        let mut complex_constraints_vars = BTreeSet::new();
+
+        for constraint in new_constraints {
+            for lit in &constraint.linear_lit {
+                if lit.sum.len() < 3 {
+                    continue;
+                }
+                for (&var, _) in lit.sum.iter() {
+                    complex_constraints_vars.insert(var);
+                }
+            }
+        }
+        for ext_constraint in new_ext_constraints {
+            match ext_constraint {
+                &ExtraConstraint::Mul(x, y, m) => {
+                    complex_constraints_vars.insert(x);
+                    complex_constraints_vars.insert(y);
+                    complex_constraints_vars.insert(m);
+                }
+                ExtraConstraint::ActiveVerticesConnected(_, _) => (),
+            }
+        }
+
         for &var in new_vars {
             let repr = norm_vars.int_var(var);
             match repr {
                 IntVarRepresentation::Domain(domain) => {
-                    if domain.num_candidates() > 500 {
+                    if domain.num_candidates() > 500 && complex_constraints_vars.contains(&var) {
                         // TODO: make this configurable
                         scheme.insert(var, EncodeScheme::Log);
                     }
@@ -566,7 +589,14 @@ fn decide_encode_schemes(
             }
         }
         for &var in &direct_encoding_vars {
-            scheme.insert(var, EncodeScheme::Direct);
+            let repr = norm_vars.int_var(var);
+            let use_direct_encoding = match repr {
+                IntVarRepresentation::Domain(domain) => domain.num_candidates() <= 500,
+                _ => true,
+            };
+            if use_direct_encoding {
+                scheme.insert(var, EncodeScheme::Direct);
+            }
         }
     }
 
