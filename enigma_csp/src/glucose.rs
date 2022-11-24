@@ -1,4 +1,6 @@
+use std::ffi::CString;
 use std::ops::{Drop, Not};
+use std::os::raw::c_char;
 
 #[repr(C)]
 struct Opaque {
@@ -9,6 +11,7 @@ extern "C" {
     fn Glucose_CreateSolver() -> *mut Opaque;
     fn Glucose_DestroySolver(solver: *mut Opaque);
     fn Glucose_NewVar(solver: *mut Opaque) -> i32;
+    fn Glucose_NewNamedVar(solver: *mut Opaque, name: *const c_char) -> i32;
     fn Glucose_AddClause(solver: *mut Opaque, lits: *const Lit, n_lits: i32) -> i32;
     fn Glucose_Solve(solver: *mut Opaque) -> i32;
     fn Glucose_NumVar(solver: *mut Opaque) -> i32;
@@ -34,6 +37,7 @@ extern "C" {
     fn Glucose_SolverStats_conflicts(solver: *mut Opaque) -> u64;
     fn Glucose_Set_random_seed(solver: *mut Opaque, random_seed: f64);
     fn Glucose_Set_rnd_init_act(solver: *mut Opaque, rnd_init_act: i32);
+    fn Glucose_Set_dump_analysis_info(solver: *mut Opaque, value: i32);
 }
 
 #[derive(Clone, Copy)]
@@ -80,6 +84,13 @@ impl Solver {
 
     pub fn new_var(&mut self) -> Var {
         let var_id = unsafe { Glucose_NewVar(self.ptr) };
+        assert!(0 <= var_id && var_id <= NUM_VAR_MAX);
+        Var(var_id)
+    }
+
+    pub fn new_named_var(&mut self, name: &str) -> Var {
+        let c_string = CString::new(name).unwrap();
+        let var_id = unsafe { Glucose_NewNamedVar(self.ptr, c_string.as_ptr()) };
         assert!(0 <= var_id && var_id <= NUM_VAR_MAX);
         Var(var_id)
     }
@@ -168,6 +179,10 @@ impl Solver {
         unsafe {
             Glucose_Set_rnd_init_act(self.ptr, if rnd_init_act { 1 } else { 0 });
         }
+    }
+
+    pub fn set_dump_analysis_info(&mut self, dump_analysis_info: bool) {
+        unsafe { Glucose_Set_dump_analysis_info(self.ptr, if dump_analysis_info { 1 } else { 0 }) }
     }
 
     pub fn solve<'a>(&'a mut self) -> Option<Model<'a>> {

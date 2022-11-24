@@ -18,6 +18,7 @@ pub struct Config {
     pub alldifferent_bijection_constraints: bool,
     pub glucose_random_seed: Option<f64>,
     pub glucose_rnd_init_act: bool,
+    pub dump_analysis_info: bool,
     pub verbose: bool,
 }
 
@@ -38,6 +39,7 @@ impl Config {
             alldifferent_bijection_constraints: false,
             glucose_random_seed: None,
             glucose_rnd_init_act: false,
+            dump_analysis_info: false,
             verbose: false,
         }
     }
@@ -87,6 +89,11 @@ impl Config {
                 &mut config.alldifferent_bijection_constraints,
                 "alldifferent-bijection-constraints",
                 "add auxiliary constraints for bijective alldifferent constraints",
+            ),
+            (
+                &mut config.dump_analysis_info,
+                "dump-analysis-info",
+                "dump analysis info in Glucose",
             ),
             (&mut config.verbose, "verbose", "show verbose outputs"),
         ];

@@ -154,6 +154,51 @@ impl Encoding {
     }
 }
 
+#[cfg(feature = "sat-analyzer")]
+macro_rules! new_var {
+    ( $sat:expr, $( $x:expr ),* ) => {
+        {
+            let name = format!($($x,)*);
+            $sat.new_var(&name)
+        }
+    };
+
+    ( $sat:expr ) => {
+        {
+            let name = format!("aux_{}", $sat.num_var());
+            $sat.new_var(&name)
+        }
+    }
+}
+
+#[cfg(not(feature = "sat-analyzer"))]
+macro_rules! new_var {
+    ( $sat:expr, $( $x:expr ),* ) => {
+        $sat.new_var()
+    };
+
+    ( $sat:expr ) => {
+        $sat.new_var()
+    };
+}
+
+#[cfg(feature = "sat-analyzer")]
+macro_rules! new_vars_as_lits {
+    ( $sat:expr, $n:expr, $( $x:expr ),* ) => {
+        {
+            let name = format!($($x,)*);
+            $sat.new_vars_as_lits($n, &name)
+        }
+    };
+}
+
+#[cfg(not(feature = "sat-analyzer"))]
+macro_rules! new_vars_as_lits {
+    ( $sat:expr, $n:expr, $( $x:expr ),* ) => {
+        $sat.new_vars_as_lits($n)
+    };
+}
+
 pub struct EncodeMap {
     bool_map: ConvertMap<BoolVar, Lit>, // mapped to Lit rather than Var so that further optimization can be done
     int_map: ConvertMap<IntVar, Encoding>,
@@ -171,7 +216,7 @@ impl EncodeMap {
         match self.bool_map[var] {
             Some(x) => x,
             None => {
-                let ret = sat.new_var().as_lit(false);
+                let ret = new_var!(sat, "{}", var.id()).as_lit(false);
                 self.bool_map[var] = Some(ret);
                 ret
             }
@@ -198,7 +243,22 @@ impl EncodeMap {
                 IntVarRepresentation::Domain(domain) => {
                     let domain = domain.enumerate();
                     assert_ne!(domain.len(), 0);
-                    let lits = sat.new_vars_as_lits(domain.len() - 1);
+                    let lits;
+                    #[cfg(feature = "sat-analyzer")]
+                    {
+                        let mut tmp = vec![];
+                        for i in 0..domain.len() - 1 {
+                            tmp.push(
+                                new_var!(sat, "{}.ord>={}", var.id(), domain[i + 1].get())
+                                    .as_lit(false),
+                            );
+                        }
+                        lits = tmp;
+                    }
+                    #[cfg(not(feature = "sat-analyzer"))]
+                    {
+                        lits = sat.new_vars_as_lits(domain.len() - 1);
+                    }
                     for i in 1..lits.len() {
                         // vars[i] implies vars[i - 1]
                         sat.add_clause(&vec![!lits[i], lits[i - 1]]);
@@ -228,7 +288,22 @@ impl EncodeMap {
                 IntVarRepresentation::Domain(domain) => {
                     let domain = domain.enumerate();
                     assert_ne!(domain.len(), 0);
-                    let lits = sat.new_vars_as_lits(domain.len());
+                    let lits;
+                    #[cfg(feature = "sat-analyzer")]
+                    {
+                        let mut tmp = vec![];
+                        for i in 0..domain.len() {
+                            tmp.push(
+                                new_var!(sat, "{}.dir=={}", var.id(), domain[i].get())
+                                    .as_lit(false),
+                            );
+                        }
+                        lits = tmp;
+                    }
+                    #[cfg(not(feature = "sat-analyzer"))]
+                    {
+                        lits = sat.new_vars_as_lits(domain.len());
+                    }
                     sat.add_clause(&lits);
                     for i in 1..lits.len() {
                         for j in 0..i {
@@ -266,7 +341,7 @@ impl EncodeMap {
                         unimplemented!("negative values not supported in log encoding");
                     }
                     let n_bits = (32 - high.get().leading_zeros()) as usize;
-                    let lits = sat.new_vars_as_lits(n_bits);
+                    let lits = new_vars_as_lits!(sat, n_bits, "{}.log", var.id());
 
                     for i in 0..n_bits {
                         if ((low.get() >> i) & 1) != 0 {
@@ -816,12 +891,12 @@ fn encode_constraint(env: &mut EncoderEnv, constr: Constraint) {
     } else {
         let mut channeling_lits = vec![];
         if encoded_lits.len() == 2 && bool_lits.len() == 0 {
-            let v = env.sat.new_var();
+            let v = new_var!(env.sat);
             channeling_lits.push(v.as_lit(false));
             channeling_lits.push(v.as_lit(true));
         } else {
             for _ in 0..encoded_lits.len() {
-                let v = env.sat.new_var();
+                let v = new_var!(env.sat);
                 channeling_lits.push(v.as_lit(true));
                 bool_lits.push(v.as_lit(false));
             }
@@ -1745,7 +1820,7 @@ fn encode_linear_log(env: &mut EncoderEnv, sum: &LinearSum, op: CmpOp) -> Clause
                 } else if i >= sum_negative.len() {
                     clause.push(sum_positive[i]);
                 } else {
-                    let aux = env.sat.new_var().as_lit(false);
+                    let aux = new_var!(env.sat).as_lit(false);
                     clause.push(aux);
 
                     let p = sum_positive[i];
@@ -1763,7 +1838,7 @@ fn encode_linear_log(env: &mut EncoderEnv, sum: &LinearSum, op: CmpOp) -> Clause
         CmpOp::Ge => {
             let mut sub: Option<Lit> = None;
             for i in 0..(sum_positive.len().min(sum_negative.len())) {
-                let sub_next = env.sat.new_var().as_lit(false);
+                let sub_next = new_var!(env.sat).as_lit(false);
                 let p = sum_positive[i];
                 let n = sum_negative[i];
 
@@ -1890,7 +1965,7 @@ fn log_encoding_adder(
         }
         let mut carry_next = vec![];
         for _ in 0..(cnt.get() / 2) {
-            let var = env.sat.new_var();
+            let var = new_var!(env.sat);
             carry_next.push(var.as_lit(false));
         }
         let carry_next_encoding = OrderEncoding {
@@ -1903,7 +1978,7 @@ fn log_encoding_adder(
         }));
 
         while i >= result.len() {
-            result.push(env.sat.new_var().as_lit(false));
+            result.push(new_var!(env.sat).as_lit(false));
         }
         let ret_encoding = OrderEncoding {
             domain: vec![CheckedInt::new(0), CheckedInt::new(1)],
@@ -2017,7 +2092,7 @@ fn log_encoding_multiplier(
         for j in 0..value2.len() {
             let x = value1[i];
             let y = value2[j];
-            let m = env.sat.new_var().as_lit(false);
+            let m = new_var!(env.sat, "mul.{}.{}.{}", env.sat.num_var(), i, j).as_lit(false);
             row.push(m);
 
             // m <=> (x & y)

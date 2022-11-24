@@ -9,6 +9,9 @@ edition = "2018"
 name = "enigma_csp"
 crate-type = ["cdylib", "lib"]
 
+[features]
+sat-analyzer = []
+
 [dependencies]
 getopts = "0.2"
 nom = "7.0.0"

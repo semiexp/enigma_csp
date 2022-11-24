@@ -64,10 +64,26 @@ impl SAT {
         self.solver.all_vars().into_iter().map(|v| Var(v)).collect()
     }
 
+    #[cfg(feature = "sat-analyzer")]
+    pub fn new_var(&mut self, name: &str) -> Var {
+        Var(self.solver.new_named_var(name))
+    }
+
+    #[cfg(not(feature = "sat-analyzer"))]
     pub fn new_var(&mut self) -> Var {
         Var(self.solver.new_var())
     }
 
+    #[cfg(feature = "sat-analyzer")]
+    pub fn new_vars(&mut self, count: usize, name: &str) -> Vec<Var> {
+        let mut vars = vec![];
+        for i in 0..count {
+            vars.push(self.new_var(&format!("{}.{}", name, i)));
+        }
+        vars
+    }
+
+    #[cfg(not(feature = "sat-analyzer"))]
     pub fn new_vars(&mut self, count: usize) -> Vec<Var> {
         let mut vars = vec![];
         for _ in 0..count {
@@ -76,6 +92,13 @@ impl SAT {
         vars
     }
 
+    #[cfg(feature = "sat-analyzer")]
+    pub fn new_vars_as_lits(&mut self, count: usize, name: &str) -> Vec<Lit> {
+        let vars = self.new_vars(count, name);
+        vars.iter().map(|v| v.as_lit(false)).collect()
+    }
+
+    #[cfg(not(feature = "sat-analyzer"))]
     pub fn new_vars_as_lits(&mut self, count: usize) -> Vec<Lit> {
         let vars = self.new_vars(count);
         vars.iter().map(|v| v.as_lit(false)).collect()
@@ -116,6 +139,10 @@ impl SAT {
 
     pub fn set_rnd_init_act(&mut self, rnd_init_act: bool) {
         self.solver.set_rnd_init_act(rnd_init_act);
+    }
+
+    pub fn set_dump_analysis_info(&mut self, dump_analysis_info: bool) {
+        self.solver.set_dump_analysis_info(dump_analysis_info);
     }
 
     pub fn solve<'a>(&'a mut self) -> Option<SATModel<'a>> {

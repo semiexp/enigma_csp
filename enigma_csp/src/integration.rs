@@ -86,6 +86,8 @@ impl<'a> IntegratedSolver<'a> {
     pub fn set_config(&mut self, config: Config) {
         self.config = config;
         self.sat.set_rnd_init_act(self.config.glucose_rnd_init_act);
+        self.sat
+            .set_dump_analysis_info(self.config.dump_analysis_info);
         if let Some(seed) = self.config.glucose_random_seed {
             self.sat.set_seed(seed);
         }

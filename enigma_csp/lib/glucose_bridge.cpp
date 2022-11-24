@@ -19,6 +19,11 @@ int Glucose_NewVar(Glucose::Solver* solver) {
     return solver->newVar();
 }
 
+int32_t Glucose_NewNamedVar(Glucose::Solver* solver, const char* name) {
+    std::string name_str(name);
+    return solver->newNamedVar(name_str);
+}
+
 int32_t Glucose_AddClause(Glucose::Solver* solver, int32_t* lits, int32_t n_lits) {
     Glucose::vec<Glucose::Lit> lits_vec;
     for (int i = 0; i < n_lits; ++i) {
@@ -86,6 +91,10 @@ void Glucose_Set_random_seed(Glucose::Solver* solver, double random_seed) {
 
 void Glucose_Set_rnd_init_act(Glucose::Solver* solver, int32_t rnd_init_act) {
     solver->rnd_init_act = rnd_init_act != 0;
+}
+
+void Glucose_Set_dump_analysis_info(Glucose::Solver* solver, int32_t value) {
+    solver->dump_analysis_info = value != 0;
 }
 
 }
