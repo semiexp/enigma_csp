@@ -160,12 +160,12 @@ impl Config {
             }
         }
 
-        if let Some(s) = matches.opt_str("native-linear-encoding-terms") {
+        if let Some(s) = matches.opt_str("domain-product-threshold") {
             let v = match s.parse::<usize>() {
                 Ok(v) => v,
                 Err(f) => {
                     println!(
-                        "error: parse failed for --native-linear-encoding-terms: {}",
+                        "error: parse failed for --domain-product-threshold: {}",
                         f.to_string()
                     );
                     std::process::exit(1);
@@ -197,7 +197,7 @@ impl Config {
                     std::process::exit(1);
                 }
             };
-            config.native_linear_encoding_terms = v;
+            config.native_linear_encoding_domain_product_threshold = v;
         }
 
         config
