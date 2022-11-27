@@ -48,6 +48,13 @@ impl<'a> SyntaxTree<'a> {
         assert!(n >= 0);
         n as usize
     }
+
+    fn as_node(&self) -> &Vec<SyntaxTree<'a>> {
+        match self {
+            SyntaxTree::Node(ch) => ch,
+            _ => panic!("node expected"),
+        }
+    }
 }
 
 fn is_ident_char(c: char) -> bool {
@@ -81,6 +88,7 @@ fn parse_to_tree(input: &str) -> Result<SyntaxTree, nom::error::Error<&str>> {
                 tag(")"),
             ),
             map(tag("graph-active-vertices-connected"), SyntaxTree::Ident),
+            map(tag("extension-supports"), SyntaxTree::Ident),
             map(ident_or_op, SyntaxTree::Ident),
             map(digit1, |s: &str| SyntaxTree::Int(s.parse::<i32>().unwrap())), // TODO
             map(preceded(tag("-"), digit1), |s: &str| {
@@ -200,6 +208,28 @@ pub fn parse<'a, 'b>(var_map: &'a VarMap, input: &'b str) -> ParseResult<'b> {
             })
             .collect::<Vec<_>>();
         ParseResult::Stmt(Stmt::ActiveVerticesConnected(vertices, edges))
+    } else if op_name == "extension-supports" {
+        assert_eq!(child.len(), 3);
+        let mut vars = vec![];
+        for c in child[1].as_node() {
+            match var_map.get_var(c.as_ident()) {
+                Some(Var::Int(v)) => vars.push(v),
+                _ => panic!(),
+            }
+        }
+        let mut supports = vec![];
+        for s in child[2].as_node() {
+            let mut support = vec![];
+            for v in s.as_node() {
+                match v {
+                    SyntaxTree::Int(v) => support.push(Some(*v)),
+                    SyntaxTree::Ident("*") => support.push(None),
+                    _ => panic!(),
+                }
+            }
+            supports.push(support);
+        }
+        ParseResult::Stmt(Stmt::ExtensionSupports(vars, supports))
     } else {
         ParseResult::Stmt(Stmt::Expr(parse_bool_expr(var_map, &tree)))
     }
