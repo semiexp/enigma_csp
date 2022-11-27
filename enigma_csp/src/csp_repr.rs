@@ -48,6 +48,7 @@ pub enum Stmt {
     AllDifferent(Vec<IntExpr>),
     ActiveVerticesConnected(Vec<BoolExpr>, Vec<(usize, usize)>),
     Circuit(Vec<IntVar>),
+    ExtensionSupports(Vec<IntVar>, Vec<Vec<Option<i32>>>),
 }
 
 impl Stmt {
@@ -87,6 +88,7 @@ impl Stmt {
                 }
                 write!(out, ")")?;
             }
+            Stmt::ExtensionSupports(_, _) => todo!(),
         }
         Ok(())
     }

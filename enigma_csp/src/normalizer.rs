@@ -244,6 +244,9 @@ fn normalize_stmt(env: &mut NormalizerEnv, stmt: Stmt) {
                 ));
         }
         Stmt::Circuit(vars) => normalize_circuit(env, vars),
+        Stmt::ExtensionSupports(vars, supports) => {
+            normalize_extension_supports(env, vars, supports)
+        }
     }
     if env.config.verbose {
         for i in num_constrs_before_norm..env.norm.constraints.len() {
@@ -809,6 +812,134 @@ fn normalize_circuit(env: &mut NormalizerEnv, vars: Vec<IntVar>) {
         ));
 }
 
+fn normalize_extension_supports(
+    env: &mut NormalizerEnv,
+    vars: Vec<IntVar>,
+    supports: Vec<Vec<Option<i32>>>,
+) {
+    fn linear_eq(var: NIntVar, constant: i32) -> LinearLit {
+        LinearLit::new(
+            LinearSum::singleton(var) - LinearSum::constant(CheckedInt::new(constant)),
+            CmpOp::Eq,
+        )
+    }
+    fn linear_ne(var: NIntVar, constant: i32) -> LinearLit {
+        LinearLit::new(
+            LinearSum::singleton(var) - LinearSum::constant(CheckedInt::new(constant)),
+            CmpOp::Ne,
+        )
+    }
+
+    let mut has_star = false;
+    for s in &supports {
+        for v in s {
+            if v.is_none() {
+                has_star = true;
+                break;
+            }
+        }
+        if has_star {
+            break;
+        }
+    }
+
+    if has_star {
+        // TODO: support efficient coding with stars
+        let mut exprs = vec![];
+        for s in &supports {
+            let mut c = vec![];
+            assert_eq!(s.len(), vars.len());
+            for i in 0..vars.len() {
+                if let Some(n) = s[i] {
+                    c.push(Box::new(vars[i].expr().eq(IntExpr::Const(n))));
+                }
+            }
+            exprs.push(Box::new(BoolExpr::And(c)));
+        }
+        normalize_stmt(env, Stmt::Expr(BoolExpr::Or(exprs)));
+        return;
+    }
+
+    let vars = vars
+        .into_iter()
+        .map(|v| env.convert_int_var(v))
+        .collect::<Vec<_>>();
+    let domains = vars
+        .iter()
+        .map(|&v| {
+            env.norm
+                .vars
+                .int_var(v)
+                .enumerate()
+                .into_iter()
+                .map(|x| x.get())
+                .collect::<Vec<_>>()
+        })
+        .collect::<Vec<_>>();
+    for domain in &domains {
+        for i in 1..domain.len() {
+            assert!(domain[i - 1] < domain[i]);
+        }
+    }
+    let mut supports = supports
+        .into_iter()
+        .map(|row| row.into_iter().map(|x| x.unwrap()).collect::<Vec<_>>())
+        .collect::<Vec<_>>();
+    supports.sort();
+
+    let mut supports_idx = vec![];
+    for support in supports {
+        let mut row = vec![];
+        for i in 0..vars.len() {
+            let idx = domains[i].binary_search(&support[i]);
+            if let Ok(idx) = idx {
+                row.push(idx);
+            } else {
+                break;
+            }
+        }
+        if row.len() == vars.len() {
+            supports_idx.push(row);
+        }
+    }
+
+    for n_prefix in 0..vars.len() {
+        let mut left = 0;
+        while left < supports_idx.len() {
+            let mut right = left + 1;
+            while right < supports_idx.len()
+                && &supports_idx[left][0..n_prefix] == &supports_idx[right][0..n_prefix]
+            {
+                right += 1;
+            }
+
+            for vi in n_prefix..vars.len() {
+                let mut has_val = vec![false; domains[vi].len()];
+                for i in left..right {
+                    has_val[supports_idx[i][vi]] = true;
+                }
+
+                if has_val.iter().all(|&x| x) {
+                    continue;
+                }
+
+                let mut constraint = Constraint::new();
+                for i in 0..n_prefix {
+                    constraint.add_linear(linear_ne(vars[i], domains[i][supports_idx[left][i]]));
+                }
+                for i in 0..has_val.len() {
+                    if has_val[i] {
+                        constraint.add_linear(linear_eq(vars[vi], domains[vi][i]));
+                    }
+                }
+                env.norm.add_constraint(constraint);
+            }
+
+            left = right;
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use std::collections::BTreeSet;
@@ -1042,6 +1173,29 @@ mod tests {
                                 }
                                 break;
                             }
+                        }
+                    }
+                    Stmt::ExtensionSupports(vars, supports) => {
+                        let values = vars
+                            .iter()
+                            .map(|&v| assignment.get_int(v).unwrap())
+                            .collect::<Vec<_>>();
+                        let mut isok = false;
+                        for support in supports {
+                            let mut flg = true;
+                            for i in 0..values.len() {
+                                if let Some(n) = support[i] {
+                                    if values[i] != n {
+                                        flg = false;
+                                    }
+                                }
+                            }
+                            if flg {
+                                isok = true;
+                            }
+                        }
+                        if !isok {
+                            return false;
                         }
                     }
                 }
@@ -1315,6 +1469,48 @@ mod tests {
         let b = tester.new_int_var(Domain::range(0, 3));
         let c = tester.new_int_var(Domain::range(0, 3));
         tester.add_constraint(Stmt::AllDifferent(vec![a.expr(), b.expr(), c.expr()]));
+        tester.check();
+    }
+
+    #[test]
+    fn test_normalization_extension_supports_1() {
+        let mut tester = NormalizerTester::new();
+
+        let a = tester.new_int_var(Domain::range(0, 2));
+        let b = tester.new_int_var(Domain::range(0, 2));
+        let c = tester.new_int_var(Domain::range(0, 2));
+        tester.add_constraint(Stmt::ExtensionSupports(
+            vec![a, b, c],
+            vec![
+                vec![Some(0), Some(0), Some(1)],
+                vec![Some(0), Some(1), Some(1)],
+                vec![Some(0), Some(1), Some(2)],
+                vec![Some(1), Some(1), Some(0)],
+                vec![Some(1), Some(2), Some(1)],
+                vec![Some(2), Some(0), Some(2)],
+            ],
+        ));
+        tester.check();
+    }
+
+    #[test]
+    fn test_normalization_extension_supports_2() {
+        let mut tester = NormalizerTester::new();
+
+        let a = tester.new_int_var(Domain::range(0, 3));
+        let b = tester.new_int_var(Domain::range(0, 3));
+        let c = tester.new_int_var(Domain::range(0, 3));
+        tester.add_constraint(Stmt::ExtensionSupports(
+            vec![a, b, c],
+            vec![
+                vec![None, Some(0), Some(1)],
+                vec![Some(0), Some(1), Some(1)],
+                vec![Some(0), Some(1), Some(2)],
+                vec![Some(1), None, Some(0)],
+                vec![Some(1), Some(2), None],
+                vec![Some(2), Some(0), Some(2)],
+            ],
+        ));
         tester.check();
     }
 

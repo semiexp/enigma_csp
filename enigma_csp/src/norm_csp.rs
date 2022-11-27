@@ -146,6 +146,21 @@ pub(super) enum IntVarRepresentation {
 }
 
 impl IntVarRepresentation {
+    pub(super) fn enumerate(&self) -> Vec<CheckedInt> {
+        match self {
+            IntVarRepresentation::Domain(domain) => domain.enumerate(),
+            &IntVarRepresentation::Binary(_, f, t) => {
+                if f < t {
+                    vec![f, t]
+                } else if f > t {
+                    vec![t, f]
+                } else {
+                    vec![f]
+                }
+            }
+        }
+    }
+
     #[allow(dead_code)]
     pub(super) fn is_domain(&self) -> bool {
         match self {

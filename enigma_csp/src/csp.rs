@@ -417,6 +417,7 @@ impl CSP {
                         .for_each(|e| vars.constant_folding_bool(e));
                 }
                 Stmt::Circuit(_) => (),
+                Stmt::ExtensionSupports(_, _) => (),
             }
         }
     }

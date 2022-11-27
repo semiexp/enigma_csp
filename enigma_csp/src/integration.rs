@@ -559,6 +559,29 @@ mod tests {
                             }
                         }
                     }
+                    Stmt::ExtensionSupports(vars, supports) => {
+                        let values = vars
+                            .iter()
+                            .map(|&v| assignment.get_int(v).unwrap())
+                            .collect::<Vec<_>>();
+                        let mut isok = false;
+                        for support in supports {
+                            let mut flg = true;
+                            for i in 0..values.len() {
+                                if let Some(n) = support[i] {
+                                    if values[i] != n {
+                                        flg = false;
+                                    }
+                                }
+                            }
+                            if flg {
+                                isok = true;
+                            }
+                        }
+                        if !isok {
+                            return false;
+                        }
+                    }
                 }
             }
             true
@@ -1428,6 +1451,42 @@ mod tests {
         let e = tester.new_int_var_from_list(vec![0, 1, 2, 3]);
 
         tester.add_constraint(Stmt::Circuit(vec![a, b, c, d, e]));
+
+        tester.check();
+    }
+
+    #[test]
+    fn test_integration_exhaustive_extension_supports1() {
+        let mut tester = IntegrationTester::new();
+
+        let a = tester.new_int_var_from_list(vec![0, 2, 3, 4]);
+        let b = tester.new_int_var(Domain::range(0, 4));
+        let c = tester.new_int_var(Domain::range(0, 4));
+        let d = tester.new_int_var(Domain::range(1, 4));
+
+        tester.add_constraint(Stmt::ExtensionSupports(
+            vec![a, b, c],
+            vec![
+                vec![Some(0), Some(0), Some(1)],
+                vec![Some(0), Some(2), Some(1)],
+                vec![Some(0), Some(2), Some(3)],
+                vec![Some(0), Some(3), Some(4)],
+                vec![Some(1), Some(2), Some(4)],
+                vec![Some(2), Some(1), Some(1)],
+                vec![Some(2), Some(2), Some(2)],
+                vec![Some(3), Some(3), Some(2)],
+                vec![Some(4), Some(4), Some(0)],
+            ],
+        ));
+        tester.add_constraint(Stmt::ExtensionSupports(
+            vec![b, c, d],
+            vec![
+                vec![Some(0), None, None],
+                vec![None, Some(1), None],
+                vec![Some(2), None, Some(2)],
+                vec![None, Some(3), Some(4)],
+            ],
+        ));
 
         tester.check();
     }
