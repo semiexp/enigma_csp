@@ -13,6 +13,7 @@ pub struct Config {
     pub use_direct_encoding: bool,
     pub use_log_encoding: bool,
     pub force_use_log_encoding: bool,
+    pub use_native_extension_supports: bool,
     pub direct_encoding_for_binary_vars: bool,
     pub merge_equivalent_variables: bool,
     pub alldifferent_bijection_constraints: bool,
@@ -34,6 +35,7 @@ impl Config {
             use_direct_encoding: true,
             use_log_encoding: true,
             force_use_log_encoding: false,
+            use_native_extension_supports: false,
             direct_encoding_for_binary_vars: false,
             merge_equivalent_variables: false,
             alldifferent_bijection_constraints: false,
@@ -79,6 +81,11 @@ impl Config {
                 &mut config.force_use_log_encoding,
                 "force-log-encoding",
                 "use log encoding for all int variables",
+            ),
+            (
+                &mut config.use_native_extension_supports,
+                "use-native-extension-supports",
+                "use native propagator for extension (supports) constraints",
             ),
             (
                 &mut config.merge_equivalent_variables,

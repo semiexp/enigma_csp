@@ -32,6 +32,14 @@ extern "C" {
         n_edges: i32,
         edges: *const i32,
     ) -> i32;
+    fn Glucose_AddDirectEncodingExtensionSupports(
+        solver: *mut Opaque,
+        n_vars: i32,
+        domain_size: *const i32,
+        lits: *const Lit,
+        n_supports: i32,
+        supports: *const i32,
+    ) -> i32;
     fn Glucose_SolverStats_decisions(solver: *mut Opaque) -> u64;
     fn Glucose_SolverStats_propagations(solver: *mut Opaque) -> u64;
     fn Glucose_SolverStats_conflicts(solver: *mut Opaque) -> u64;
@@ -164,6 +172,46 @@ impl Solver {
                 lits.as_ptr(),
                 edges.len() as i32,
                 edges_flat.as_ptr(),
+            )
+        };
+        res != 0
+    }
+
+    pub fn add_direct_encoding_extension_supports(
+        &mut self,
+        vars: &[Vec<Lit>],
+        supports: &[Vec<Option<usize>>],
+    ) -> bool {
+        let mut len_total = 0;
+        for v in vars {
+            len_total += v.len();
+        }
+        assert!(len_total <= i32::max_value() as usize);
+        assert!(vars.len() * supports.len() <= i32::max_value() as usize);
+
+        let domain_size = vars.iter().map(|v| v.len() as i32).collect::<Vec<_>>();
+        let vars_flat = vars.iter().flatten().copied().collect::<Vec<_>>();
+        let mut supports_flat = vec![];
+        for support in supports {
+            assert_eq!(vars.len(), support.len());
+            for i in 0..vars.len() {
+                if let Some(n) = support[i] {
+                    assert!(n < vars[i].len());
+                    supports_flat.push(n as i32);
+                } else {
+                    supports_flat.push(-1);
+                }
+            }
+        }
+
+        let res = unsafe {
+            Glucose_AddDirectEncodingExtensionSupports(
+                self.ptr,
+                vars.len() as i32,
+                domain_size.as_ptr(),
+                vars_flat.as_ptr(),
+                supports.len() as i32,
+                supports_flat.as_ptr(),
             )
         };
         res != 0

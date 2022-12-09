@@ -14,6 +14,7 @@ fn main() {
                 "lib/glucose/utils/Options.cc",
                 "lib/glucose/constraints/Graph.cc",
                 "lib/glucose/constraints/OrderEncodingLinear.cc",
+                "lib/glucose/constraints/DirectEncodingExtension.cc",
             ])
             .include("lib/glucose")
             .flag("-std=c++17")
@@ -30,6 +31,7 @@ fn main() {
                 "lib/glucose/utils/Options.cc",
                 "lib/glucose/constraints/Graph.cc",
                 "lib/glucose/constraints/OrderEncodingLinear.cc",
+                "lib/glucose/constraints/DirectEncodingExtension.cc",
             ])
             .include("lib/glucose")
             .flag("-std=c++17")

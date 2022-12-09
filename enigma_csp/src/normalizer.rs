@@ -817,6 +817,25 @@ fn normalize_extension_supports(
     vars: Vec<IntVar>,
     supports: Vec<Vec<Option<i32>>>,
 ) {
+    if env.config.use_native_extension_supports {
+        let vars = vars
+            .into_iter()
+            .map(|v| env.convert_int_var(v))
+            .collect::<Vec<_>>();
+        let supports = supports
+            .into_iter()
+            .map(|row| {
+                row.into_iter()
+                    .map(|x| x.map(CheckedInt::new))
+                    .collect::<Vec<_>>()
+            })
+            .collect::<Vec<_>>();
+
+        env.norm
+            .add_extra_constraint(ExtraConstraint::ExtensionSupports(vars, supports));
+        return;
+    }
+
     fn linear_eq(var: NIntVar, constant: i32) -> LinearLit {
         LinearLit::new(
             LinearSum::singleton(var) - LinearSum::constant(CheckedInt::new(constant)),
@@ -1220,6 +1239,31 @@ mod tests {
                             return false;
                         }
                     }
+                    ExtraConstraint::ExtensionSupports(vars, supports) => {
+                        let values = vars
+                            .iter()
+                            .map(|&v| assignment.get_int(v).unwrap())
+                            .collect::<Vec<_>>();
+                        let mut isok = false;
+                        for support in supports {
+                            let mut flg = true;
+                            for i in 0..values.len() {
+                                if let Some(n) = support[i] {
+                                    if values[i] != n {
+                                        flg = false;
+                                        break;
+                                    }
+                                }
+                            }
+                            if flg {
+                                isok = true;
+                                break;
+                            }
+                        }
+                        if !isok {
+                            return false;
+                        }
+                    }
                 }
             }
             true
@@ -1474,44 +1518,50 @@ mod tests {
 
     #[test]
     fn test_normalization_extension_supports_1() {
-        let mut tester = NormalizerTester::new();
+        for use_native in [false, true] {
+            let mut tester = NormalizerTester::new();
+            tester.config.use_native_extension_supports = use_native;
 
-        let a = tester.new_int_var(Domain::range(0, 2));
-        let b = tester.new_int_var(Domain::range(0, 2));
-        let c = tester.new_int_var(Domain::range(0, 2));
-        tester.add_constraint(Stmt::ExtensionSupports(
-            vec![a, b, c],
-            vec![
-                vec![Some(0), Some(0), Some(1)],
-                vec![Some(0), Some(1), Some(1)],
-                vec![Some(0), Some(1), Some(2)],
-                vec![Some(1), Some(1), Some(0)],
-                vec![Some(1), Some(2), Some(1)],
-                vec![Some(2), Some(0), Some(2)],
-            ],
-        ));
-        tester.check();
+            let a = tester.new_int_var(Domain::range(0, 2));
+            let b = tester.new_int_var(Domain::range(0, 2));
+            let c = tester.new_int_var(Domain::range(0, 2));
+            tester.add_constraint(Stmt::ExtensionSupports(
+                vec![a, b, c],
+                vec![
+                    vec![Some(0), Some(0), Some(1)],
+                    vec![Some(0), Some(1), Some(1)],
+                    vec![Some(0), Some(1), Some(2)],
+                    vec![Some(1), Some(1), Some(0)],
+                    vec![Some(1), Some(2), Some(1)],
+                    vec![Some(2), Some(0), Some(2)],
+                ],
+            ));
+            tester.check();
+        }
     }
 
     #[test]
     fn test_normalization_extension_supports_2() {
-        let mut tester = NormalizerTester::new();
+        for use_native in [false, true] {
+            let mut tester = NormalizerTester::new();
+            tester.config.use_native_extension_supports = use_native;
 
-        let a = tester.new_int_var(Domain::range(0, 3));
-        let b = tester.new_int_var(Domain::range(0, 3));
-        let c = tester.new_int_var(Domain::range(0, 3));
-        tester.add_constraint(Stmt::ExtensionSupports(
-            vec![a, b, c],
-            vec![
-                vec![None, Some(0), Some(1)],
-                vec![Some(0), Some(1), Some(1)],
-                vec![Some(0), Some(1), Some(2)],
-                vec![Some(1), None, Some(0)],
-                vec![Some(1), Some(2), None],
-                vec![Some(2), Some(0), Some(2)],
-            ],
-        ));
-        tester.check();
+            let a = tester.new_int_var(Domain::range(0, 3));
+            let b = tester.new_int_var(Domain::range(0, 3));
+            let c = tester.new_int_var(Domain::range(0, 3));
+            tester.add_constraint(Stmt::ExtensionSupports(
+                vec![a, b, c],
+                vec![
+                    vec![None, Some(0), Some(1)],
+                    vec![Some(0), Some(1), Some(1)],
+                    vec![Some(0), Some(1), Some(2)],
+                    vec![Some(1), None, Some(0)],
+                    vec![Some(1), Some(2), None],
+                    vec![Some(2), Some(0), Some(2)],
+                ],
+            ));
+            tester.check();
+        }
     }
 
     /*

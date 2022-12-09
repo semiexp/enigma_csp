@@ -1,6 +1,7 @@
 #include "glucose_bridge.h"
 
 #include "core/Solver.h"
+#include "constraints/DirectEncodingExtension.h"
 #include "constraints/Graph.h"
 #include "constraints/OrderEncodingLinear.h"
 
@@ -71,6 +72,27 @@ int32_t Glucose_AddActiveVerticesConnected(Glucose::Solver* solver, int32_t n_ve
         g_edges.push_back({edges[i * 2], edges[i * 2 + 1]});
     }
     return solver->addConstraint(std::make_unique<Glucose::ActiveVerticesConnected>(std::move(g_lits), std::move(g_edges))) ? 1 : 0;
+}
+
+int32_t Glucose_AddDirectEncodingExtensionSupports(Glucose::Solver* solver, int32_t n_vars, const int32_t* domain_size, const int32_t* lits, int32_t n_supports, const int32_t* supports) {
+    std::vector<std::vector<Glucose::Lit>> g_lits;
+    int lits_offset = 0;
+    for (int i = 0; i < n_vars; ++i) {
+        std::vector<Glucose::Lit> var_lits;
+        for (int j = 0; j < domain_size[i]; ++j) {
+            var_lits.push_back(Glucose::Lit{lits[lits_offset++]});
+        }
+        g_lits.push_back(var_lits);
+    }
+    std::vector<std::vector<int>> g_supports;
+    for (int i = 0; i < n_supports; ++i) {
+        std::vector<int> s;
+        for (int j = 0; j < n_vars; ++j) {
+            s.push_back(supports[i * n_vars + j]);
+        }
+        g_supports.push_back(s);
+    }
+    return solver->addConstraint(std::make_unique<Glucose::DirectEncodingExtensionSupports>(std::move(g_lits), std::move(g_supports)));
 }
 
 uint64_t Glucose_SolverStats_decisions(Glucose::Solver* solver) {

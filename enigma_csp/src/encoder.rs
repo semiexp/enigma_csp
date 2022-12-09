@@ -508,6 +508,7 @@ pub fn encode(norm: &mut NormCSP, sat: &mut SAT, map: &mut EncodeMap, config: &C
                     .into_iter()
                     .map(|l| env.convert_bool_lit(l))
                     .collect::<Vec<_>>();
+                // TODO: handle failure of addition of constraint
                 env.sat.add_active_vertices_connected(lits, edges);
             }
             ExtraConstraint::Mul(x, y, m) => {
@@ -524,6 +525,52 @@ pub fn encode(norm: &mut NormCSP, sat: &mut SAT, map: &mut EncodeMap, config: &C
                     // TODO: constrain the domain of m if m is encoded by order or direct
                     encode_mul_naive(&mut env, x, y, m);
                 }
+            }
+            ExtraConstraint::ExtensionSupports(vars, supports) => {
+                let encodings = vars
+                    .iter()
+                    .map(|&v| {
+                        env.map.int_map[v]
+                            .as_ref()
+                            .unwrap()
+                            .direct_encoding
+                            .as_ref()
+                            .unwrap()
+                    })
+                    .collect::<Vec<_>>();
+
+                let mut vars_encoded = vec![];
+                let mut supports_encoded = vec![];
+
+                for i in 0..vars.len() {
+                    vars_encoded.push(encodings[i].lits.clone());
+                }
+                for support in &supports {
+                    let mut encoded = vec![];
+                    let mut out_of_domain = false;
+
+                    assert_eq!(vars.len(), support.len());
+                    for i in 0..vars.len() {
+                        if let Some(x) = support[i] {
+                            if let Ok(idx) = encodings[i].domain.binary_search(&x) {
+                                encoded.push(Some(idx));
+                            } else {
+                                out_of_domain = true;
+                                break;
+                            }
+                        } else {
+                            encoded.push(None);
+                        }
+                    }
+
+                    if !out_of_domain {
+                        supports_encoded.push(encoded);
+                    }
+                }
+
+                // TODO: handle failure of addition of constraint
+                env.sat
+                    .add_direct_encoding_extension_supports(&vars_encoded, &supports_encoded);
             }
         }
     }
@@ -546,6 +593,7 @@ fn decide_encode_schemes(
     new_ext_constraints: &[ExtraConstraint],
 ) -> BTreeMap<IntVar, EncodeScheme> {
     // TODO: consider already encoded variables
+    // TODO: ExtensionSupports requires direct encoding for efficient propagation
 
     if config.force_use_log_encoding {
         let mut ret = BTreeMap::new();
@@ -579,6 +627,7 @@ fn decide_encode_schemes(
                     complex_constraints_vars.insert(m);
                 }
                 ExtraConstraint::ActiveVerticesConnected(_, _) => (),
+                ExtraConstraint::ExtensionSupports(_, _) => (),
             }
         }
 
@@ -631,6 +680,7 @@ fn decide_encode_schemes(
                             }
                         }
                     }
+                    ExtraConstraint::ExtensionSupports(_, _) => (),
                 }
             }
 

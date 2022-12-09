@@ -133,6 +133,19 @@ impl SAT {
         self.solver.add_active_vertices_connected(&lits, &edges)
     }
 
+    pub fn add_direct_encoding_extension_supports(
+        &mut self,
+        vars: &[Vec<Lit>],
+        supports: &[Vec<Option<usize>>],
+    ) -> bool {
+        let vars = vars
+            .iter()
+            .map(|x| x.iter().map(|l| l.0).collect::<Vec<_>>())
+            .collect::<Vec<_>>();
+        self.solver
+            .add_direct_encoding_extension_supports(&vars, supports)
+    }
+
     pub fn set_seed(&mut self, seed: f64) {
         self.solver.set_seed(seed);
     }

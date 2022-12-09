@@ -334,6 +334,7 @@ impl NormCSPVars {
 pub enum ExtraConstraint {
     ActiveVerticesConnected(Vec<BoolLit>, Vec<(usize, usize)>),
     Mul(IntVar, IntVar, IntVar),
+    ExtensionSupports(Vec<IntVar>, Vec<Vec<Option<CheckedInt>>>),
 }
 
 pub struct NormCSP {
