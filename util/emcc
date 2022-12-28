@@ -21,7 +21,7 @@ def main():
     output = root + ".js"
 
     args = ["emcc", "-o", output, "-s", "MODULARIZE=1", "-s", "SINGLE_FILE=1", "-s", "ALLOW_MEMORY_GROWTH=1", "-s", "FILESYSTEM=0", "--memory-init-file=0", "-s", "ENVIRONMENT=web,worker"] + extra_args
-    subprocess.run(args)
+    subprocess.check_call(args)
 
 
 if __name__ == "__main__":
