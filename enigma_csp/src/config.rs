@@ -1,7 +1,3 @@
-extern crate getopts;
-use getopts::Options;
-use std::env;
-
 #[derive(Clone)]
 pub struct Config {
     pub use_constant_folding: bool,
@@ -46,8 +42,12 @@ impl Config {
         }
     }
 
+    #[cfg(feature = "cli")]
     pub fn parse_from_args() -> Config {
-        let args = env::args().collect::<Vec<_>>();
+        extern crate getopts;
+        use getopts::Options;
+
+        let args = std::env::args().collect::<Vec<_>>();
         let mut config = Config::default();
         let mut opts = Options::new();
 

@@ -10,15 +10,16 @@ name = "enigma_csp"
 crate-type = ["cdylib", "lib"]
 
 [features]
-default = ["csp-extra-constraints", "parser"]
+default = ["csp-extra-constraints", "parser", "cli"]
 sat-analyzer = []
 parser = ["dep:nom"]
+cli = ["parser", "dep:getopts"]
 
 # Enable support for extra CSP constraints which are not used in puzzle solvers.
 csp-extra-constraints = []
 
 [dependencies]
-getopts = "0.2"
+getopts = { version = "0.2", optional = true }
 nom = { version = "7.0.0", optional = true }
 
 [target.'cfg(not(target_arch = "wasm32"))'.dependencies]
