@@ -3,6 +3,8 @@ use std::collections::HashMap;
 use pyo3::prelude::*;
 
 use crate::config::Config;
+
+#[cfg(feature = "parser")]
 use crate::csugar_cli::csugar_cli;
 
 #[pyclass(name = "Config")]
@@ -165,6 +167,7 @@ fn set_config(config: PyConfig) {
     }
 }
 
+#[cfg(feature = "parser")]
 #[pyfunction]
 fn solver(input: String) -> String {
     let mut bytes = input.as_bytes();
@@ -172,6 +175,13 @@ fn solver(input: String) -> String {
     res
 }
 
+#[cfg(not(feature = "parser"))]
+#[pyfunction]
+fn solver(_input: String) -> String {
+    panic!("parser feature not enabled");
+}
+
+#[cfg(feature = "parser")]
 #[pyfunction]
 fn solver_with_perf(input: String) -> (String, HashMap<String, f64>) {
     let mut bytes = input.as_bytes();
@@ -186,6 +196,12 @@ fn solver_with_perf(input: String) -> (String, HashMap<String, f64>) {
     perf_map.insert(String::from("conflicts"), perf.conflicts() as f64);
 
     (res, perf_map)
+}
+
+#[cfg(not(feature = "parser"))]
+#[pyfunction]
+fn solver_with_perf(_input: String) -> (String, HashMap<String, f64>) {
+    panic!("parser feature not enabled");
 }
 
 #[pymodule]
