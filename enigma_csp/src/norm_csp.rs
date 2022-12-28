@@ -146,6 +146,7 @@ pub(super) enum IntVarRepresentation {
 }
 
 impl IntVarRepresentation {
+    #[allow(unused)]
     pub(super) fn enumerate(&self) -> Vec<CheckedInt> {
         match self {
             IntVarRepresentation::Domain(domain) => domain.enumerate(),

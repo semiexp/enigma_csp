@@ -1,5 +1,7 @@
 use std::cmp::Reverse;
-use std::collections::{BTreeMap, BTreeSet, BinaryHeap, VecDeque};
+#[cfg(not(feature = "puzzle-solver-minimal"))]
+use std::collections::VecDeque;
+use std::collections::{BTreeMap, BTreeSet, BinaryHeap};
 use std::ops::Index;
 
 use super::config::Config;
@@ -118,6 +120,7 @@ impl Encoding {
         }
     }
 
+    #[allow(unused)]
     fn log_encoding(enc: LogEncoding) -> Encoding {
         Encoding {
             order_encoding: None,
@@ -182,6 +185,7 @@ macro_rules! new_var {
     };
 }
 
+#[allow(unused)]
 #[cfg(feature = "sat-analyzer")]
 macro_rules! new_vars_as_lits {
     ( $sat:expr, $n:expr, $( $x:expr ),* ) => {
@@ -192,6 +196,7 @@ macro_rules! new_vars_as_lits {
     };
 }
 
+#[allow(unused)]
 #[cfg(not(feature = "sat-analyzer"))]
 macro_rules! new_vars_as_lits {
     ( $sat:expr, $n:expr, $( $x:expr ),* ) => {
@@ -325,7 +330,12 @@ impl EncodeMap {
         }
     }
 
-    #[allow(unused)]
+    #[cfg(feature = "puzzle-solver-minimal")]
+    fn convert_int_var_log_encoding(&mut self, _: &NormCSPVars, _: &mut SAT, _: IntVar) {
+        panic!("feature not enabled");
+    }
+
+    #[cfg(not(feature = "puzzle-solver-minimal"))]
     fn convert_int_var_log_encoding(
         &mut self,
         norm_vars: &NormCSPVars,
@@ -511,6 +521,7 @@ pub fn encode(norm: &mut NormCSP, sat: &mut SAT, map: &mut EncodeMap, config: &C
                 // TODO: handle failure of addition of constraint
                 env.sat.add_active_vertices_connected(lits, edges);
             }
+            #[cfg(not(feature = "puzzle-solver-minimal"))]
             ExtraConstraint::Mul(x, y, m) => {
                 let x_log = env.map.int_map[x].as_ref().unwrap().log_encoding.is_some();
                 let y_log = env.map.int_map[y].as_ref().unwrap().log_encoding.is_some();
@@ -526,6 +537,11 @@ pub fn encode(norm: &mut NormCSP, sat: &mut SAT, map: &mut EncodeMap, config: &C
                     encode_mul_naive(&mut env, x, y, m);
                 }
             }
+            #[cfg(feature = "puzzle-solver-minimal")]
+            ExtraConstraint::Mul(_, _, _) => {
+                panic!("feature not enabled");
+            }
+            #[cfg(not(feature = "puzzle-solver-minimal"))]
             ExtraConstraint::ExtensionSupports(vars, supports) => {
                 let encodings = vars
                     .iter()
@@ -572,6 +588,10 @@ pub fn encode(norm: &mut NormCSP, sat: &mut SAT, map: &mut EncodeMap, config: &C
                 env.sat
                     .add_direct_encoding_extension_supports(&vars_encoded, &supports_encoded);
             }
+            #[cfg(feature = "puzzle-solver-minimal")]
+            ExtraConstraint::ExtensionSupports(_, _) => {
+                panic!("feature not enabled");
+            }
         }
     }
     norm.num_encoded_vars = norm.vars.int_var.len();
@@ -590,11 +610,12 @@ fn decide_encode_schemes(
     _map: &EncodeMap,
     new_vars: &[IntVar],
     new_constraints: &[Constraint],
-    new_ext_constraints: &[ExtraConstraint],
+    #[allow(unused)] new_ext_constraints: &[ExtraConstraint],
 ) -> BTreeMap<IntVar, EncodeScheme> {
     // TODO: consider already encoded variables
     // TODO: ExtensionSupports requires direct encoding for efficient propagation
 
+    #[cfg(not(feature = "puzzle-solver-minimal"))]
     if config.force_use_log_encoding {
         let mut ret = BTreeMap::new();
         for &var in new_vars {
@@ -605,6 +626,7 @@ fn decide_encode_schemes(
 
     let mut scheme = BTreeMap::new();
 
+    #[cfg(not(feature = "puzzle-solver-minimal"))]
     if config.use_log_encoding {
         // Values with large domain must be log-encoded
         let mut complex_constraints_vars = BTreeSet::new();
@@ -811,13 +833,16 @@ fn encode_constraint(env: &mut EncoderEnv, constr: Constraint) {
                 simplified_linears.push(decompose_linear_lit(env, &linear_lit));
             }
             EncoderKind::Log => {
-                let normalized = match linear_lit.op {
-                    CmpOp::Eq | CmpOp::Ne | CmpOp::Ge => linear_lit,
-                    CmpOp::Le => LinearLit::new(linear_lit.sum * -1, CmpOp::Ge),
-                    CmpOp::Lt => LinearLit::new(linear_lit.sum * -1 + (-1), CmpOp::Ge),
-                    CmpOp::Gt => LinearLit::new(linear_lit.sum + (-1), CmpOp::Ge),
-                };
-                simplified_linears.push(decompose_linear_lit_log(env, &normalized));
+                #[cfg(not(feature = "puzzle-solver-minimal"))]
+                {
+                    let normalized = match linear_lit.op {
+                        CmpOp::Eq | CmpOp::Ne | CmpOp::Ge => linear_lit,
+                        CmpOp::Le => LinearLit::new(linear_lit.sum * -1, CmpOp::Ge),
+                        CmpOp::Lt => LinearLit::new(linear_lit.sum * -1 + (-1), CmpOp::Ge),
+                        CmpOp::Gt => LinearLit::new(linear_lit.sum + (-1), CmpOp::Ge),
+                    };
+                    simplified_linears.push(decompose_linear_lit_log(env, &normalized));
+                }
             }
         }
     }
@@ -860,6 +885,7 @@ fn encode_constraint(env: &mut EncoderEnv, constr: Constraint) {
                         env.sat.add_clause(&encoded[i]);
                     }
                 }
+                #[cfg(not(feature = "puzzle-solver-minimal"))]
                 EncoderKind::Log => {
                     assert!(
                         linear_lit.op == CmpOp::Eq
@@ -870,6 +896,10 @@ fn encode_constraint(env: &mut EncoderEnv, constr: Constraint) {
                     for i in 0..encoded.len() {
                         env.sat.add_clause(&encoded[i]);
                     }
+                }
+                #[cfg(feature = "puzzle-solver-minimal")]
+                EncoderKind::Log => {
+                    panic!("feature not enabled");
                 }
             }
         }
@@ -903,6 +933,7 @@ fn encode_constraint(env: &mut EncoderEnv, constr: Constraint) {
                     };
                     encoded_conjunction.append(encoded);
                 }
+                #[cfg(not(feature = "puzzle-solver-minimal"))]
                 EncoderKind::Log => {
                     assert!(
                         linear_lit.op == CmpOp::Eq
@@ -911,6 +942,10 @@ fn encode_constraint(env: &mut EncoderEnv, constr: Constraint) {
                     );
                     let encoded = encode_linear_log(env, &linear_lit.sum, linear_lit.op);
                     encoded_conjunction.append(encoded);
+                }
+                #[cfg(feature = "puzzle-solver-minimal")]
+                EncoderKind::Log => {
+                    panic!("feature not enabled");
                 }
             }
         }
@@ -1230,6 +1265,7 @@ fn decompose_linear_lit(env: &mut EncoderEnv, lit: &LinearLit) -> Vec<LinearLit>
     ret
 }
 
+#[cfg(not(feature = "puzzle-solver-minimal"))]
 fn decompose_linear_lit_log(env: &mut EncoderEnv, lit: &LinearLit) -> Vec<LinearLit> {
     assert!(lit.op == CmpOp::Ge || lit.op == CmpOp::Eq || lit.op == CmpOp::Ne);
     let op_for_aux_lits = if lit.op == CmpOp::Ge {
@@ -1794,6 +1830,7 @@ fn encode_linear_ne_direct(env: &EncoderEnv, sum: &LinearSum) -> ClauseSet {
     clauses_buf
 }
 
+#[cfg(not(feature = "puzzle-solver-minimal"))]
 fn encode_linear_log(env: &mut EncoderEnv, sum: &LinearSum, op: CmpOp) -> ClauseSet {
     // TODO: some clauses should be directly added to `env`
     let mut values_positive = vec![];
@@ -1934,6 +1971,7 @@ fn encode_linear_log(env: &mut EncoderEnv, sum: &LinearSum, op: CmpOp) -> Clause
     clause_set
 }
 
+#[cfg(not(feature = "puzzle-solver-minimal"))]
 fn log_encoding_adder(
     env: &mut EncoderEnv,
     values: Vec<(usize, Vec<Lit>)>,
@@ -2065,6 +2103,7 @@ fn log_encoding_adder(
     (clause_set, result)
 }
 
+#[cfg(not(feature = "puzzle-solver-minimal"))]
 fn encode_mul_naive(env: &mut EncoderEnv, x: IntVar, y: IntVar, m: IntVar) {
     let x_range = env.map.int_map[x].as_ref().unwrap().range();
     let y_range = env.map.int_map[y].as_ref().unwrap().range();
@@ -2093,6 +2132,7 @@ fn encode_mul_naive(env: &mut EncoderEnv, x: IntVar, y: IntVar, m: IntVar) {
     }
 }
 
+#[cfg(not(feature = "puzzle-solver-minimal"))]
 fn encode_mul_log(env: &mut EncoderEnv, x: IntVar, y: IntVar, m: IntVar) -> ClauseSet {
     let x_repr = env.map.int_map[x]
         .as_ref()
@@ -2128,6 +2168,7 @@ fn encode_mul_log(env: &mut EncoderEnv, x: IntVar, y: IntVar, m: IntVar) -> Clau
     clause_set
 }
 
+#[cfg(not(feature = "puzzle-solver-minimal"))]
 fn log_encoding_multiplier(
     env: &mut EncoderEnv,
     value1: Vec<Lit>,
@@ -2308,6 +2349,7 @@ mod tests {
             assert_eq!(result_by_literals, result_by_sat);
         }
 
+        #[allow(unused)]
         fn run_check_with_mul(mut self, lits: &[LinearLit], mul: &[(IntVar, IntVar, IntVar)]) {
             let mut result_by_literals = self.enumerate_valid_assignments_by_literals(lits, mul);
             result_by_literals.sort();
@@ -2441,6 +2483,7 @@ mod tests {
         tester.run_check(&lits);
     }
 
+    #[cfg(not(feature = "puzzle-solver-minimal"))]
     #[test]
     fn test_encode_log_var() {
         let mut tester = EncoderTester::new();
@@ -2450,6 +2493,7 @@ mod tests {
         tester.run_check(&[]);
     }
 
+    #[cfg(not(feature = "puzzle-solver-minimal"))]
     #[test]
     fn test_encode_linear_eq_log_encoding_1() {
         let mut tester = EncoderTester::new();
@@ -2470,6 +2514,7 @@ mod tests {
         tester.run_check(&lits);
     }
 
+    #[cfg(not(feature = "puzzle-solver-minimal"))]
     #[test]
     fn test_encode_linear_eq_log_encoding_2() {
         let mut tester = EncoderTester::new();
@@ -2490,6 +2535,7 @@ mod tests {
         tester.run_check(&lits);
     }
 
+    #[cfg(not(feature = "puzzle-solver-minimal"))]
     #[test]
     fn test_encode_linear_eq_log_encoding_3() {
         let mut tester = EncoderTester::new();
@@ -2511,6 +2557,7 @@ mod tests {
         tester.run_check(&lits);
     }
 
+    #[cfg(not(feature = "puzzle-solver-minimal"))]
     #[test]
     fn test_encode_linear_ne_log_encoding() {
         let mut tester = EncoderTester::new();
@@ -2531,6 +2578,7 @@ mod tests {
         tester.run_check(&lits);
     }
 
+    #[cfg(not(feature = "puzzle-solver-minimal"))]
     #[test]
     fn test_encode_linear_ge_log_encoding_1() {
         let mut tester = EncoderTester::new();
@@ -2551,6 +2599,7 @@ mod tests {
         tester.run_check(&lits);
     }
 
+    #[cfg(not(feature = "puzzle-solver-minimal"))]
     #[test]
     fn test_encode_linear_ge_log_encoding_2() {
         let mut tester = EncoderTester::new();
@@ -2571,6 +2620,7 @@ mod tests {
         tester.run_check(&lits);
     }
 
+    #[cfg(not(feature = "puzzle-solver-minimal"))]
     #[test]
     fn test_encode_linear_log_encoding_operators() {
         for op in [CmpOp::Gt, CmpOp::Le, CmpOp::Lt] {
@@ -2596,6 +2646,7 @@ mod tests {
         }
     }
 
+    #[cfg(not(feature = "puzzle-solver-minimal"))]
     #[test]
     fn test_encode_mul_log() {
         let mut tester = EncoderTester::new();

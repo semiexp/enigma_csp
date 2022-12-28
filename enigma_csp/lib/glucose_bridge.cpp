@@ -74,6 +74,11 @@ int32_t Glucose_AddActiveVerticesConnected(Glucose::Solver* solver, int32_t n_ve
     return solver->addConstraint(std::make_unique<Glucose::ActiveVerticesConnected>(std::move(g_lits), std::move(g_edges))) ? 1 : 0;
 }
 
+#if PUZZLE_SOLVER_MINIMAL
+int32_t Glucose_AddDirectEncodingExtensionSupports(Glucose::Solver* solver, int32_t n_vars, const int32_t* domain_size, const int32_t* lits, int32_t n_supports, const int32_t* supports) {
+    abort();
+}
+#else
 int32_t Glucose_AddDirectEncodingExtensionSupports(Glucose::Solver* solver, int32_t n_vars, const int32_t* domain_size, const int32_t* lits, int32_t n_supports, const int32_t* supports) {
     std::vector<std::vector<Glucose::Lit>> g_lits;
     int lits_offset = 0;
@@ -94,6 +99,7 @@ int32_t Glucose_AddDirectEncodingExtensionSupports(Glucose::Solver* solver, int3
     }
     return solver->addConstraint(std::make_unique<Glucose::DirectEncodingExtensionSupports>(std::move(g_lits), std::move(g_supports)));
 }
+#endif
 
 uint64_t Glucose_SolverStats_decisions(Glucose::Solver* solver) {
     return solver->decisions;

@@ -133,6 +133,16 @@ impl SAT {
         self.solver.add_active_vertices_connected(&lits, &edges)
     }
 
+    #[cfg(feature = "puzzle-solver-minimal")]
+    pub fn add_direct_encoding_extension_supports(
+        &mut self,
+        _: &[Vec<Lit>],
+        _: &[Vec<Option<usize>>],
+    ) -> bool {
+        panic!("feature not enabled");
+    }
+
+    #[cfg(not(feature = "puzzle-solver-minimal"))]
     pub fn add_direct_encoding_extension_supports(
         &mut self,
         vars: &[Vec<Lit>],
