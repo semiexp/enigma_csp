@@ -1163,7 +1163,7 @@ mod tests {
         tester.check();
     }
 
-    #[cfg(not(feature = "puzzle-solver-minimal"))]
+    #[cfg(feature = "csp-extra-constraints")]
     #[test]
     fn test_integration_exhaustive_mul1() {
         let mut tester = IntegrationTester::new();
@@ -1177,7 +1177,7 @@ mod tests {
         tester.check();
     }
 
-    #[cfg(not(feature = "puzzle-solver-minimal"))]
+    #[cfg(feature = "csp-extra-constraints")]
     #[test]
     fn test_integration_exhaustive_mul2() {
         let mut tester = IntegrationTester::new();
@@ -1428,7 +1428,7 @@ mod tests {
         tester.check();
     }
 
-    #[cfg(not(feature = "puzzle-solver-minimal"))]
+    #[cfg(feature = "csp-extra-constraints")]
     #[test]
     fn test_integration_exhaustive_circuit1() {
         let mut tester = IntegrationTester::new();
@@ -1443,7 +1443,7 @@ mod tests {
         tester.check();
     }
 
-    #[cfg(not(feature = "puzzle-solver-minimal"))]
+    #[cfg(feature = "csp-extra-constraints")]
     #[test]
     fn test_integration_exhaustive_circuit2() {
         let mut tester = IntegrationTester::new();
@@ -1459,7 +1459,7 @@ mod tests {
         tester.check();
     }
 
-    #[cfg(not(feature = "puzzle-solver-minimal"))]
+    #[cfg(feature = "csp-extra-constraints")]
     #[test]
     fn test_integration_exhaustive_extension_supports1() {
         for use_native in [false, true] {

@@ -5,5 +5,9 @@ edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
+[features]
+default = ["csp-extra-constraints"]
+csp-extra-constraints = ["enigma_csp/csp-extra-constraints"]
+
 [dependencies]
-enigma_csp = { path = "../enigma_csp" }
+enigma_csp = { path = "../enigma_csp", default-features = false }

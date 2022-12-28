@@ -10,15 +10,15 @@ fn main() {
         "lib/glucose/constraints/OrderEncodingLinear.cc",
     ];
 
-    #[cfg(not(feature = "puzzle-solver-minimal"))]
+    #[cfg(feature = "csp-extra-constraints")]
     let build_target = build_target
         .into_iter()
         .chain(["lib/glucose/constraints/DirectEncodingExtension.cc"])
         .collect::<Vec<_>>();
 
-    #[cfg(feature = "puzzle-solver-minimal")]
+    #[cfg(not(feature = "csp-extra-constraints"))]
     let puzzle_solver_minimal_flag = "-DPUZZLE_SOLVER_MINIMAL=1";
-    #[cfg(not(feature = "puzzle-solver-minimal"))]
+    #[cfg(feature = "csp-extra-constraints")]
     let puzzle_solver_minimal_flag = "-DPUZZLE_SOLVER_MINIMAL=0";
 
     if arch == "wasm32" {

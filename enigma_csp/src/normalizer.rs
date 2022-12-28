@@ -680,12 +680,12 @@ fn normalize_int_expr(env: &mut NormalizerEnv, expr: &IntExpr) -> LinearSum {
     }
 }
 
-#[cfg(feature = "puzzle-solver-minimal")]
+#[cfg(not(feature = "csp-extra-constraints"))]
 fn normalize_circuit(_: &mut NormalizerEnv, _: Vec<IntVar>) {
     panic!("feature not enabled");
 }
 
-#[cfg(not(feature = "puzzle-solver-minimal"))]
+#[cfg(feature = "csp-extra-constraints")]
 fn normalize_circuit(env: &mut NormalizerEnv, vars: Vec<IntVar>) {
     let n = vars.len();
 
@@ -818,12 +818,12 @@ fn normalize_circuit(env: &mut NormalizerEnv, vars: Vec<IntVar>) {
         ));
 }
 
-#[cfg(feature = "puzzle-solver-minimal")]
+#[cfg(not(feature = "csp-extra-constraints"))]
 fn normalize_extension_supports(_: &mut NormalizerEnv, _: Vec<IntVar>, _: Vec<Vec<Option<i32>>>) {
     panic!("feature not enabled");
 }
 
-#[cfg(not(feature = "puzzle-solver-minimal"))]
+#[cfg(feature = "csp-extra-constraints")]
 fn normalize_extension_supports(
     env: &mut NormalizerEnv,
     vars: Vec<IntVar>,
@@ -1528,7 +1528,7 @@ mod tests {
         tester.check();
     }
 
-    #[cfg(not(feature = "puzzle-solver-minimal"))]
+    #[cfg(feature = "csp-extra-constraints")]
     #[test]
     fn test_normalization_extension_supports_1() {
         for use_native in [false, true] {
@@ -1553,7 +1553,7 @@ mod tests {
         }
     }
 
-    #[cfg(not(feature = "puzzle-solver-minimal"))]
+    #[cfg(feature = "csp-extra-constraints")]
     #[test]
     fn test_normalization_extension_supports_2() {
         for use_native in [false, true] {

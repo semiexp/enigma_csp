@@ -8,4 +8,4 @@ name = "cspuz_solver_backend"
 crate-type = ["cdylib", "lib"]
 
 [dependencies]
-cspuz_rs = { path = "../cspuz_rs" }
+cspuz_rs = { path = "../cspuz_rs", default-features = false }

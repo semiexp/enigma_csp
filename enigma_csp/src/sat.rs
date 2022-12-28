@@ -133,7 +133,7 @@ impl SAT {
         self.solver.add_active_vertices_connected(&lits, &edges)
     }
 
-    #[cfg(feature = "puzzle-solver-minimal")]
+    #[cfg(not(feature = "csp-extra-constraints"))]
     pub fn add_direct_encoding_extension_supports(
         &mut self,
         _: &[Vec<Lit>],
@@ -142,7 +142,7 @@ impl SAT {
         panic!("feature not enabled");
     }
 
-    #[cfg(not(feature = "puzzle-solver-minimal"))]
+    #[cfg(feature = "csp-extra-constraints")]
     pub fn add_direct_encoding_extension_supports(
         &mut self,
         vars: &[Vec<Lit>],

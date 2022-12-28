@@ -10,14 +10,11 @@ name = "enigma_csp"
 crate-type = ["cdylib", "lib"]
 
 [features]
+default = ["csp-extra-constraints"]
 sat-analyzer = []
 
-# Enable only the features used in puzzle solvers.
-#
-# Some features are introduced for CSP competitions, but they are unnecessary for puzzle solvers.
-# Such features include Mul, Circuit and ExtensionSupports.
-# `puzzle-solver-minimal` feature disables them to reduce the code size.
-puzzle-solver-minimal = []
+# Enable support for extra CSP constraints which are not used in puzzle solvers.
+csp-extra-constraints = []
 
 [dependencies]
 getopts = "0.2"
