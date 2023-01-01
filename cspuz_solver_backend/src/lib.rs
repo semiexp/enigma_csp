@@ -57,6 +57,8 @@ fn decode_and_solve(url: &[u8]) -> Result<Board, &'static str> {
         puzzle::norinori::solve_norinori(url)
     } else if puzzle_kind == "coral" {
         puzzle::coral::solve_coral(url)
+    } else if puzzle_kind == "cave" {
+        puzzle::cave::solve_cave(url)
     } else {
         Err("unknown puzzle type")
     }

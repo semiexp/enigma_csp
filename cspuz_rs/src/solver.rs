@@ -919,6 +919,12 @@ pub const FALSE: Value<Array0DImpl<CSPBoolExpr>> = Value(Array0DImpl {
     data: CSPBoolExpr::Const(false),
 });
 
+pub fn int_constant(n: i32) -> IntExpr {
+    Value(Array0DImpl {
+        data: CSPIntExpr::Const(n),
+    })
+}
+
 // ==========
 // Solver
 // ==========
@@ -930,6 +936,7 @@ pub type BoolExpr = Value<Array0DImpl<CSPBoolExpr>>;
 pub type IntVar = Value<Array0DImpl<CSPIntVar>>;
 pub type IntVarArray1D = Value<Array1DImpl<CSPIntVar>>;
 pub type IntVarArray2D = Value<Array2DImpl<CSPIntVar>>;
+pub type IntExpr = Value<Array0DImpl<CSPIntExpr>>;
 
 pub trait DerefVar {
     type Var;
