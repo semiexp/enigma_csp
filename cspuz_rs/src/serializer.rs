@@ -1158,10 +1158,7 @@ pub fn url_to_puzzle_kind(serialized: &str) -> Option<String> {
     Some(String::from(kind))
 }
 
-pub fn url_to_problem<T, C>(combinator: C, puzzle_kinds: &[&str], serialized: &str) -> Option<T>
-where
-    C: Combinator<T>,
-{
+pub fn strip_prefix(serialized: &str) -> Option<&str> {
     let serialized = serialized
         .strip_prefix("http://")
         .or(serialized.strip_prefix("https://"))?;
@@ -1169,6 +1166,14 @@ where
         .strip_prefix("puzz.link/p?")
         .or(serialized.strip_prefix("pzv.jp/p.html?"))
         .or(serialized.strip_prefix("pzprxs.vercel.app/p?"))?;
+    Some(serialized)
+}
+
+pub fn url_to_problem<T, C>(combinator: C, puzzle_kinds: &[&str], serialized: &str) -> Option<T>
+where
+    C: Combinator<T>,
+{
+    let serialized = strip_prefix(serialized)?;
     let pos = serialized.find('/')?;
     let kind = &serialized[0..pos];
     if !puzzle_kinds.iter().any(|&k| kind == k) {

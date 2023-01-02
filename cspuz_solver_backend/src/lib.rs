@@ -59,6 +59,8 @@ fn decode_and_solve(url: &[u8]) -> Result<Board, &'static str> {
         puzzle::coral::solve_coral(url)
     } else if puzzle_kind == "cave" {
         puzzle::cave::solve_cave(url)
+    } else if puzzle_kind == "curvedata" {
+        puzzle::curvedata::solve_curvedata(url)
     } else {
         Err("unknown puzzle type")
     }
@@ -74,6 +76,8 @@ fn decode_and_enumerate(
 
     if puzzle_kind == "heyawake" {
         puzzle::heyawake::enumerate_answers_heyawake(url, num_max_answers)
+    } else if puzzle_kind == "curvedata" {
+        puzzle::curvedata::enumerate_answers_curvedata(url, num_max_answers)
     } else {
         Err("unsupported puzzle type")
     }

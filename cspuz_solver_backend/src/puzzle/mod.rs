@@ -5,6 +5,7 @@ pub mod castle_wall;
 pub mod cave;
 pub mod compass;
 pub mod coral;
+pub mod curvedata;
 pub mod heyawake;
 pub mod kropki;
 pub mod kurotto;
