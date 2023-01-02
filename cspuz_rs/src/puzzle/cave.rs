@@ -3,7 +3,7 @@ use crate::graph;
 use crate::serializer::{
     problem_to_url, url_to_problem, Choice, Combinator, Dict, Grid, HexInt, Optionalize, Spaces,
 };
-use crate::solver::{int_constant, BoolExpr, IntExpr, Solver};
+use crate::solver::Solver;
 
 pub fn solve_cave(clues: &[Vec<Option<i32>>]) -> Option<Vec<Vec<Option<bool>>>> {
     let (h, w) = util::infer_shape(clues);
@@ -35,14 +35,6 @@ pub fn solve_cave(clues: &[Vec<Option<i32>>]) -> Option<Vec<Vec<Option<bool>>>> 
     aux_vertices.push(t);
     graph::active_vertices_connected(&mut solver, &aux_vertices, &aux_graph);
 
-    fn consecutive_true(seq: &[BoolExpr]) -> IntExpr {
-        let mut ret = int_constant(0);
-        for v in seq.iter().rev() {
-            ret = v.ite(ret + 1, 0);
-        }
-        ret
-    }
-
     let is_white = &!is_black;
 
     for y in 0..h {
@@ -52,30 +44,15 @@ pub fn solve_cave(clues: &[Vec<Option<i32>>]) -> Option<Vec<Vec<Option<bool>>>> 
                 if n < 0 {
                     continue;
                 }
-                let up = is_white
-                    .slice_fixed_x((..y, x))
-                    .into_iter()
-                    .rev()
-                    .collect::<Vec<_>>();
-                let down = is_white
-                    .slice_fixed_x(((y + 1).., x))
-                    .into_iter()
-                    .collect::<Vec<_>>();
-                let left = is_white
-                    .slice_fixed_y((y, ..x))
-                    .into_iter()
-                    .rev()
-                    .collect::<Vec<_>>();
-                let right = is_white
-                    .slice_fixed_y((y, (x + 1)..))
-                    .into_iter()
-                    .collect::<Vec<_>>();
-
+                let up = is_white.slice_fixed_x((..y, x)).reverse();
+                let down = is_white.slice_fixed_x(((y + 1).., x));
+                let left = is_white.slice_fixed_y((y, ..x)).reverse();
+                let right = is_white.slice_fixed_y((y, (x + 1)..));
                 solver.add_expr(
-                    (consecutive_true(&up)
-                        + consecutive_true(&down)
-                        + consecutive_true(&left)
-                        + consecutive_true(&right)
+                    (up.consecutive_prefix_true()
+                        + down.consecutive_prefix_true()
+                        + left.consecutive_prefix_true()
+                        + right.consecutive_prefix_true()
                         + 1)
                     .eq(n),
                 );
@@ -149,7 +126,7 @@ mod tests {
     }
 
     #[test]
-    fn test_kurotto_serializer() {
+    fn test_cave_serializer() {
         let problem = problem_for_tests();
         let url = "https://puzz.link/p?cave/6/6/k3h6j2l7g3g2h3n";
         util::tests::serializer_test(problem, url, serialize_problem, deserialize_problem);

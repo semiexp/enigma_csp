@@ -126,6 +126,12 @@ impl<T: Clone> Value<Array1DImpl<T>> {
             data: self.0.data[idx].clone(),
         })
     }
+
+    pub fn reverse(&self) -> Value<Array1DImpl<T>> {
+        let mut data = self.0.data.clone();
+        data.reverse();
+        Value(Array1DImpl { data })
+    }
 }
 
 fn resolve_range<T: RangeBounds<usize>>(len: usize, range: &T) -> (usize, usize) {
@@ -875,6 +881,22 @@ where
     })
 }
 
+pub fn consecutive_prefix_true<T>(values: T) -> Value<Array0DImpl<CSPIntExpr>>
+where
+    T: IntoIterator,
+    T::Item: Operand<Output = Array0DImpl<CSPBoolExpr>>,
+{
+    let terms: Vec<Value<Array0DImpl<CSPBoolExpr>>> = values
+        .into_iter()
+        .map(|x| Value(x.as_expr_array()))
+        .collect();
+    let mut ret = int_constant(0);
+    for t in terms.iter().rev() {
+        ret = t.ite(ret + 1, 0);
+    }
+    ret
+}
+
 impl<T> Value<T>
 where
     Value<T>: IntoIterator + Clone,
@@ -890,6 +912,10 @@ where
 
     pub fn all(&self) -> Value<Array0DImpl<CSPBoolExpr>> {
         all(self.clone())
+    }
+
+    pub fn consecutive_prefix_true(&self) -> Value<Array0DImpl<CSPIntExpr>> {
+        consecutive_prefix_true(self.clone())
     }
 }
 
