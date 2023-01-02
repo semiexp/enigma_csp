@@ -1,10 +1,26 @@
 use crate::board::{Board, BoardKind, Item, ItemKind};
 use cspuz_rs::graph;
-use cspuz_rs::puzzle::heyawake;
+use cspuz_rs::puzzle::{ayeheya, heyawake};
 
-pub fn solve_heyawake(url: &str) -> Result<Board, &'static str> {
-    let (borders, clues) = heyawake::deserialize_problem(url).ok_or("invalid url")?;
-    let is_black = heyawake::solve_heyawake(&borders, &clues).ok_or("no answer")?;
+pub fn solve_heyawake(url: &str, is_ayeheya: bool) -> Result<Board, &'static str> {
+    let borders;
+    let clues;
+    let is_black;
+
+    if is_ayeheya {
+        let problem = ayeheya::deserialize_problem(url).ok_or("invalid url")?;
+        borders = problem.0;
+        clues = problem.1;
+        if !ayeheya::all_room_symmetry(&borders) {
+            return Err("asymmetry room");
+        }
+        is_black = ayeheya::solve_ayeheya(&borders, &clues).ok_or("no answer")?;
+    } else {
+        let problem = heyawake::deserialize_problem(url).ok_or("invalid url")?;
+        borders = problem.0;
+        clues = problem.1;
+        is_black = heyawake::solve_heyawake(&borders, &clues).ok_or("no answer")?;
+    }
 
     let height = is_black.len();
     let width = is_black[0].len();

@@ -3,6 +3,7 @@ pub mod util;
 pub mod akari;
 pub mod aqre;
 pub mod araf;
+pub mod ayeheya;
 pub mod castle_wall;
 pub mod cave;
 pub mod compass;

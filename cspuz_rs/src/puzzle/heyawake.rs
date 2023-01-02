@@ -42,7 +42,7 @@ pub fn enumerate_answers_heyawake(
         .collect()
 }
 
-fn add_constraints(
+pub(super) fn add_constraints(
     solver: &mut Solver,
     is_black: &BoolVarArray2D,
     borders: &graph::InnerGridEdges<Vec<Vec<bool>>>,
@@ -93,9 +93,9 @@ fn add_constraints(
     }
 }
 
-type Problem = (graph::InnerGridEdges<Vec<Vec<bool>>>, Vec<Option<i32>>);
+pub(super) type Problem = (graph::InnerGridEdges<Vec<Vec<bool>>>, Vec<Option<i32>>);
 
-fn combinator() -> impl Combinator<Problem> {
+pub(super) fn combinator() -> impl Combinator<Problem> {
     Size::new(RoomsWithValues::new(Choice::new(vec![
         Box::new(Optionalize::new(HexInt)),
         Box::new(Spaces::new(None, 'g')),

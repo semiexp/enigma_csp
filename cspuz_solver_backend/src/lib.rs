@@ -18,7 +18,9 @@ fn decode_and_solve(url: &[u8]) -> Result<Board, &'static str> {
     } else if puzzle_kind == "yajilin" || puzzle_kind == "yajirin" {
         puzzle::yajilin::solve_yajilin(url)
     } else if puzzle_kind == "heyawake" {
-        puzzle::heyawake::solve_heyawake(url)
+        puzzle::heyawake::solve_heyawake(url, false)
+    } else if puzzle_kind == "ayeheya" {
+        puzzle::heyawake::solve_heyawake(url, true)
     } else if puzzle_kind == "slither" || puzzle_kind == "slitherlink" {
         puzzle::slitherlink::solve_slitherlink(url)
     } else if puzzle_kind == "slalom" {
