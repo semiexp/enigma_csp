@@ -18,6 +18,7 @@ pub mod norinori;
 pub mod nurikabe;
 pub mod nurimisaki;
 pub mod shakashaka;
+pub mod shikaku;
 pub mod shimaguni;
 pub mod simpleloop;
 pub mod slalom;
