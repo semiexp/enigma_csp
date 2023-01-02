@@ -24,6 +24,7 @@ pub mod simpleloop;
 pub mod slalom;
 pub mod slitherlink;
 pub mod star_battle;
+pub mod sudoku;
 pub mod tapa;
 pub mod yajilin;
 pub mod yajilin_regions;
