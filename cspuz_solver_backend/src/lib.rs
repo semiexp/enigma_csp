@@ -67,6 +67,8 @@ fn decode_and_solve(url: &[u8]) -> Result<Board, &'static str> {
         puzzle::shikaku::solve_shikaku(url)
     } else if puzzle_kind == "sudoku" {
         puzzle::sudoku::solve_sudoku(url)
+    } else if puzzle_kind == "sashigane" {
+        puzzle::sashigane::solve_sashigane(url)
     } else {
         Err("unknown puzzle type")
     }

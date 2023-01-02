@@ -17,6 +17,7 @@ pub mod masyu;
 pub mod norinori;
 pub mod nurikabe;
 pub mod nurimisaki;
+pub mod sasahigane;
 pub mod shakashaka;
 pub mod shikaku;
 pub mod shimaguni;
