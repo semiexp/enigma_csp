@@ -249,7 +249,6 @@ type Problem = (
 pub fn deserialize_problem(url: &str) -> Option<Problem> {
     let content = strip_prefix(url)?;
     let toks = content.split("/").collect::<Vec<&str>>();
-    eprintln!("{:?}", toks);
     if toks[0] != "curvedata" {
         return None;
     }
