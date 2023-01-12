@@ -13,6 +13,7 @@ pub mod heyawake;
 pub mod kropki;
 pub mod kurotto;
 pub mod lits;
+pub mod lohkous;
 pub mod masyu;
 pub mod norinori;
 pub mod nurikabe;
