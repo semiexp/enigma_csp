@@ -31,6 +31,25 @@ impl Graph {
     pub fn n_edges(&self) -> usize {
         self.edges.len()
     }
+
+    pub fn line_graph(&self) -> Graph {
+        let mut line_graph = Graph::new(self.n_edges());
+        let mut adj = vec![vec![]; self.n_vertices];
+        for (i, &(u, v)) in self.edges.iter().enumerate() {
+            adj[u].push((i, v));
+            adj[v].push((i, u));
+        }
+        for a in &adj {
+            for i in 0..a.len() {
+                for j in (i + 1)..a.len() {
+                    let e = a[i].0;
+                    let f = a[j].0;
+                    line_graph.add_edge(e, f);
+                }
+            }
+        }
+        line_graph
+    }
 }
 
 impl Index<usize> for Graph {
@@ -363,16 +382,7 @@ where
         solver.add_expr(count_true(adj_edges).eq(is_passed.at(u).ite(2, 0)));
     }
 
-    let mut line_graph = Graph::new(graph.n_edges());
-    for a in &adj {
-        for i in 0..a.len() {
-            for j in (i + 1)..a.len() {
-                let e = a[i].0;
-                let f = a[j].0;
-                line_graph.add_edge(e, f);
-            }
-        }
-    }
+    let line_graph = graph.line_graph();
     active_vertices_connected(solver, &is_active_edge, &line_graph);
 
     is_passed
