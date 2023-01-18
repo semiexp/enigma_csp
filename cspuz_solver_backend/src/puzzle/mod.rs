@@ -23,6 +23,7 @@ pub mod shikaku;
 pub mod shimaguni;
 pub mod simpleloop;
 pub mod slalom;
+pub mod slashpack;
 pub mod slitherlink;
 pub mod sudoku;
 pub mod tapa;
