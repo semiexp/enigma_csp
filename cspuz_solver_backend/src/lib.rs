@@ -73,6 +73,8 @@ fn decode_and_solve(url: &[u8]) -> Result<Board, &'static str> {
         puzzle::lohkous::solve_lohkous(url)
     } else if puzzle_kind == "hashi" {
         puzzle::hashi::solve_hashi(url)
+    } else if puzzle_kind == "herugolf" {
+        puzzle::herugolf::solve_herugolf(url)
     } else {
         Err("unknown puzzle type")
     }
