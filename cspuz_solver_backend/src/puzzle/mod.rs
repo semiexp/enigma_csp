@@ -14,6 +14,7 @@ pub mod kurotto;
 pub mod lits;
 pub mod lohkous;
 pub mod masyu;
+pub mod moonsun;
 pub mod norinori;
 pub mod nurikabe;
 pub mod nurimisaki;

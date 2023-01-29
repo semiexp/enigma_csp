@@ -77,6 +77,8 @@ fn decode_and_solve(url: &[u8]) -> Result<Board, &'static str> {
         puzzle::herugolf::solve_herugolf(url)
     } else if puzzle_kind == "slashpack" {
         puzzle::slashpack::solve_slashpack(url)
+    } else if puzzle_kind == "moonsun" {
+        puzzle::moonsun::solve_moonsun(url)
     } else {
         Err("unknown puzzle type")
     }
