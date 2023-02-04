@@ -45,6 +45,79 @@ pub fn solve_sudoku(clues: &[Vec<Option<i32>>]) -> Option<Vec<Vec<Option<i32>>>>
     solver.irrefutable_facts().map(|f| f.get(num))
 }
 
+pub fn solve_sudoku_as_cands(clues: &[Vec<Option<i32>>]) -> Option<Vec<Vec<Vec<bool>>>> {
+    let (h, w) = util::infer_shape(clues);
+    if h != w {
+        return None;
+    }
+    let n = h;
+    let mut s = None;
+    for i in 2..=5 {
+        if n == i * i {
+            s = Some(i);
+            break;
+        }
+    }
+    let s = s?;
+
+    let mut solver = Solver::new();
+    let num = &solver.int_var_2d((n, n), 1, n as i32);
+    let mut cands = vec![];
+    for _ in 0..n {
+        let mut row = vec![];
+        for _ in 0..n {
+            let b = solver.bool_var_1d(n);
+            solver.add_answer_key_bool(&b);
+            row.push(b);
+        }
+        cands.push(row);
+    }
+
+    for y in 0..n {
+        for x in 0..n {
+            for i in 0..n {
+                solver.add_expr(num.at((y, x)).eq((i + 1) as i32).iff(cands[y][x].at(i)));
+            }
+        }
+    }
+
+    for i in 0..n {
+        solver.all_different(num.slice_fixed_y((i, ..)));
+        solver.all_different(num.slice_fixed_x((.., i)));
+    }
+    for i in 0..s {
+        for j in 0..s {
+            solver.all_different(num.slice((((i * s)..((i + 1) * s)), ((j * s)..((j + 1) * s)))));
+        }
+    }
+    for y in 0..n {
+        for x in 0..n {
+            if let Some(val) = clues[y][x] {
+                if val > 0 {
+                    solver.add_expr(num.at((y, x)).eq(val));
+                }
+            }
+        }
+    }
+
+    solver.irrefutable_facts().map(|f| {
+        let mut ret = vec![];
+        for y in 0..n {
+            let mut row = vec![];
+            for x in 0..n {
+                row.push(
+                    f.get(&cands[y][x])
+                        .into_iter()
+                        .map(|x| x.unwrap_or(true))
+                        .collect(),
+                );
+            }
+            ret.push(row);
+        }
+        ret
+    })
+}
+
 type Problem = Vec<Vec<Option<i32>>>;
 
 fn combinator() -> impl Combinator<Problem> {

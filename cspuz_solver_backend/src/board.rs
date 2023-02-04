@@ -41,6 +41,7 @@ pub enum ItemKind {
     Num(i32),
     Compass(Compass),
     TapaClue([i32; 4]),
+    SudokuCandidateSet(i32, Vec<i32>),
 }
 
 impl ItemKind {
@@ -86,6 +87,15 @@ impl ItemKind {
             ItemKind::TapaClue(clues) => format!(
                 "{{\"kind\":\"tapaClue\",\"value\":[{},{},{},{}]}}",
                 clues[0], clues[1], clues[2], clues[3]
+            ),
+            ItemKind::SudokuCandidateSet(size, cands) => format!(
+                "{{\"kind\":\"sudokuCandidateSet\",\"size\":{},\"values\":[{}]}}",
+                *size,
+                cands
+                    .iter()
+                    .map(|x| x.to_string())
+                    .collect::<Vec<_>>()
+                    .join(",")
             ),
         }
     }
