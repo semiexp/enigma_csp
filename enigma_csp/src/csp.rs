@@ -418,6 +418,7 @@ impl CSP {
                 }
                 Stmt::Circuit(_) => (),
                 Stmt::ExtensionSupports(_, _) => (),
+                Stmt::GraphDivision(_, _, _) => (),
             }
         }
     }

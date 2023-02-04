@@ -108,6 +108,62 @@ pub fn product_multi<T: Clone>(inputs: &Vec<Vec<T>>) -> Vec<Vec<T>> {
     ret
 }
 
+#[allow(dead_code)]
+pub fn check_graph_division(
+    sizes: &[Option<i32>],
+    edges: &[(usize, usize)],
+    edge_disconnected: &[bool],
+) -> bool {
+    let mut adj = vec![vec![]; sizes.len()];
+    for i in 0..edges.len() {
+        if !edge_disconnected[i] {
+            let (u, v) = edges[i];
+            adj[u].push(v);
+            adj[v].push(u);
+        }
+    }
+
+    let mut grp_id = vec![!0; sizes.len()];
+    fn dfs(grp_id: &mut [usize], adj: &[Vec<usize>], p: usize, id: usize) -> i32 {
+        if grp_id[p] != !0 {
+            return 0;
+        }
+        grp_id[p] = id;
+        let mut ret = 1;
+        for &q in &adj[p] {
+            ret += dfs(grp_id, adj, q, id);
+        }
+        ret
+    }
+
+    let mut grp_size = vec![];
+    for i in 0..sizes.len() {
+        if grp_id[i] != !0 {
+            continue;
+        }
+        let size = dfs(&mut grp_id, &adj, i, grp_size.len());
+        grp_size.push(size);
+    }
+
+    for i in 0..sizes.len() {
+        if let Some(s) = sizes[i] {
+            if s != grp_size[grp_id[i]] {
+                return false;
+            }
+        }
+    }
+    for i in 0..edges.len() {
+        if edge_disconnected[i] {
+            let (u, v) = edges[i];
+            if grp_id[u] == grp_id[v] {
+                return false;
+            }
+        }
+    }
+
+    true
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

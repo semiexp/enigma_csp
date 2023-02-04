@@ -40,6 +40,16 @@ extern "C" {
         n_supports: i32,
         supports: *const i32,
     ) -> i32;
+    fn Glucose_AddGraphDivision(
+        solver: *mut Opaque,
+        n_vertices: i32,
+        dom_sizes: *const i32,
+        domains: *const i32,
+        dom_lits: *const Lit,
+        n_edges: i32,
+        edges: *const i32,
+        edge_lits: *const Lit,
+    ) -> i32;
     fn Glucose_SolverStats_decisions(solver: *mut Opaque) -> u64;
     fn Glucose_SolverStats_propagations(solver: *mut Opaque) -> u64;
     fn Glucose_SolverStats_conflicts(solver: *mut Opaque) -> u64;
@@ -212,6 +222,54 @@ impl Solver {
                 vars_flat.as_ptr(),
                 supports.len() as i32,
                 supports_flat.as_ptr(),
+            )
+        };
+        res != 0
+    }
+
+    pub fn add_graph_division(
+        &mut self,
+        domains: &[Vec<i32>],
+        dom_lits: &[Vec<Lit>],
+        edges: &[(usize, usize)],
+        edge_lits: &[Lit],
+    ) -> bool {
+        assert_eq!(domains.len(), dom_lits.len());
+        assert_eq!(edges.len(), edge_lits.len());
+
+        let mut dom_sizes = vec![];
+        let mut dom_lits_flat = vec![];
+        let mut domains_flat = vec![];
+
+        for i in 0..domains.len() {
+            dom_sizes.push(domains[i].len() as i32);
+            if !domains[i].is_empty() {
+                assert_eq!(domains[i].len(), dom_lits[i].len() + 1);
+                for &v in &domains[i] {
+                    domains_flat.push(v);
+                }
+                for &l in &dom_lits[i] {
+                    dom_lits_flat.push(l);
+                }
+            }
+        }
+
+        let mut edges_flat = vec![];
+        for &(u, v) in edges {
+            edges_flat.push(u as i32);
+            edges_flat.push(v as i32);
+        }
+
+        let res = unsafe {
+            Glucose_AddGraphDivision(
+                self.ptr,
+                domains.len() as i32,
+                dom_sizes.as_ptr(),
+                domains_flat.as_ptr(),
+                dom_lits_flat.as_ptr(),
+                edges.len() as i32,
+                edges_flat.as_ptr(),
+                edge_lits.as_ptr(),
             )
         };
         res != 0

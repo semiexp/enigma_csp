@@ -582,6 +582,20 @@ mod tests {
                             return false;
                         }
                     }
+                    Stmt::GraphDivision(sizes, edges, edges_lit) => {
+                        let sizes = sizes
+                            .iter()
+                            .map(|v| v.map(|v| assignment.get_int(v).unwrap()))
+                            .collect::<Vec<_>>();
+                        let edge_disconnected = edges_lit
+                            .iter()
+                            .map(|e| assignment.eval_bool_expr(e))
+                            .collect::<Vec<_>>();
+
+                        if !util::check_graph_division(&sizes, edges, &edge_disconnected) {
+                            return false;
+                        }
+                    }
                 }
             }
             true
@@ -1499,5 +1513,39 @@ mod tests {
 
             tester.check();
         }
+    }
+
+    #[test]
+    fn test_integration_graph_division1() {
+        let mut tester = IntegrationTester::new();
+
+        let mut vars = vec![];
+        for _ in 0..12 {
+            vars.push(tester.new_bool_var().expr());
+        }
+
+        let a = tester.new_int_var(Domain::range(2, 3));
+        let b = tester.new_int_var(Domain::range(4, 5));
+
+        tester.add_constraint(Stmt::GraphDivision(
+            vec![Some(a), None, None, None, None, None, None, None, Some(b)],
+            vec![
+                (0, 1),
+                (1, 2),
+                (3, 4),
+                (4, 5),
+                (6, 7),
+                (7, 8),
+                (0, 3),
+                (1, 4),
+                (2, 5),
+                (3, 6),
+                (4, 7),
+                (5, 8),
+            ],
+            vars,
+        ));
+
+        tester.check();
     }
 }

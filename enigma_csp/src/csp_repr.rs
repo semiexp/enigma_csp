@@ -49,6 +49,7 @@ pub enum Stmt {
     ActiveVerticesConnected(Vec<BoolExpr>, Vec<(usize, usize)>),
     Circuit(Vec<IntVar>),
     ExtensionSupports(Vec<IntVar>, Vec<Vec<Option<i32>>>),
+    GraphDivision(Vec<Option<IntVar>>, Vec<(usize, usize)>, Vec<BoolExpr>),
 }
 
 impl Stmt {
@@ -89,6 +90,7 @@ impl Stmt {
                 write!(out, ")")?;
             }
             Stmt::ExtensionSupports(_, _) => todo!(),
+            Stmt::GraphDivision(_, _, _) => todo!(),
         }
         Ok(())
     }

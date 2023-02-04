@@ -592,6 +592,29 @@ pub fn encode(norm: &mut NormCSP, sat: &mut SAT, map: &mut EncodeMap, config: &C
             ExtraConstraint::ExtensionSupports(_, _) => {
                 panic!("feature not enabled");
             }
+            ExtraConstraint::GraphDivision(sizes, edges, edge_lits) => {
+                let mut domains = vec![];
+                let mut dom_lits = vec![];
+
+                for i in 0..sizes.len() {
+                    if let Some(v) = sizes[i] {
+                        let encoding = env.map.int_map[v].as_ref().unwrap().as_order_encoding();
+                        domains.push(encoding.domain.iter().map(|x| x.get()).collect());
+                        dom_lits.push(encoding.lits.clone());
+                    } else {
+                        domains.push(vec![]);
+                        dom_lits.push(vec![]);
+                    }
+                }
+
+                let edge_lits = edge_lits
+                    .into_iter()
+                    .map(|l| env.convert_bool_lit(l))
+                    .collect::<Vec<_>>();
+
+                env.sat
+                    .add_graph_division(&domains, &dom_lits, &edges, &edge_lits);
+            }
         }
     }
     norm.num_encoded_vars = norm.vars.int_var.len();
@@ -650,6 +673,7 @@ fn decide_encode_schemes(
                 }
                 ExtraConstraint::ActiveVerticesConnected(_, _) => (),
                 ExtraConstraint::ExtensionSupports(_, _) => (),
+                ExtraConstraint::GraphDivision(_, _, _) => (),
             }
         }
 
@@ -703,6 +727,7 @@ fn decide_encode_schemes(
                         }
                     }
                     ExtraConstraint::ExtensionSupports(_, _) => (),
+                    ExtraConstraint::GraphDivision(_, _, _) => (),
                 }
             }
 
@@ -735,6 +760,17 @@ fn decide_encode_schemes(
                 }
             }
         }
+        for ext in new_ext_constraints {
+            // GraphDivision requires size variables to be order-encoded
+            if let ExtraConstraint::GraphDivision(sizes, _, _) = ext {
+                for v in sizes {
+                    if let Some(v) = v {
+                        direct_encoding_vars.remove(v);
+                    }
+                }
+            }
+        }
+
         for &var in &direct_encoding_vars {
             let repr = norm_vars.int_var(var);
             let use_direct_encoding = match repr {

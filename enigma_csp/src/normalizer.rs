@@ -247,6 +247,38 @@ fn normalize_stmt(env: &mut NormalizerEnv, stmt: Stmt) {
         Stmt::ExtensionSupports(vars, supports) => {
             normalize_extension_supports(env, vars, supports)
         }
+        Stmt::GraphDivision(sizes, edges, edge_lits) => {
+            let sizes = sizes
+                .into_iter()
+                .map(|v| v.map(|v| env.convert_int_var(v)))
+                .collect::<Vec<_>>();
+
+            // TODO: remove duplicated codes
+            let mut edge_lits_converted = vec![];
+            for e in edge_lits {
+                let simplified = match &e {
+                    BoolExpr::Var(v) => Some(env.convert_bool_var(*v)),
+                    BoolExpr::Not(e) => match e.as_ref() {
+                        BoolExpr::Var(v) => Some(!env.convert_bool_var(*v)),
+                        _ => None,
+                    },
+                    _ => None,
+                };
+                if let Some(l) = simplified {
+                    edge_lits_converted.push(l);
+                } else {
+                    let aux = env.norm.new_bool_var();
+                    normalize_and_register_expr(env, BoolExpr::NVar(aux).iff(e));
+                    edge_lits_converted.push(NBoolLit::new(aux, false));
+                }
+            }
+            env.norm
+                .add_extra_constraint(ExtraConstraint::GraphDivision(
+                    sizes,
+                    edges,
+                    edge_lits_converted,
+                ));
+        }
     }
     if env.config.verbose {
         for i in num_constrs_before_norm..env.norm.constraints.len() {
@@ -1229,6 +1261,7 @@ mod tests {
                             return false;
                         }
                     }
+                    Stmt::GraphDivision(_, _, _) => todo!(),
                 }
             }
             true
@@ -1276,6 +1309,7 @@ mod tests {
                             return false;
                         }
                     }
+                    ExtraConstraint::GraphDivision(_, _, _) => todo!(),
                 }
             }
             true

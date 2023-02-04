@@ -156,6 +156,22 @@ impl SAT {
             .add_direct_encoding_extension_supports(&vars, supports)
     }
 
+    pub fn add_graph_division(
+        &mut self,
+        domains: &[Vec<i32>],
+        dom_lits: &[Vec<Lit>],
+        edges: &[(usize, usize)],
+        edge_lits: &[Lit],
+    ) -> bool {
+        let dom_lits = dom_lits
+            .iter()
+            .map(|x| x.iter().map(|l| l.0).collect::<Vec<_>>())
+            .collect::<Vec<_>>();
+        let edge_lits = edge_lits.iter().map(|x| x.0).collect::<Vec<_>>();
+        self.solver
+            .add_graph_division(domains, &dom_lits, edges, &edge_lits)
+    }
+
     pub fn set_seed(&mut self, seed: f64) {
         self.solver.set_seed(seed);
     }

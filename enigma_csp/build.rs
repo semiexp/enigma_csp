@@ -8,6 +8,7 @@ fn main() {
         "lib/glucose/utils/Options.cc",
         "lib/glucose/constraints/Graph.cc",
         "lib/glucose/constraints/OrderEncodingLinear.cc",
+        "lib/glucose/constraints/GraphDivision.cc",
     ];
 
     #[cfg(feature = "csp-extra-constraints")]

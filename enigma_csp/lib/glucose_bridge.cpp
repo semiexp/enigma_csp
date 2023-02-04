@@ -3,6 +3,7 @@
 #include "core/Solver.h"
 #include "constraints/DirectEncodingExtension.h"
 #include "constraints/Graph.h"
+#include "constraints/GraphDivision.h"
 #include "constraints/OrderEncodingLinear.h"
 
 extern "C" {
@@ -100,6 +101,36 @@ int32_t Glucose_AddDirectEncodingExtensionSupports(Glucose::Solver* solver, int3
     return solver->addConstraint(std::make_unique<Glucose::DirectEncodingExtensionSupports>(std::move(g_lits), std::move(g_supports)));
 }
 #endif
+
+int32_t Glucose_AddGraphDivision(Glucose::Solver* solver, int32_t n_vertices, const int32_t* dom_sizes, const int32_t* domains, const int32_t* dom_lits, int32_t n_edges, const int32_t* edges, const int32_t* edge_lits) {
+    std::vector<Glucose::OptionalOrderEncoding> vertices;
+    int domains_offset = 0;
+    int dom_lits_offset = 0;
+    for (int i = 0; i < n_vertices; ++i) {
+        Glucose::OptionalOrderEncoding ooe;
+        if (dom_sizes[i] > 0) {
+            for (int j = 0; j < dom_sizes[i]; ++j) {
+                ooe.values.push_back(domains[domains_offset++]);
+            }
+            for (int j = 1; j < dom_sizes[i]; ++j) {
+                ooe.lits.push_back(Glucose::Lit{ dom_lits[dom_lits_offset++] });
+            }
+        }
+        vertices.push_back(ooe);
+    }
+
+    std::vector<std::pair<int, int>> graph;
+    for (int i = 0; i < n_edges; ++i) {
+        graph.push_back({edges[i * 2], edges[i * 2 + 1]});
+    }
+
+    std::vector<Glucose::Lit> edge_lits_l;
+    for (int i = 0; i < n_edges; ++i) {
+        edge_lits_l.push_back(Glucose::Lit{ edge_lits[i] });
+    }
+
+    return solver->addConstraint(std::make_unique<Glucose::GraphDivision>(vertices, graph, edge_lits_l));
+}
 
 uint64_t Glucose_SolverStats_decisions(Glucose::Solver* solver) {
     return solver->decisions;

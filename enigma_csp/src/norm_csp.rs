@@ -336,6 +336,7 @@ pub enum ExtraConstraint {
     ActiveVerticesConnected(Vec<BoolLit>, Vec<(usize, usize)>),
     Mul(IntVar, IntVar, IntVar),
     ExtensionSupports(Vec<IntVar>, Vec<Vec<Option<CheckedInt>>>),
+    GraphDivision(Vec<Option<IntVar>>, Vec<(usize, usize)>, Vec<BoolLit>),
 }
 
 pub struct NormCSP {
