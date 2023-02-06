@@ -6,6 +6,7 @@ pub mod cave;
 pub mod compass;
 pub mod coral;
 pub mod curvedata;
+pub mod fillomino;
 pub mod hashi;
 pub mod herugolf;
 pub mod heyawake;

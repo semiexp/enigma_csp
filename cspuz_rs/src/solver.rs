@@ -1098,6 +1098,27 @@ impl<'a> Solver<'a> {
             .add_constraint(Stmt::ActiveVerticesConnected(vertices, graph.to_owned()));
     }
 
+    pub fn add_graph_division<T>(
+        &mut self,
+        sizes: &[Option<Value<Array0DImpl<CSPIntVar>>>],
+        edges: &[(usize, usize)],
+        edge_values: T,
+    ) where
+        T: IntoIterator,
+        <T as IntoIterator>::Item: Operand<Output = Array0DImpl<CSPBoolExpr>>,
+    {
+        let sizes = sizes
+            .into_iter()
+            .map(|x| x.clone().map(|x| x.0.data))
+            .collect::<Vec<_>>();
+        let edge_values: Vec<CSPBoolExpr> = edge_values
+            .into_iter()
+            .map(|x| x.as_expr_array().data)
+            .collect();
+        self.solver
+            .add_constraint(Stmt::GraphDivision(sizes, edges.to_owned(), edge_values));
+    }
+
     pub fn set_perf_stats<'b: 'a>(&mut self, perf_stats: &'b PerfStats) {
         self.solver.set_perf_stats(perf_stats);
     }
