@@ -8,6 +8,7 @@ pub mod compass;
 pub mod coral;
 pub mod curvedata;
 pub mod fillomino;
+pub mod fivecells;
 pub mod hashi;
 pub mod herugolf;
 pub mod heyawake;
