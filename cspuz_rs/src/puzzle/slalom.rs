@@ -328,7 +328,7 @@ mod tests {
     #[test]
     fn test_slalom_problem() {
         // https://puzsq.jp/main/puzzle_play.php?pid=9522
-        let is_black_base = [
+        let is_black = crate::puzzle::util::tests::to_bool_2d([
             [0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
             [0, 0, 0, 0, 1, 0, 0, 0, 1, 0],
             [0, 0, 1, 0, 1, 0, 0, 0, 0, 0],
@@ -339,11 +339,7 @@ mod tests {
             [1, 0, 1, 0, 0, 0, 0, 0, 0, 0],
             [0, 0, 0, 0, 0, 1, 0, 0, 0, 0],
             [0, 0, 1, 0, 0, 0, 0, 0, 0, 0],
-        ];
-        let is_black = is_black_base
-            .iter()
-            .map(|row| row.iter().map(|&n| n == 1).collect::<Vec<_>>())
-            .collect::<Vec<_>>();
+        ]);
 
         let gates = vec![
             Gate {

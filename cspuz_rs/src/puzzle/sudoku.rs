@@ -162,18 +162,17 @@ mod tests {
         let ans = solve_sudoku(&problem);
         assert!(ans.is_some());
         let ans = ans.unwrap();
-        #[rustfmt::skip]
-        let expected = vec![
-            vec![Some(2), Some(6), Some(4), Some(7), Some(9), Some(8), Some(3), Some(1), Some(5)],
-            vec![Some(7), Some(3), Some(5), Some(1), Some(2), Some(4), Some(8), Some(6), Some(9)],
-            vec![Some(9), Some(8), Some(1), Some(6), Some(5), Some(3), Some(2), Some(7), Some(4)],
-            vec![Some(4), Some(2), Some(6), Some(3), Some(8), Some(9), Some(7), Some(5), Some(1)],
-            vec![Some(5), Some(7), Some(3), Some(4), Some(1), Some(6), Some(9), Some(8), Some(2)],
-            vec![Some(8), Some(1), Some(9), Some(2), Some(7), Some(5), Some(6), Some(4), Some(3)],
-            vec![Some(1), Some(5), Some(2), Some(9), Some(6), Some(7), Some(4), Some(3), Some(8)],
-            vec![Some(3), Some(9), Some(7), Some(8), Some(4), Some(1), Some(5), Some(2), Some(6)],
-            vec![Some(6), Some(4), Some(8), Some(5), Some(3), Some(2), Some(1), Some(9), Some(7)],
-        ];
+        let expected = crate::puzzle::util::tests::to_option_2d([
+            [2, 6, 4, 7, 9, 8, 3, 1, 5],
+            [7, 3, 5, 1, 2, 4, 8, 6, 9],
+            [9, 8, 1, 6, 5, 3, 2, 7, 4],
+            [4, 2, 6, 3, 8, 9, 7, 5, 1],
+            [5, 7, 3, 4, 1, 6, 9, 8, 2],
+            [8, 1, 9, 2, 7, 5, 6, 4, 3],
+            [1, 5, 2, 9, 6, 7, 4, 3, 8],
+            [3, 9, 7, 8, 4, 1, 5, 2, 6],
+            [6, 4, 8, 5, 3, 2, 1, 9, 7],
+        ]);
         assert_eq!(ans, expected);
     }
 

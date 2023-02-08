@@ -210,8 +210,12 @@ mod tests {
         assert!(ans.is_some());
         let ans = ans.unwrap();
 
-        let expected_base = [[4, 2, 1, 3], [1, 3, 2, 4], [3, 1, 4, 2], [2, 4, 3, 1]];
-        let expected = expected_base.map(|row| row.iter().map(|&n| Some(n)).collect::<Vec<_>>());
+        let expected = crate::puzzle::util::tests::to_option_2d([
+            [4, 2, 1, 3],
+            [1, 3, 2, 4],
+            [3, 1, 4, 2],
+            [2, 4, 3, 1],
+        ]);
         assert_eq!(ans, expected);
     }
 

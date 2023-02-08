@@ -178,14 +178,14 @@ mod tests {
         assert!(ans.is_some());
         let ans = ans.unwrap();
 
-        let expected = vec![
-            vec![Some(0), Some(2), Some(0), Some(0), Some(0), Some(0)],
-            vec![Some(0), Some(0), Some(2), Some(1), Some(2), Some(0)],
-            vec![Some(0), Some(0), Some(1), Some(0), Some(1), Some(0)],
-            vec![Some(2), Some(0), Some(2), Some(0), Some(2), Some(0)],
-            vec![Some(0), Some(2), Some(1), Some(0), Some(1), Some(0)],
-            vec![Some(0), Some(0), Some(0), Some(1), Some(0), Some(0)],
-        ];
+        let expected = crate::puzzle::util::tests::to_option_2d([
+            [0, 2, 0, 0, 0, 0],
+            [0, 0, 2, 1, 2, 0],
+            [0, 0, 1, 0, 1, 0],
+            [2, 0, 2, 0, 2, 0],
+            [0, 2, 1, 0, 1, 0],
+            [0, 0, 0, 1, 0, 0],
+        ]);
         assert_eq!(ans, expected);
     }
 }

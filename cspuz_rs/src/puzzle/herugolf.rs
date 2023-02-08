@@ -198,14 +198,14 @@ mod tests {
     #[rustfmt::skip]
     fn problem_for_tests() -> Problem {
         (
-            vec![
-                vec![false, false, false, false, false, false],
-                vec![false, true, false, false, false, false],
-                vec![false, false, false, false, false, false],
-                vec![false, false, false, true, false, false],
-                vec![false, false, false, true, false, false],
-                vec![false, false, false, false, false, false],
-            ],
+            crate::puzzle::util::tests::to_bool_2d(vec![
+                vec![0, 0, 0, 0, 0, 0],
+                vec![0, 1, 0, 0, 0, 0],
+                vec![0, 0, 0, 0, 0, 0],
+                vec![0, 0, 0, 1, 0, 0],
+                vec![0, 0, 0, 1, 0, 0],
+                vec![0, 0, 0, 0, 0, 0],
+            ]),
             vec![
                 vec![None, None, Some(-1), None, None, Some(-1)],
                 vec![None, None, None, None, None, None],
@@ -226,21 +226,21 @@ mod tests {
         let ans = ans.unwrap();
         
         let expected = graph::GridEdges {
-            horizontal: vec![
-                vec![Some(false), Some(false), Some(true), Some(false), Some(true)],
-                vec![Some(false), Some(false), Some(false), Some(false), Some(false)],
-                vec![Some(false), Some(false), Some(false), Some(false), Some(false)],
-                vec![Some(false), Some(false), Some(false), Some(false), Some(false)],
-                vec![Some(false), Some(true), Some(false), Some(false), Some(false)],
-                vec![Some(true), Some(true), Some(true), Some(true), Some(false)],
-            ],
-            vertical: vec![
-                vec![Some(false), Some(false), Some(false), Some(true), Some(true), Some(false)],
-                vec![Some(false), Some(false), Some(false), Some(true), Some(true), Some(false)],
-                vec![Some(false), Some(true), Some(false), Some(false), Some(true), Some(false)],
-                vec![Some(false), Some(true), Some(false), Some(false), Some(true), Some(false)],
-                vec![Some(false), Some(false), Some(false), Some(false), Some(true), Some(false)],
-            ],
+            horizontal: crate::puzzle::util::tests::to_option_bool_2d([
+                [0, 0, 1, 0, 1],
+                [0, 0, 0, 0, 0],
+                [0, 0, 0, 0, 0],
+                [0, 0, 0, 0, 0],
+                [0, 1, 0, 0, 0],
+                [1, 1, 1, 1, 0],
+            ]),
+            vertical: crate::puzzle::util::tests::to_option_bool_2d([
+                [0, 0, 0, 1, 1, 0],
+                [0, 0, 0, 1, 1, 0],
+                [0, 1, 0, 0, 1, 0],
+                [0, 1, 0, 0, 1, 0],
+                [0, 0, 0, 0, 1, 0],
+            ]),
         };
         assert_eq!(ans, expected);
     }

@@ -172,7 +172,7 @@ mod tests {
         let ans = solve_akari(&problem);
         assert!(ans.is_some());
         let ans = ans.unwrap();
-        let expected = [
+        let expected = crate::puzzle::util::tests::to_option_bool_2d([
             [1, 0, 0, 1, 0, 0, 0, 0, 0, 0],
             [0, 0, 1, 0, 0, 0, 0, 0, 0, 1],
             [0, 0, 0, 0, 1, 0, 0, 0, 1, 0],
@@ -183,18 +183,8 @@ mod tests {
             [0, 0, 0, 0, 0, 1, 0, 0, 0, 0],
             [0, 0, 1, 0, 0, 0, 0, 0, 0, 0],
             [0, 1, 0, 0, 0, 0, 0, 0, 0, 1],
-        ];
-        for y in 0..10 {
-            for x in 0..10 {
-                assert_eq!(
-                    ans[y][x],
-                    Some(expected[y][x] == 1),
-                    "mismatch at ({}, {})",
-                    y,
-                    x
-                );
-            }
-        }
+        ]);
+        assert_eq!(ans, expected);
     }
 
     #[test]

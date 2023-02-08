@@ -130,21 +130,21 @@ mod tests {
         let ans = ans.unwrap();
         #[rustfmt::skip]
         let expected = graph::BoolInnerGridEdgesIrrefutableFacts {
-            horizontal: vec![
-                vec![Some(true), Some(false), Some(false), Some(false), Some(false), Some(false)],
-                vec![Some(true), Some(true), Some(true), Some(false), Some(true), Some(false)],
-                vec![Some(true), Some(false), Some(true), Some(true), Some(true), Some(false)],
-                vec![Some(false), Some(false), Some(true), Some(true), Some(false), Some(true)],
-                vec![Some(false), Some(true), Some(true), Some(false), Some(true), Some(true)],
-            ],
-            vertical: vec![
-                vec![Some(true), Some(false), Some(true), Some(false), Some(true)],
-                vec![Some(false), Some(false), Some(true), Some(false), Some(true)],
-                vec![Some(false), Some(false), Some(true), Some(true), Some(false)],
-                vec![Some(true), Some(true), Some(false), Some(false), Some(true)],
-                vec![Some(true), Some(true), Some(false), Some(true), Some(false)],
-                vec![Some(false), Some(false), Some(true), Some(false), Some(false)],
-            ],
+            horizontal: crate::puzzle::util::tests::to_option_bool_2d([
+                [1, 0, 0, 0, 0, 0],
+                [1, 1, 1, 0, 1, 0],
+                [1, 0, 1, 1, 1, 0],
+                [0, 0, 1, 1, 0, 1],
+                [0, 1, 1, 0, 1, 1],
+            ]),
+            vertical: crate::puzzle::util::tests::to_option_bool_2d([
+                [1, 0, 1, 0, 1],
+                [0, 0, 1, 0, 1],
+                [0, 0, 1, 1, 0],
+                [1, 1, 0, 0, 1],
+                [1, 1, 0, 1, 0],
+                [0, 0, 1, 0, 0],
+            ]),
         };
         assert_eq!(ans, expected);
     }

@@ -124,21 +124,21 @@ mod tests {
         let ans = ans.unwrap();
 
         let expected = graph::GridEdges {
-            horizontal: vec![
-                vec![Some(1), Some(1), Some(0), Some(0), Some(1)],
-                vec![Some(0), Some(1), Some(1), Some(0), Some(0)],
-                vec![Some(2), Some(2), Some(0), Some(0), Some(0)],
-                vec![Some(0), Some(2), Some(2), Some(1), Some(1)],
-                vec![Some(0), Some(0), Some(2), Some(2), Some(0)],
-                vec![Some(1), Some(1), Some(1), Some(1), Some(1)],
-            ],
-            vertical: vec![
-                vec![Some(2), Some(0), Some(0), Some(0), Some(1), Some(1)],
-                vec![Some(2), Some(0), Some(0), Some(1), Some(1), Some(1)],
-                vec![Some(1), Some(0), Some(0), Some(1), Some(0), Some(1)],
-                vec![Some(1), Some(0), Some(0), Some(0), Some(0), Some(1)],
-                vec![Some(1), Some(0), Some(2), Some(0), Some(0), Some(1)],
-            ],
+            horizontal: crate::puzzle::util::tests::to_option_2d([
+                [1, 1, 0, 0, 1],
+                [0, 1, 1, 0, 0],
+                [2, 2, 0, 0, 0],
+                [0, 2, 2, 1, 1],
+                [0, 0, 2, 2, 0],
+                [1, 1, 1, 1, 1],
+            ]),
+            vertical: crate::puzzle::util::tests::to_option_2d([
+                [2, 0, 0, 0, 1, 1],
+                [2, 0, 0, 1, 1, 1],
+                [1, 0, 0, 1, 0, 1],
+                [1, 0, 0, 0, 0, 1],
+                [1, 0, 2, 0, 0, 1],
+            ]),
         };
         assert_eq!(ans, expected);
     }

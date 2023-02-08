@@ -43,13 +43,16 @@ mod tests {
             vec![(4, 5), (5, 5)],
         ];
         let ans = solve_star_battle(n, k, &rooms);
-        assert_eq!(ans, Some(vec![
-            vec![Some(false), Some(true), Some(false), Some(false), Some(false), Some(false)],
-            vec![Some(false), Some(false), Some(false), Some(false), Some(true), Some(false)],
-            vec![Some(false), Some(false), Some(true), Some(false), Some(false), Some(false)],
-            vec![Some(true), Some(false), Some(false), Some(false), Some(false), Some(false)],
-            vec![Some(false), Some(false), Some(false), Some(false), Some(false), Some(true)],
-            vec![Some(false), Some(false), Some(false), Some(true), Some(false), Some(false)],
-        ]));
+        assert!(ans.is_some());
+        let ans = ans.unwrap();
+        let expected = crate::puzzle::util::tests::to_option_bool_2d([
+            [0, 1, 0, 0, 0, 0],
+            [0, 0, 0, 0, 1, 0],
+            [0, 0, 1, 0, 0, 0],
+            [1, 0, 0, 0, 0, 0],
+            [0, 0, 0, 0, 0, 1],
+            [0, 0, 0, 1, 0, 0],
+        ]);
+        assert_eq!(ans, expected);
     }
 }

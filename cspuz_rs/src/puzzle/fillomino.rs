@@ -84,13 +84,13 @@ mod tests {
         let ans = solve_fillomino(&problem);
         assert!(ans.is_some());
         let ans = ans.unwrap();
-        let expected = vec![
-            vec![Some(6), Some(1), Some(3), Some(3), Some(4)],
-            vec![Some(6), Some(6), Some(3), Some(4), Some(4)],
-            vec![Some(2), Some(6), Some(6), Some(5), Some(4)],
-            vec![Some(2), Some(4), Some(6), Some(5), Some(5)],
-            vec![Some(4), Some(4), Some(4), Some(5), Some(5)],
-        ];
+        let expected = crate::puzzle::util::tests::to_option_2d([
+            [6, 1, 3, 3, 4],
+            [6, 6, 3, 4, 4],
+            [2, 6, 6, 5, 4],
+            [2, 4, 6, 5, 5],
+            [4, 4, 4, 5, 5],
+        ]);
         assert_eq!(ans.0, expected);
     }
 

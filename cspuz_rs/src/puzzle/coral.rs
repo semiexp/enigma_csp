@@ -273,7 +273,7 @@ mod tests {
         assert!(ans.is_some());
         let ans = ans.unwrap();
 
-        let expected_base = [
+        let expected = crate::puzzle::util::tests::to_option_bool_2d([
             [0, 1, 1, 1, 1, 0],
             [0, 0, 1, 0, 1, 1],
             [0, 1, 1, 0, 1, 0],
@@ -281,9 +281,7 @@ mod tests {
             [1, 1, 1, 0, 0, 0],
             [0, 0, 1, 1, 1, 1],
             [0, 1, 1, 0, 0, 0],
-        ];
-        let expected =
-            expected_base.map(|row| row.iter().map(|&n| Some(n == 1)).collect::<Vec<_>>());
+        ]);
         assert_eq!(ans, expected);
     }
 

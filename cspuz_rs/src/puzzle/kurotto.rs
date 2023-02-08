@@ -99,25 +99,15 @@ mod tests {
         let ans = solve_kurotto(&problem);
         assert!(ans.is_some());
         let ans = ans.unwrap();
-        let expected = [
+        let expected = crate::puzzle::util::tests::to_option_bool_2d([
             [0, 1, 0, 1, 0, 0],
             [1, 0, 1, 0, 0, 1],
             [1, 0, 1, 1, 1, 0],
             [0, 1, 1, 0, 0, 0],
             [1, 1, 0, 0, 1, 0],
             [0, 0, 1, 0, 1, 0],
-        ];
-        for y in 0..6 {
-            for x in 0..6 {
-                assert_eq!(
-                    ans[y][x],
-                    Some(expected[y][x] == 1),
-                    "mismatch at ({}, {})",
-                    y,
-                    x
-                );
-            }
-        }
+        ]);
+        assert_eq!(ans, expected);
     }
 
     #[test]
