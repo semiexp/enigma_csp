@@ -2347,7 +2347,7 @@ mod tests {
                 })
                 .collect::<Vec<_>>();
 
-            let all_assignments = crate::util::product_multi(&domains);
+            let all_assignments = crate::test_util::product_multi(&domains);
             let valid_assignments = all_assignments
                 .into_iter()
                 .filter(|assignment| {

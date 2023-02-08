@@ -398,7 +398,7 @@ impl<'a> Model<'a> {
 mod tests {
     use super::super::csp;
     use super::*;
-    use crate::util;
+    use crate::test_util;
 
     enum DomainOrList {
         Domain(Domain),
@@ -476,9 +476,9 @@ mod tests {
             }
 
             let mut n_assignment_expected = 0;
-            for (vb, vi) in util::product_binary(
-                &util::product_multi(&bool_domains),
-                &util::product_multi(&int_domains),
+            for (vb, vi) in test_util::product_binary(
+                &test_util::product_multi(&bool_domains),
+                &test_util::product_multi(&int_domains),
             ) {
                 let mut assignment = csp::Assignment::new();
                 for i in 0..self.bool_vars.len() {
@@ -592,7 +592,7 @@ mod tests {
                             .map(|e| assignment.eval_bool_expr(e))
                             .collect::<Vec<_>>();
 
-                        if !util::check_graph_division(&sizes, edges, &edge_disconnected) {
+                        if !test_util::check_graph_division(&sizes, edges, &edge_disconnected) {
                             return false;
                         }
                     }

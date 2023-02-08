@@ -27,3 +27,6 @@ pub use pyo3_binding::enigma_csp;
 
 #[cfg(target_arch = "wasm32")]
 mod wasm;
+
+#[cfg(test)]
+mod test_util;

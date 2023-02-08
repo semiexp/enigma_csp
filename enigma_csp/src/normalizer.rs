@@ -1013,7 +1013,7 @@ mod tests {
     use super::super::norm_csp::BoolVar as NBoolVar;
     use super::super::norm_csp::IntVarRepresentation;
     use super::*;
-    use crate::util;
+    use crate::test_util;
 
     struct NormalizerTester {
         original_constr: Vec<Stmt>,
@@ -1124,9 +1124,9 @@ mod tests {
                 }
             }
 
-            for (vb, vi) in util::product_binary(
-                &util::product_multi(&bool_domains),
-                &util::product_multi(&int_domains),
+            for (vb, vi) in test_util::product_binary(
+                &test_util::product_multi(&bool_domains),
+                &test_util::product_multi(&int_domains),
             ) {
                 let mut assignment = csp::Assignment::new();
                 for i in 0..self.bool_vars.len() {
@@ -1157,9 +1157,9 @@ mod tests {
                         );
                     }
                     if !inconsistent {
-                        for (ub, ui) in util::product_binary(
-                            &util::product_multi(&unfixed_bool_domains),
-                            &util::product_multi(&unfixed_int_domains),
+                        for (ub, ui) in test_util::product_binary(
+                            &test_util::product_multi(&unfixed_bool_domains),
+                            &test_util::product_multi(&unfixed_int_domains),
                         ) {
                             let mut n_assignment = n_assignment.clone();
                             for i in 0..unfixed_bool_vars.len() {
