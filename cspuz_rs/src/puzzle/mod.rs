@@ -7,6 +7,7 @@ pub mod ayeheya;
 pub mod castle_wall;
 pub mod cave;
 pub mod chocobanana;
+pub mod cocktail;
 pub mod compass;
 pub mod coral;
 pub mod curvedata;

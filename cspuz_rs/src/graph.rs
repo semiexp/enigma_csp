@@ -351,6 +351,36 @@ where
     active_vertices_connected(solver, is_active, &graph)
 }
 
+pub fn active_vertices_connected_2d_region<T>(
+    solver: &mut Solver,
+    is_active: T,
+    indices: &[(usize, usize)],
+) where
+    T: Operand<Output = Array2DImpl<CSPBoolExpr>>,
+{
+    let is_active = is_active.as_expr_array_value();
+
+    let mut indices = indices.to_owned();
+    indices.sort();
+
+    let mut vertices = vec![];
+    for &p in &indices {
+        vertices.push(is_active.at(p));
+    }
+    let mut graph = Graph::new(indices.len());
+    for i in 0..indices.len() {
+        let (y, x) = indices[i];
+        if let Ok(j) = indices.binary_search(&(y + 1, x)) {
+            graph.add_edge(i, j);
+        }
+        if let Ok(j) = indices.binary_search(&(y, x + 1)) {
+            graph.add_edge(i, j);
+        }
+    }
+
+    active_vertices_connected(solver, &vertices, &graph)
+}
+
 pub fn active_edges_single_cycle<T>(
     solver: &mut Solver,
     is_active_edge: T,

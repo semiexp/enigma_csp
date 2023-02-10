@@ -85,6 +85,8 @@ fn decode_and_solve(url: &[u8]) -> Result<Board, &'static str> {
         puzzle::chocobanana::solve_chocobanana(url)
     } else if puzzle_kind == "fivecells" {
         puzzle::fivecells::solve_fivecells(url)
+    } else if puzzle_kind == "cocktail" {
+        puzzle::cocktail::solve_cocktail(url)
     } else {
         Err("unknown puzzle type")
     }
