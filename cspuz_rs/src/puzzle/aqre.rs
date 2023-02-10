@@ -76,7 +76,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_heyawake_problem() {
+    fn test_aqre_problem() {
         let url = "https://puzz.link/p?aqre/6/6/8a41dd1t0re00g300g";
         let problem = deserialize_problem(url);
         assert!(problem.is_some());
