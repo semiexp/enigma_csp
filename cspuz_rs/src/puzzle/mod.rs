@@ -34,6 +34,7 @@ pub mod slalom;
 pub mod slashpack;
 pub mod slitherlink;
 pub mod star_battle;
+pub mod stostone;
 pub mod sudoku;
 pub mod tapa;
 pub mod yajilin;

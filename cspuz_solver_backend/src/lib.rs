@@ -87,6 +87,8 @@ fn decode_and_solve(url: &[u8]) -> Result<Board, &'static str> {
         puzzle::fivecells::solve_fivecells(url)
     } else if puzzle_kind == "cocktail" {
         puzzle::cocktail::solve_cocktail(url)
+    } else if puzzle_kind == "stostone" {
+        puzzle::stostone::solve_stostone(url)
     } else {
         Err("unknown puzzle type")
     }
