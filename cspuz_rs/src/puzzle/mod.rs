@@ -25,6 +25,7 @@ pub mod moonsun;
 pub mod norinori;
 pub mod nurikabe;
 pub mod nurimisaki;
+pub mod pencils;
 pub mod sasahigane;
 pub mod shakashaka;
 pub mod shikaku;

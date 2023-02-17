@@ -1,5 +1,6 @@
 use cspuz_rs::graph;
 
+#[derive(PartialEq, Eq)]
 pub struct Compass {
     pub up: Option<i32>,
     pub down: Option<i32>,
@@ -8,6 +9,7 @@ pub struct Compass {
 }
 
 #[allow(unused)]
+#[derive(PartialEq, Eq)]
 pub enum ItemKind {
     Dot,
     Block,
@@ -28,6 +30,10 @@ pub enum ItemKind {
     AboloUpperRight,
     AboloLowerLeft,
     AboloLowerRight,
+    PencilUp,
+    PencilDown,
+    PencilLeft,
+    PencilRight,
     Cross,
     Line,
     DoubleLine,
@@ -66,6 +72,10 @@ impl ItemKind {
             &ItemKind::AboloUpperRight => String::from("\"aboloUpperRight\""),
             &ItemKind::AboloLowerLeft => String::from("\"aboloLowerLeft\""),
             &ItemKind::AboloLowerRight => String::from("\"aboloLowerRight\""),
+            &ItemKind::PencilUp => String::from("\"pencilUp\""),
+            &ItemKind::PencilDown => String::from("\"pencilDown\""),
+            &ItemKind::PencilLeft => String::from("\"pencilLeft\""),
+            &ItemKind::PencilRight => String::from("\"pencilRight\""),
             &ItemKind::Cross => String::from("\"cross\""),
             &ItemKind::Line => String::from("\"line\""),
             &ItemKind::DoubleLine => String::from("\"doubleLine\""),
