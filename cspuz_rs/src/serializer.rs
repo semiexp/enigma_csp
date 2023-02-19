@@ -611,6 +611,40 @@ impl Combinator<i32> for MultiDigit {
     }
 }
 
+pub struct AlphaToNum {
+    alpha_low: u8,
+    alpha_high: u8,
+    num_low: i32,
+    num_high: i32,
+}
+
+impl AlphaToNum {
+    pub fn new(alpha_low: char, alpha_high: char, offset: i32) -> AlphaToNum {
+        AlphaToNum {
+            alpha_low: alpha_low as u8,
+            alpha_high: alpha_high as u8,
+            num_low: offset,
+            num_high: offset + (alpha_high as u8 - alpha_low as u8) as i32,
+        }
+    }
+}
+
+impl Combinator<i32> for AlphaToNum {
+    fn serialize(&self, _: &Context, input: &[i32]) -> Option<(usize, Vec<u8>)> {
+        if input.len() == 0 || !(self.num_low <= input[0] && input[0] <= self.num_high) {
+            return None;
+        }
+        Some((1, vec![(input[0] - self.num_low) as u8 + self.alpha_low]))
+    }
+
+    fn deserialize(&self, _: &Context, input: &[u8]) -> Option<(usize, Vec<i32>)> {
+        if input.len() == 0 || !(self.alpha_low <= input[0] && input[0] <= self.alpha_high) {
+            return None;
+        }
+        Some((1, vec![(input[0] - self.alpha_low) as i32 + self.num_low]))
+    }
+}
+
 pub struct Map<C, F, G> {
     base_serializer: C,
     a_to_b: F,
@@ -1105,6 +1139,99 @@ where
     }
 }
 
+pub struct KudamonoGrid<S, T>
+where
+    S: Combinator<T>,
+    T: Clone,
+{
+    base_serializer: S,
+    empty: T,
+}
+
+impl<S, T> KudamonoGrid<S, T>
+where
+    S: Combinator<T>,
+    T: Clone,
+{
+    pub fn new(base_serializer: S, empty: T) -> KudamonoGrid<S, T> {
+        KudamonoGrid {
+            base_serializer,
+            empty,
+        }
+    }
+}
+
+impl<S, T> Combinator<Vec<Vec<T>>> for KudamonoGrid<S, T>
+where
+    S: Combinator<T>,
+    T: Clone,
+{
+    fn serialize(&self, _: &Context, _: &[Vec<Vec<T>>]) -> Option<(usize, Vec<u8>)> {
+        todo!();
+    }
+
+    fn deserialize(&self, ctx: &Context, input: &[u8]) -> Option<(usize, Vec<Vec<Vec<T>>>)> {
+        let height = ctx.height.unwrap();
+        let width = ctx.width.unwrap();
+        let y_ord = lexicographic_order(height);
+        let x_ord = lexicographic_order(width);
+
+        let mut ret = vec![];
+        let mut row = vec![];
+        for _ in 0..width {
+            row.push(self.empty.clone());
+        }
+        for _ in 0..height {
+            ret.push(row.clone());
+        }
+        let mut sequencer = Sequencer::new(input);
+        let mut pos = 0;
+
+        while sequencer.n_read() < input.len() {
+            let mut item = sequencer.deserialize(ctx, &self.base_serializer)?;
+            assert_eq!(item.len(), 1);
+            let gap = sequencer.deserialize(ctx, &DecInt)?;
+            assert_eq!(item.len(), 1);
+
+            pos += gap[0] as usize;
+            if pos >= height * width {
+                return None;
+            }
+
+            let y = height - 1 - y_ord[pos % height];
+            let x = x_ord[pos / height];
+            ret[y][x] = item.swap_remove(0);
+        }
+
+        Some((sequencer.n_read(), vec![ret]))
+    }
+}
+
+fn lexicographic_order(n: usize) -> Vec<usize> {
+    if n < 10 {
+        return (0..n).collect();
+    }
+
+    let mut ret = vec![];
+    fn traverse(x: usize, lim: usize, res: &mut Vec<usize>) {
+        res.push(x);
+        for i in 0..10 {
+            if x == 0 && i == 0 {
+                continue;
+            }
+            let x2 = x * 10 + i;
+            if x2 < lim {
+                traverse(x2, lim, res);
+            } else {
+                break;
+            }
+        }
+    }
+
+    traverse(0, n, &mut ret);
+    ret
+}
+
 pub fn problem_to_url_with_context<T, C>(
     combinator: C,
     puzzle_kind: &str,
@@ -1181,6 +1308,65 @@ where
     }
     let body = &serialized[(pos + 1)..];
     let (_, mut problem) = combinator.deserialize(&Context::new(), body.as_bytes())?;
+    assert_eq!(problem.len(), 1);
+    problem.pop()
+}
+
+pub struct KudamonoURLInfo<'a> {
+    pub height: usize,
+    pub width: usize,
+    pub puzzle_kind: &'a str,
+    pub content: &'a str,
+}
+
+pub fn get_kudamono_url_info(url: &str) -> Option<KudamonoURLInfo> {
+    let body = url.strip_prefix("https://pedros.works/paper-puzzle-player?")?;
+    let mut idx = 0;
+
+    let mut height: Option<usize> = None;
+    let mut width: Option<usize> = None;
+    let mut puzzle_kind: Option<&str> = None;
+    let mut content: Option<&str> = None;
+
+    while idx < body.len() {
+        let kind = &body[idx..=idx];
+        idx += 1;
+        if idx >= body.len() || &body[idx..=idx] != "=" {
+            return None;
+        }
+        idx += 1;
+        let mut end = idx;
+        while end < body.len() && &body[end..=end] != "&" {
+            end += 1;
+        }
+
+        if kind == "W" {
+            width = Some(body[idx..end].parse::<usize>().ok()? + 1);
+        } else if kind == "H" {
+            height = Some(body[idx..end].parse::<usize>().ok()? + 1);
+        } else if kind == "G" {
+            puzzle_kind = Some(&body[idx..end]);
+        } else if kind == "L" {
+            content = Some(&body[idx..end]);
+        }
+
+        idx = end + 1;
+    }
+
+    Some(KudamonoURLInfo {
+        height: height?,
+        width: width?,
+        puzzle_kind: puzzle_kind?,
+        content: content.unwrap_or(""),
+    })
+}
+
+pub fn kudamono_url_info_to_problem<T, C>(combinator: C, info: KudamonoURLInfo) -> Option<T>
+where
+    C: Combinator<T>,
+{
+    let ctx = Context::sized(info.height, info.width);
+    let (_, mut problem) = combinator.deserialize(&ctx, info.content.as_bytes())?;
     assert_eq!(problem.len(), 1);
     problem.pop()
 }
@@ -1356,6 +1542,27 @@ mod tests {
     }
 
     #[test]
+    fn test_alpha_to_num() {
+        let ctx = &Context::new();
+        let combinator = AlphaToNum::new('a', 'x', 1);
+
+        assert_eq!(combinator.serialize(ctx, &[]), None);
+        assert_eq!(combinator.serialize(ctx, &[3]), Some((1, Vec::from("c"))));
+        assert_eq!(
+            combinator.serialize(ctx, &[23, 12]),
+            Some((1, Vec::from("w")))
+        );
+        assert_eq!(combinator.serialize(ctx, &[25]), None);
+
+        assert_eq!(combinator.deserialize(ctx, "".as_bytes()), None);
+        assert_eq!(
+            combinator.deserialize(ctx, "c".as_bytes()),
+            Some((1, vec![3]))
+        );
+        assert_eq!(combinator.deserialize(ctx, "y".as_bytes()), None);
+    }
+
+    #[test]
     fn test_maybe_skip() {
         let ctx = &Context::new();
         let combinator = MaybeSkip::new("!!", HexInt);
@@ -1519,6 +1726,53 @@ mod tests {
     }
 
     #[test]
+    fn test_kudamono_grid() {
+        let combinator = KudamonoGrid::new(Dict::new(true, "x"), false);
+
+        {
+            let ctx = &Context::sized(4, 5);
+            assert_eq!(
+                combinator.deserialize(ctx, "".as_bytes()),
+                Some((
+                    0,
+                    vec![vec![
+                        vec![false, false, false, false, false],
+                        vec![false, false, false, false, false],
+                        vec![false, false, false, false, false],
+                        vec![false, false, false, false, false],
+                    ]]
+                ))
+            );
+            assert_eq!(
+                combinator.deserialize(ctx, "x0x11".as_bytes()),
+                Some((
+                    5,
+                    vec![vec![
+                        vec![false, false, true, false, false],
+                        vec![false, false, false, false, false],
+                        vec![false, false, false, false, false],
+                        vec![true, false, false, false, false],
+                    ]]
+                ))
+            );
+            assert_eq!(combinator.deserialize(ctx, "x".as_bytes()), None,);
+        }
+        {
+            let ctx = &Context::sized(13, 14);
+            let deserialized = combinator.deserialize(ctx, "x3x37x19x18x12".as_bytes());
+            assert!(deserialized.is_some());
+            let (n, deserialized) = deserialized.unwrap();
+            assert_eq!(n, 14);
+            assert_eq!(deserialized.len(), 1);
+            assert_eq!(deserialized[0][1][0], true);
+            assert_eq!(deserialized[0][3][13], true);
+            assert_eq!(deserialized[0][4][2], true);
+            assert_eq!(deserialized[0][8][12], true);
+            assert_eq!(deserialized[0][11][11], true);
+        }
+    }
+
+    #[test]
     fn test_rooms_with_values() {
         let ctx = &Context::sized(3, 4);
         let combinator = RoomsWithValues::new(HexInt);
@@ -1606,5 +1860,36 @@ mod tests {
             combinator.deserialize(ctx, "93f".as_bytes()),
             Some((3, vec![NumberedArrow::Right(63)]))
         );
+    }
+
+    #[test]
+    fn test_lexicographic_order() {
+        assert_eq!(lexicographic_order(1), vec![0]);
+        assert_eq!(lexicographic_order(8), vec![0, 1, 2, 3, 4, 5, 6, 7]);
+        assert_eq!(
+            lexicographic_order(12),
+            vec![0, 1, 10, 11, 2, 3, 4, 5, 6, 7, 8, 9]
+        );
+
+        {
+            let long_seq = lexicographic_order(150);
+            // 0, 1, 10, 100, 101, ..., 109, 11, 110, 111, ..., 119, ...
+            assert_eq!(&long_seq[0..5], &[0, 1, 10, 100, 101]);
+            assert_eq!(long_seq[13], 11);
+            assert_eq!(long_seq[14], 110);
+        }
+    }
+
+    #[test]
+    fn test_kudamono_url_info() {
+        let url =
+            "https://pedros.works/paper-puzzle-player?W=13&H=12&L=x3x37x19x18x12&G=tricklayer";
+        let info = get_kudamono_url_info(url);
+        assert!(info.is_some());
+        let info = info.unwrap();
+        assert_eq!(info.height, 13);
+        assert_eq!(info.width, 14);
+        assert_eq!(info.puzzle_kind, "tricklayer");
+        assert_eq!(info.content, "x3x37x19x18x12");
     }
 }
