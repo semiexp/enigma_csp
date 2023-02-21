@@ -1142,7 +1142,7 @@ where
 pub struct KudamonoGrid<S, T>
 where
     S: Combinator<T>,
-    T: Clone,
+    T: Clone + PartialEq,
 {
     base_serializer: S,
     empty: T,
@@ -1151,7 +1151,7 @@ where
 impl<S, T> KudamonoGrid<S, T>
 where
     S: Combinator<T>,
-    T: Clone,
+    T: Clone + PartialEq,
 {
     pub fn new(base_serializer: S, empty: T) -> KudamonoGrid<S, T> {
         KudamonoGrid {
@@ -1164,10 +1164,42 @@ where
 impl<S, T> Combinator<Vec<Vec<T>>> for KudamonoGrid<S, T>
 where
     S: Combinator<T>,
-    T: Clone,
+    T: Clone + PartialEq,
 {
-    fn serialize(&self, _: &Context, _: &[Vec<Vec<T>>]) -> Option<(usize, Vec<u8>)> {
-        todo!();
+    fn serialize(&self, ctx: &Context, input: &[Vec<Vec<T>>]) -> Option<(usize, Vec<u8>)> {
+        if input.len() == 0 {
+            return None;
+        }
+        let data = &input[0];
+        let height = data.len();
+        if height == 0 {
+            return Some((0, vec![]));
+        }
+        let width = data[0].len();
+        for y in 1..height {
+            assert_eq!(data[y].len(), width);
+        }
+        let y_ord = lexicographic_order(height);
+        let x_ord = lexicographic_order(width);
+
+        let mut ret = vec![];
+        let mut last_nonempty = 0;
+        for i in 0..(height * width) {
+            let x = x_ord[i / height];
+            let y = height - 1 - y_ord[i % height];
+            if data[y][x] == self.empty {
+                continue;
+            }
+            ret.extend(
+                self.base_serializer
+                    .serialize(ctx, &[data[y][x].clone()])?
+                    .1,
+            );
+            ret.extend(DecInt.serialize(ctx, &[(i - last_nonempty) as i32])?.1);
+            last_nonempty = i;
+        }
+
+        Some((1, ret))
     }
 
     fn deserialize(&self, ctx: &Context, input: &[u8]) -> Option<(usize, Vec<Vec<Vec<T>>>)> {
@@ -1756,6 +1788,20 @@ mod tests {
                 ))
             );
             assert_eq!(combinator.deserialize(ctx, "x".as_bytes()), None,);
+
+            assert_eq!(combinator.serialize(ctx, &[]), None);
+            assert_eq!(
+                combinator.serialize(
+                    ctx,
+                    &[vec![
+                        vec![false, false, true, false, false],
+                        vec![false, false, false, false, false],
+                        vec![false, false, false, false, false],
+                        vec![true, false, false, false, false],
+                    ]]
+                ),
+                Some((1, Vec::from("x0x11")))
+            );
         }
         {
             let ctx = &Context::sized(13, 14);
@@ -1769,6 +1815,17 @@ mod tests {
             assert_eq!(deserialized[0][4][2], true);
             assert_eq!(deserialized[0][8][12], true);
             assert_eq!(deserialized[0][11][11], true);
+
+            let mut data = vec![vec![false; 14]; 13];
+            data[1][0] = true;
+            data[3][13] = true;
+            data[4][2] = true;
+            data[8][12] = true;
+            data[11][11] = true;
+            assert_eq!(
+                combinator.serialize(ctx, &[data]),
+                Some((1, Vec::from("x3x37x19x18x12")))
+            );
         }
     }
 
