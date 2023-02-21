@@ -1,7 +1,8 @@
 use super::util;
 use crate::graph;
 use crate::serializer::{
-    get_kudamono_url_info, kudamono_url_info_to_problem, Combinator, Dict, KudamonoGrid,
+    get_kudamono_url_info, kudamono_url_info_to_problem, problem_to_kudamono_url_grid, Combinator,
+    Dict, KudamonoGrid,
 };
 use crate::solver::{all, count_true, Solver};
 
@@ -99,6 +100,10 @@ fn combinator() -> impl Combinator<Problem> {
     KudamonoGrid::new(Dict::new(true, "x"), false)
 }
 
+pub fn serialize_problem(problem: &Problem) -> Option<String> {
+    problem_to_kudamono_url_grid(combinator(), "tricklayer", problem.clone())
+}
+
 pub fn deserialize_problem(url: &str) -> Option<Problem> {
     let info = get_kudamono_url_info(url)?;
     kudamono_url_info_to_problem(combinator(), info)
@@ -145,6 +150,11 @@ mod tests {
     fn test_tricklayer_serializer() {
         let problem = problem_for_tests();
         let url = "https://pedros.works/paper-puzzle-player?W=4&H=3&L=x1x2x8x7x1&G=tricklayer";
-        assert_eq!(deserialize_problem(url), Some(problem));
+        crate::puzzle::util::tests::serializer_test(
+            problem,
+            url,
+            serialize_problem,
+            deserialize_problem,
+        );
     }
 }

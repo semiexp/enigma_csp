@@ -1403,6 +1403,43 @@ where
     problem.pop()
 }
 
+pub fn problem_to_kudamono_url<T, C>(
+    combinator: C,
+    puzzle_kind: &str,
+    problem: T,
+    height: usize,
+    width: usize,
+) -> Option<String>
+where
+    C: Combinator<T>,
+{
+    let desc = combinator
+        .serialize(&Context::sized(height, width), &[problem])?
+        .1;
+    let desc = String::from_utf8(desc).ok()?;
+    let url = format!(
+        "https://pedros.works/paper-puzzle-player?W={}&H={}&L={}&G={}",
+        width - 1,
+        height - 1,
+        desc,
+        puzzle_kind
+    );
+    Some(url)
+}
+
+pub fn problem_to_kudamono_url_grid<X, C>(
+    combinator: C,
+    puzzle_kind: &str,
+    problem: Vec<Vec<X>>,
+) -> Option<String>
+where
+    C: Combinator<Vec<Vec<X>>>,
+{
+    let height = problem.len();
+    let width = problem[0].len();
+    problem_to_kudamono_url(combinator, puzzle_kind, problem, height, width)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
