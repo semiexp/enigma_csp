@@ -34,5 +34,6 @@ pub mod slitherlink;
 pub mod stostone;
 pub mod sudoku;
 pub mod tapa;
+pub mod tricklayer;
 pub mod yajilin;
 pub mod yajilin_regions;

@@ -4,15 +4,11 @@ pub mod board;
 mod puzzle;
 
 use board::Board;
-use cspuz_rs::serializer::url_to_puzzle_kind;
+use cspuz_rs::serializer::{get_kudamono_url_info, url_to_puzzle_kind};
 
 static mut SHARED_ARRAY: Vec<u8> = vec![];
 
-fn decode_and_solve(url: &[u8]) -> Result<Board, &'static str> {
-    let url = std::str::from_utf8(url).map_err(|_| "failed to decode URL as UTF-8")?;
-
-    let puzzle_kind = url_to_puzzle_kind(url).ok_or("puzzle type not detected")?;
-
+fn solve_puzz_link(puzzle_kind: String, url: &str) -> Result<Board, &'static str> {
     if puzzle_kind == "nurikabe" {
         puzzle::nurikabe::solve_nurikabe(url)
     } else if puzzle_kind == "yajilin" || puzzle_kind == "yajirin" {
@@ -93,6 +89,24 @@ fn decode_and_solve(url: &[u8]) -> Result<Board, &'static str> {
         puzzle::pencils::solve_pencils(url)
     } else {
         Err("unknown puzzle type")
+    }
+}
+
+fn decode_and_solve(url: &[u8]) -> Result<Board, &'static str> {
+    let url = std::str::from_utf8(url).map_err(|_| "failed to decode URL as UTF-8")?;
+
+    let puzzle_kind = url_to_puzzle_kind(url).ok_or("puzzle type not detected");
+
+    match puzzle_kind {
+        Ok(puzzle_kind) => solve_puzz_link(puzzle_kind, url),
+        Err(_) => {
+            let kudamono = get_kudamono_url_info(url).ok_or("failed to parse URL")?;
+            if kudamono.puzzle_kind == "tricklayer" {
+                puzzle::tricklayer::solve_tricklayer(url)
+            } else {
+                Err("unknown puzzle type")
+            }
+        }
     }
 }
 
