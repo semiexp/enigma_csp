@@ -103,6 +103,8 @@ fn decode_and_solve(url: &[u8]) -> Result<Board, &'static str> {
             let kudamono = get_kudamono_url_info(url).ok_or("failed to parse URL")?;
             if kudamono.puzzle_kind == "tricklayer" {
                 puzzle::tricklayer::solve_tricklayer(url)
+            } else if kudamono.puzzle_kind == "parrot-loop" {
+                puzzle::parrot_loop::solve_parrot_loop(url)
             } else {
                 Err("unknown puzzle type")
             }
