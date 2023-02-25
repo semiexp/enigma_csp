@@ -198,6 +198,27 @@ impl<T: Clone> Value<Array2DImpl<T>> {
         })
     }
 
+    pub fn at_offset<D, E>(
+        &self,
+        idx: (usize, usize),
+        offset: (i32, i32),
+        default: D,
+    ) -> Value<Array0DImpl<E>>
+    where
+        D: Operand<Output = Array0DImpl<E>>,
+        Value<Array0DImpl<T>>: Operand<Output = Array0DImpl<E>>,
+    {
+        let (y, x) = idx;
+        let (dy, dx) = offset;
+        let y = y as i32 + dy;
+        let x = x as i32 + dx;
+        if 0 <= y && y < self.shape().0 as i32 && 0 <= x && x < self.shape().1 as i32 {
+            Value(self.at((y as usize, x as usize)).as_expr_array())
+        } else {
+            Value(default.as_expr_array())
+        }
+    }
+
     pub fn select<I, X>(&self, idx: I) -> Value<Array1DImpl<T>>
     where
         I: IntoIterator<Item = X>,
