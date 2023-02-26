@@ -96,33 +96,26 @@ pub fn solve_sashigane(
     for y in 0..h {
         for x in 0..w {
             if let Some(c) = clues[y][x] {
+                let p = (y, x);
                 match c {
                     SashiganeClue::Up => {
-                        solver.add_expr(cell_kind.at((y, x)).eq(0));
-                        if y < h - 1 {
-                            solver.add_expr(cell_kind.at((y + 1, x)).ne(0));
-                        }
+                        solver.add_expr(cell_kind.at(p).eq(0));
+                        solver.add_expr(cell_kind.at_offset(p, (1, 0), -1).ne(0));
                     }
                     SashiganeClue::Down => {
-                        solver.add_expr(cell_kind.at((y, x)).eq(1));
-                        if y > 0 {
-                            solver.add_expr(cell_kind.at((y - 1, x)).ne(1));
-                        }
+                        solver.add_expr(cell_kind.at(p).eq(1));
+                        solver.add_expr(cell_kind.at_offset(p, (-1, 0), -1).ne(1));
                     }
                     SashiganeClue::Left => {
-                        solver.add_expr(cell_kind.at((y, x)).eq(2));
-                        if x < w - 1 {
-                            solver.add_expr(cell_kind.at((y, x + 1)).ne(2));
-                        }
+                        solver.add_expr(cell_kind.at(p).eq(2));
+                        solver.add_expr(cell_kind.at_offset(p, (0, 1), -1).ne(2));
                     }
                     SashiganeClue::Right => {
-                        solver.add_expr(cell_kind.at((y, x)).eq(3));
-                        if x > 0 {
-                            solver.add_expr(cell_kind.at((y, x - 1)).ne(3));
-                        }
+                        solver.add_expr(cell_kind.at(p).eq(3));
+                        solver.add_expr(cell_kind.at_offset(p, (0, -1), -1).ne(3));
                     }
                     SashiganeClue::Corner(n) => {
-                        solver.add_expr(cell_kind.at((y, x)).eq(4));
+                        solver.add_expr(cell_kind.at(p).eq(4));
                         if n > 0 {
                             let up = cell_kind
                                 .slice_fixed_x((..y, x))

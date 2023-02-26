@@ -1,7 +1,7 @@
 use super::util;
 use crate::graph;
 use crate::serializer::{problem_to_url, url_to_problem, Combinator, Grid, Map, MultiDigit};
-use crate::solver::{any, Solver};
+use crate::solver::Solver;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum MasyuClue {
@@ -22,64 +22,34 @@ pub fn solve_masyu(clues: &[Vec<MasyuClue>]) -> Option<graph::BoolGridEdgesIrref
 
     for y in 0..h {
         for x in 0..w {
+            let p = (y, x);
             match clues[y][x] {
                 MasyuClue::None => (),
                 MasyuClue::White => {
-                    let mut cands = vec![];
-                    if 1 < y && y < h - 2 {
-                        cands.push(
-                            is_line.vertical.at((y - 1, x))
-                                & is_line.vertical.at((y, x))
-                                & !(is_line.vertical.at((y - 2, x))
-                                    & is_line.vertical.at((y + 1, x))),
-                        );
-                    } else if 0 < y && y < h - 1 {
-                        cands.push(is_line.vertical.at((y - 1, x)) & is_line.vertical.at((y, x)));
-                    }
-                    if 1 < x && x < w - 2 {
-                        cands.push(
-                            is_line.horizontal.at((y, x - 1))
-                                & is_line.horizontal.at((y, x))
-                                & !(is_line.horizontal.at((y, x - 2))
-                                    & is_line.horizontal.at((y, x + 1))),
-                        );
-                    } else if 0 < x && x < w - 1 {
-                        cands.push(
-                            is_line.horizontal.at((y, x - 1)) & is_line.horizontal.at((y, x)),
-                        );
-                    }
-                    solver.add_expr(any(cands));
+                    solver.add_expr(
+                        (is_line.vertical.at_offset(p, (-1, 0), false)
+                            & is_line.vertical.at_offset(p, (0, 0), false)
+                            & !(is_line.vertical.at_offset(p, (-2, 0), false)
+                                & is_line.vertical.at_offset(p, (1, 0), false)))
+                            | (is_line.horizontal.at_offset(p, (0, -1), false)
+                                & is_line.horizontal.at_offset(p, (0, 0), false)
+                                & !(is_line.horizontal.at_offset(p, (0, -2), false)
+                                    & is_line.horizontal.at_offset(p, (0, 1), false))),
+                    );
                 }
                 MasyuClue::Black => {
-                    {
-                        let mut cands = vec![];
-                        if y >= 2 {
-                            cands.push(
-                                is_line.vertical.at((y - 2, x)) & is_line.vertical.at((y - 1, x)),
-                            );
-                        }
-                        if y < h - 2 {
-                            cands.push(
-                                is_line.vertical.at((y, x)) & is_line.vertical.at((y + 1, x)),
-                            );
-                        }
-                        solver.add_expr(any(cands));
-                    }
-                    {
-                        let mut cands = vec![];
-                        if x >= 2 {
-                            cands.push(
-                                is_line.horizontal.at((y, x - 2))
-                                    & is_line.horizontal.at((y, x - 1)),
-                            );
-                        }
-                        if x < w - 2 {
-                            cands.push(
-                                is_line.horizontal.at((y, x)) & is_line.horizontal.at((y, x + 1)),
-                            );
-                        }
-                        solver.add_expr(any(cands));
-                    }
+                    solver.add_expr(
+                        (is_line.vertical.at_offset(p, (-2, 0), false)
+                            & is_line.vertical.at_offset(p, (-1, 0), false))
+                            | (is_line.vertical.at_offset(p, (0, 0), false)
+                                & is_line.vertical.at_offset(p, (1, 0), false)),
+                    );
+                    solver.add_expr(
+                        (is_line.horizontal.at_offset(p, (0, -2), false)
+                            & is_line.horizontal.at_offset(p, (0, -1), false))
+                            | (is_line.horizontal.at_offset(p, (0, 0), false)
+                                & is_line.horizontal.at_offset(p, (0, 1), false)),
+                    );
                 }
             }
         }
