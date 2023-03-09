@@ -1459,6 +1459,183 @@ impl OwnedPartialModel {
     }
 }
 
+pub mod ops {
+
+    use super::*;
+
+    pub trait GenericComparable<Rhs> {
+        type Output;
+
+        fn eq(&self, rhs: &Rhs) -> Self::Output;
+        fn ne(&self, rhs: &Rhs) -> Self::Output;
+        fn le(&self, rhs: &Rhs) -> Self::Output;
+        fn lt(&self, rhs: &Rhs) -> Self::Output;
+        fn ge(&self, rhs: &Rhs) -> Self::Output;
+        fn gt(&self, rhs: &Rhs) -> Self::Output;
+    }
+
+    impl<X> GenericComparable<X> for X
+    where
+        X: PartialOrd,
+    {
+        type Output = bool;
+
+        fn eq(&self, rhs: &X) -> Self::Output {
+            self == rhs
+        }
+        fn ne(&self, rhs: &X) -> Self::Output {
+            self == rhs
+        }
+        fn le(&self, rhs: &X) -> Self::Output {
+            self < rhs
+        }
+        fn lt(&self, rhs: &X) -> Self::Output {
+            self <= rhs
+        }
+        fn ge(&self, rhs: &X) -> Self::Output {
+            self >= rhs
+        }
+        fn gt(&self, rhs: &X) -> Self::Output {
+            self > rhs
+        }
+    }
+
+    impl<X, Y, Z> GenericComparable<Y> for Value<X>
+    where
+        Y: Clone,
+        for<'a, 'b> (&'a Value<X>, &'b Y):
+            PropagateBinaryGeneric<CSPIntExpr, CSPIntExpr, CSPBoolExpr, Output = Z>,
+    {
+        type Output = Value<Z>;
+
+        fn eq(&self, rhs: &Y) -> Self::Output {
+            Value::eq(self, rhs)
+        }
+        fn ne(&self, rhs: &Y) -> Self::Output {
+            Value::ne(self, rhs)
+        }
+        fn le(&self, rhs: &Y) -> Self::Output {
+            Value::le(self, rhs)
+        }
+        fn lt(&self, rhs: &Y) -> Self::Output {
+            Value::lt(self, rhs)
+        }
+        fn ge(&self, rhs: &Y) -> Self::Output {
+            Value::ge(self, rhs)
+        }
+        fn gt(&self, rhs: &Y) -> Self::Output {
+            Value::gt(self, rhs)
+        }
+    }
+
+    impl<X, Y, Z> GenericComparable<Y> for &Value<X>
+    where
+        Y: Clone,
+        for<'a, 'b> (&'a Value<X>, &'b Y):
+            PropagateBinaryGeneric<CSPIntExpr, CSPIntExpr, CSPBoolExpr, Output = Z>,
+    {
+        type Output = Value<Z>;
+
+        fn eq(&self, rhs: &Y) -> Self::Output {
+            Value::eq(self, rhs)
+        }
+        fn ne(&self, rhs: &Y) -> Self::Output {
+            Value::ne(self, rhs)
+        }
+        fn le(&self, rhs: &Y) -> Self::Output {
+            Value::le(self, rhs)
+        }
+        fn lt(&self, rhs: &Y) -> Self::Output {
+            Value::lt(self, rhs)
+        }
+        fn ge(&self, rhs: &Y) -> Self::Output {
+            Value::ge(self, rhs)
+        }
+        fn gt(&self, rhs: &Y) -> Self::Output {
+            Value::gt(self, rhs)
+        }
+    }
+
+    pub fn eq<X, Y>(lhs: &X, rhs: &Y) -> <X as GenericComparable<Y>>::Output
+    where
+        X: GenericComparable<Y>,
+    {
+        lhs.eq(rhs)
+    }
+
+    pub fn ne<X, Y>(lhs: &X, rhs: &Y) -> <X as GenericComparable<Y>>::Output
+    where
+        X: GenericComparable<Y>,
+    {
+        lhs.ne(rhs)
+    }
+
+    pub fn le<X, Y>(lhs: &X, rhs: &Y) -> <X as GenericComparable<Y>>::Output
+    where
+        X: GenericComparable<Y>,
+    {
+        lhs.le(rhs)
+    }
+
+    pub fn lt<X, Y>(lhs: &X, rhs: &Y) -> <X as GenericComparable<Y>>::Output
+    where
+        X: GenericComparable<Y>,
+    {
+        lhs.lt(rhs)
+    }
+
+    pub fn ge<X, Y>(lhs: &X, rhs: &Y) -> <X as GenericComparable<Y>>::Output
+    where
+        X: GenericComparable<Y>,
+    {
+        lhs.ge(rhs)
+    }
+
+    pub fn gt<X, Y>(lhs: &X, rhs: &Y) -> <X as GenericComparable<Y>>::Output
+    where
+        X: GenericComparable<Y>,
+    {
+        lhs.gt(rhs)
+    }
+
+    pub trait GenericCallable2<X, Y, Z> {
+        fn call(&self, a1: X, a2: Y) -> Z;
+    }
+
+    impl<X, Y, Z> GenericCallable2<X, Y, Z> for fn(X, Y) -> Z {
+        fn call(&self, a1: X, a2: Y) -> Z {
+            self(a1, a2)
+        }
+    }
+
+    impl<T> GenericCallable2<usize, usize, Value<Array0DImpl<T>>> for Value<Array2DImpl<T>>
+    where
+        T: Clone,
+    {
+        fn call(&self, y: usize, x: usize) -> Value<Array0DImpl<T>> {
+            self.at((y, x))
+        }
+    }
+
+    impl<T> GenericCallable2<usize, usize, Value<Array0DImpl<T>>> for &Value<Array2DImpl<T>>
+    where
+        T: Clone,
+    {
+        fn call(&self, y: usize, x: usize) -> Value<Array0DImpl<T>> {
+            self.at((y, x))
+        }
+    }
+
+    pub fn call<F, X, Y, Z>(f: F, x: X, y: Y) -> Z
+    where
+        F: GenericCallable2<X, Y, Z>,
+    {
+        f.call(x, y)
+    }
+}
+
+pub use cspuz_rs_macro::expr;
+
 #[cfg(test)]
 mod tests {
     use super::*;

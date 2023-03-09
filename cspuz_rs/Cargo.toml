@@ -11,3 +11,4 @@ csp-extra-constraints = ["enigma_csp/csp-extra-constraints"]
 
 [dependencies]
 enigma_csp = { path = "../enigma_csp", default-features = false }
+cspuz_rs_macro = { path = "../cspuz_rs_macro" }
