@@ -2,11 +2,26 @@ use proc_macro::TokenStream;
 use proc_macro2::{Ident, Span};
 use quote::quote;
 use syn::fold::{self, Fold};
-use syn::{parse_macro_input, parse_quote, BinOp, Expr};
+use syn::parse::{Parse, ParseStream, Result};
+use syn::{parse_macro_input, parse_quote, BinOp, Expr, Path, Token};
 
-fn make_explicit_op(lhs: Expr, rhs: Expr, op: Ident) -> Expr {
+struct Input {
+    arg: Expr,
+    mod_path: Path,
+}
+
+impl Parse for Input {
+    fn parse(input: ParseStream) -> Result<Self> {
+        let arg = input.parse()?;
+        input.parse::<Token![,]>()?;
+        let mod_path = input.parse()?;
+        Ok(Input { arg, mod_path })
+    }
+}
+
+fn make_explicit_op(lhs: Expr, rhs: Expr, op: Ident, path: &Path) -> Expr {
     parse_quote!(
-        crate::solver::ops::#op(&#lhs, &#rhs)
+        #path::solver::ops::#op(&#lhs, &#rhs)
     )
 }
 
@@ -23,7 +38,7 @@ fn explicit_op_ident(op: BinOp) -> Option<Ident> {
     Some(Ident::new(ident_name, Span::call_site()))
 }
 
-struct Converter;
+struct Converter(Path);
 
 impl Fold for Converter {
     fn fold_expr(&mut self, e: Expr) -> Expr {
@@ -32,7 +47,7 @@ impl Fold for Converter {
                 Some(ident) => {
                     let left = fold::fold_expr(self, *e.left);
                     let right = fold::fold_expr(self, *e.right);
-                    make_explicit_op(left, right, ident)
+                    make_explicit_op(left, right, ident, &self.0)
                 }
                 _ => Expr::Binary(fold::fold_expr_binary(self, e)),
             },
@@ -50,9 +65,9 @@ impl Fold for Converter {
 }
 
 #[proc_macro]
-pub fn expr(input: TokenStream) -> TokenStream {
-    let input = parse_macro_input!(input as Expr);
-    let output = Converter.fold_expr(input);
+pub fn _expr_impl(input: TokenStream) -> TokenStream {
+    let Input { arg, mod_path } = parse_macro_input!(input as Input);
+    let output = Converter(mod_path).fold_expr(arg);
 
     TokenStream::from(quote!(#output))
 }

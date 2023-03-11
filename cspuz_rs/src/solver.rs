@@ -1634,7 +1634,14 @@ pub mod ops {
     }
 }
 
-pub use cspuz_rs_macro::expr;
+pub use cspuz_rs_macro::_expr_impl;
+
+#[macro_export]
+macro_rules! expr {
+    ($x:expr) => {
+        $crate::solver::_expr_impl!($x, $crate)
+    };
+}
 
 #[cfg(test)]
 mod tests {
@@ -1745,5 +1752,18 @@ mod tests {
             n_ans += 1;
         }
         assert_eq!(n_ans, 24);
+    }
+
+    #[test]
+    fn test_expr_macro() {
+        let mut solver = Solver::new();
+        let x = &solver.int_var(0, 5);
+        let y = &solver.int_var(0, 5);
+        solver.add_answer_key_int(x);
+        solver.add_answer_key_int(y);
+        solver.add_expr(expr!(x > y));
+
+        let n_ans = solver.answer_iter().count();
+        assert_eq!(n_ans, 15);
     }
 }
