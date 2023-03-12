@@ -6,9 +6,11 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [features]
-default = ["csp-extra-constraints"]
+default = ["csp-extra-constraints", "generator"]
 csp-extra-constraints = ["enigma_csp/csp-extra-constraints"]
+generator = ["rand"]
 
 [dependencies]
 enigma_csp = { path = "../enigma_csp", default-features = false }
 cspuz_rs_macro = { path = "../cspuz_rs_macro" }
+rand = { version = "0.8.5", optional = true }
