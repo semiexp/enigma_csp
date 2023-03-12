@@ -1203,39 +1203,8 @@ mod tests {
                             .iter()
                             .map(|&v| assignment.get_int(v).unwrap())
                             .collect::<Vec<_>>();
-                        for i in 0..values.len() {
-                            if values[i] < 0 || values[i] as usize >= values.len() {
-                                return false;
-                            }
-                        }
-                        let values = values.into_iter().map(|x| x as usize).collect::<Vec<_>>();
-                        let mut expected_cyc_len = 0;
-                        for i in 0..values.len() {
-                            if values[i] != i {
-                                expected_cyc_len += 1;
-                            }
-                        }
-                        let mut visited = vec![false; values.len()];
-                        for i in 0..values.len() {
-                            if values[i] != i {
-                                let mut cyc_len = 0;
-                                let mut p = i;
-                                while !visited[p] {
-                                    if p == values[p] {
-                                        return false;
-                                    }
-                                    visited[p] = true;
-                                    p = values[p];
-                                    cyc_len += 1;
-                                }
-                                if p != i {
-                                    return false;
-                                }
-                                if expected_cyc_len != cyc_len {
-                                    return false;
-                                }
-                                break;
-                            }
+                        if !test_util::check_circuit(&values) {
+                            return false;
                         }
                     }
                     Stmt::ExtensionSupports(vars, supports) => {
@@ -1275,7 +1244,15 @@ mod tests {
             }
             for constr in &self.norm.extra_constraints {
                 match constr {
-                    ExtraConstraint::ActiveVerticesConnected(_, _) => unimplemented!(),
+                    ExtraConstraint::ActiveVerticesConnected(is_active, edges) => {
+                        let is_active = is_active
+                            .iter()
+                            .map(|&v| assignment.get_bool(v.var).unwrap() ^ v.negated)
+                            .collect::<Vec<_>>();
+                        if !test_util::check_graph_active_vertices_connected(&is_active, &edges) {
+                            return false;
+                        }
+                    }
                     &ExtraConstraint::Mul(x, y, m) => {
                         let val_x = assignment.get_int(x).unwrap();
                         let val_y = assignment.get_int(y).unwrap();
@@ -1612,9 +1589,8 @@ mod tests {
         }
     }
 
-    /*
     #[test]
-    fn test_normalization_circuit() {
+    fn test_normalization_circuit_1() {
         let mut tester = NormalizerTester::new();
 
         let a = tester.new_int_var(Domain::range(0, 2));
@@ -1623,5 +1599,4 @@ mod tests {
         tester.add_constraint(Stmt::Circuit(vec![a, b, c]));
         tester.check();
     }
-    */
 }

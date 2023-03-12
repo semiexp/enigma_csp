@@ -517,46 +517,22 @@ mod tests {
                             }
                         }
                     }
-                    Stmt::ActiveVerticesConnected(_, _) => todo!(),
+                    Stmt::ActiveVerticesConnected(is_active, edges) => {
+                        let is_active = is_active
+                            .iter()
+                            .map(|v| assignment.eval_bool_expr(v))
+                            .collect::<Vec<_>>();
+                        if !test_util::check_graph_active_vertices_connected(&is_active, &edges) {
+                            return false;
+                        }
+                    }
                     Stmt::Circuit(values) => {
                         let values = values
                             .iter()
                             .map(|&v| assignment.get_int(v).unwrap())
                             .collect::<Vec<_>>();
-                        let n = values.len();
-                        if values.iter().any(|&x| x < 0 || x >= n as i32) {
+                        if !test_util::check_circuit(&values) {
                             return false;
-                        }
-                        let values = values.iter().map(|&x| x as usize).collect::<Vec<_>>();
-
-                        let mut cyc_size = 0;
-                        for i in 0..n {
-                            if values[i] != i {
-                                cyc_size += 1;
-                            }
-                        }
-
-                        let mut visited = vec![false; n];
-                        for i in 0..n {
-                            if values[i] != i {
-                                let mut size = 0;
-                                let mut p = i;
-                                while !visited[p] {
-                                    if values[p] == p {
-                                        return false;
-                                    }
-                                    size += 1;
-                                    visited[p] = true;
-                                    p = values[p];
-                                }
-                                if p != i {
-                                    return false;
-                                }
-                                if size != cyc_size {
-                                    return false;
-                                }
-                                break;
-                            }
                         }
                     }
                     Stmt::ExtensionSupports(vars, supports) => {
@@ -1513,6 +1489,36 @@ mod tests {
 
             tester.check();
         }
+    }
+
+    #[test]
+    fn test_integration_active_vertices_connected1() {
+        let mut tester = IntegrationTester::new();
+
+        let mut vars = vec![];
+        for _ in 0..9 {
+            vars.push(tester.new_bool_var().expr());
+        }
+
+        tester.add_constraint(Stmt::ActiveVerticesConnected(
+            vars,
+            vec![
+                (0, 1),
+                (1, 2),
+                (3, 4),
+                (4, 5),
+                (6, 7),
+                (7, 8),
+                (0, 3),
+                (1, 4),
+                (2, 5),
+                (3, 6),
+                (4, 7),
+                (5, 8),
+            ],
+        ));
+
+        tester.check();
     }
 
     #[test]

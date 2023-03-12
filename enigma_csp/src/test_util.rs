@@ -31,6 +31,75 @@ pub fn product_multi<T: Clone>(inputs: &Vec<Vec<T>>) -> Vec<Vec<T>> {
     ret
 }
 
+pub fn check_graph_active_vertices_connected(is_active: &[bool], edges: &[(usize, usize)]) -> bool {
+    let n = is_active.len();
+    let mut graph = vec![vec![]; n];
+    for &(u, v) in edges {
+        graph[u].push(v);
+        graph[v].push(u);
+    }
+
+    let mut visited = vec![false; n];
+    fn visit(graph: &[Vec<usize>], is_active: &[bool], visited: &mut [bool], p: usize) {
+        if visited[p] || !is_active[p] {
+            return;
+        }
+        visited[p] = true;
+        for &q in &graph[p] {
+            visit(graph, is_active, visited, q);
+        }
+    }
+
+    let mut n_connected_components = 0;
+    for u in 0..n {
+        if is_active[u] && !visited[u] {
+            n_connected_components += 1;
+            visit(&graph, &is_active, &mut visited, u);
+        }
+    }
+
+    n_connected_components <= 1
+}
+
+pub fn check_circuit(values: &[i32]) -> bool {
+    let n = values.len();
+    if values.iter().any(|&x| x < 0 || x >= n as i32) {
+        return false;
+    }
+    let values = values.iter().map(|&x| x as usize).collect::<Vec<_>>();
+
+    let mut cyc_size = 0;
+    for i in 0..n {
+        if values[i] != i {
+            cyc_size += 1;
+        }
+    }
+
+    let mut visited = vec![false; n];
+    for i in 0..n {
+        if values[i] != i {
+            let mut size = 0;
+            let mut p = i;
+            while !visited[p] {
+                if values[p] == p {
+                    return false;
+                }
+                size += 1;
+                visited[p] = true;
+                p = values[p];
+            }
+            if p != i {
+                return false;
+            }
+            if size != cyc_size {
+                return false;
+            }
+            break;
+        }
+    }
+    true
+}
+
 pub fn check_graph_division(
     sizes: &[Option<i32>],
     edges: &[(usize, usize)],
@@ -140,6 +209,32 @@ mod tests {
         assert_eq!(
             product_multi(&vec![vec![1, 2], vec![], vec![3, 4, 5]]),
             Vec::<Vec::<i32>>::new()
+        );
+    }
+
+    #[test]
+    fn test_check_active_vertices_connected() {
+        let edges = [(0, 1), (0, 2), (1, 2), (2, 3), (3, 4)];
+
+        assert_eq!(
+            check_graph_active_vertices_connected(&[false, false, false, false, false], &edges),
+            true
+        );
+        assert_eq!(
+            check_graph_active_vertices_connected(&[true, false, false, false, false], &edges),
+            true
+        );
+        assert_eq!(
+            check_graph_active_vertices_connected(&[true, false, false, true, false], &edges),
+            false
+        );
+        assert_eq!(
+            check_graph_active_vertices_connected(&[true, false, true, true, false], &edges),
+            true
+        );
+        assert_eq!(
+            check_graph_active_vertices_connected(&[true, true, true, true, true], &edges),
+            true
         );
     }
 }
