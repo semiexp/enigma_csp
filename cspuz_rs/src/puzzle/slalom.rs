@@ -143,7 +143,7 @@ struct SlalomAuxCombinator;
 
 impl Combinator<Vec<Vec<SlalomCell>>> for SlalomAuxCombinator {
     fn serialize(&self, _: &Context, _: &[Vec<Vec<SlalomCell>>]) -> Option<(usize, Vec<u8>)> {
-        unimplemented!();
+        todo!();
     }
 
     fn deserialize(

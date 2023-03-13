@@ -348,7 +348,7 @@ impl EncodeMap {
                     let low = domain.lower_bound_checked();
                     let high = domain.upper_bound_checked();
                     if low < 0 {
-                        unimplemented!("negative values not supported in log encoding");
+                        todo!("negative values not supported in log encoding");
                     }
                     let n_bits = (32 - high.get().leading_zeros()) as usize;
                     let lits = new_vars_as_lits!(sat, n_bits, "{}.log", var.id());
@@ -400,7 +400,7 @@ impl EncodeMap {
                     }));
                 }
                 IntVarRepresentation::Binary(_, _, _) => {
-                    unimplemented!();
+                    todo!();
                 }
             }
         }
