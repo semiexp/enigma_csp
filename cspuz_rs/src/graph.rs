@@ -434,3 +434,128 @@ pub fn graph_division_2d(
     let sizes = sizes.into_iter().map(Some).collect::<Vec<_>>();
     solver.add_graph_division(&sizes, &graph.edges, edges)
 }
+
+pub fn crossable_single_cycle_grid_edges(
+    solver: &mut Solver,
+    grid_frame: &BoolGridEdges,
+) -> (BoolVarArray2D, BoolVarArray2D) {
+    let (height, width) = grid_frame.base_shape();
+    let height = height + 1;
+    let width = width + 1;
+
+    let is_passed = solver.bool_var_2d((height, width));
+    let is_cross = solver.bool_var_2d((height, width));
+
+    solver.add_expr(is_cross.imp(&is_passed));
+    for y in 0..height {
+        for x in 0..width {
+            if y == 0 || y == height - 1 || x == 0 || x == width - 1 {
+                solver.add_expr(!is_cross.at((y, x)));
+            }
+
+            let d = grid_frame.vertex_neighbors((y, x)).count_true();
+            solver.add_expr((!is_passed.at((y, x))).imp(d.eq(0)));
+            solver.add_expr(
+                is_passed
+                    .at((y, x))
+                    .imp(d.eq(is_cross.at((y, x)).ite(4, 2))),
+            );
+        }
+    }
+
+    let is_passed_single = &solver.bool_var_2d((height, width));
+    let is_passed_double_horizontal = &solver.bool_var_2d((height, width));
+    let is_passed_double_vertical = &solver.bool_var_2d((height, width));
+
+    solver.add_expr(is_passed_single.iff(&is_passed & !&is_cross));
+    solver.add_expr(is_passed_double_horizontal.iff(&is_cross));
+    solver.add_expr(is_passed_double_vertical.iff(&is_cross));
+    let mut g = Graph::new(height * width * 3 + (height - 1) * width + height * (width - 1));
+    let mut gv = vec![];
+    for y in 0..height {
+        for x in 0..width {
+            gv.push(is_passed_single.at((y, x)));
+            gv.push(is_passed_double_horizontal.at((y, x)));
+            gv.push(is_passed_double_vertical.at((y, x)));
+        }
+    }
+    for y in 0..(height - 1) {
+        for x in 0..width {
+            gv.push(grid_frame.vertical.at((y, x)));
+        }
+    }
+    for y in 0..height {
+        for x in 0..(width - 1) {
+            gv.push(grid_frame.horizontal.at((y, x)));
+        }
+    }
+    for y in 0..(height - 1) {
+        for x in 0..width {
+            let eid = height * width * 3 + y * width + x;
+            let v0 = (y * width + x) * 3;
+            let v1 = ((y + 1) * width + x) * 3;
+            g.add_edge(eid, v0);
+            g.add_edge(eid, v0 + 2);
+            g.add_edge(eid, v1);
+            g.add_edge(eid, v1 + 2);
+        }
+    }
+    for y in 0..height {
+        for x in 0..(width - 1) {
+            let eid = height * width * 3 + (height - 1) * width + y * (width - 1) + x;
+            let v0 = (y * width + x) * 3;
+            let v1 = (y * width + x + 1) * 3;
+            g.add_edge(eid, v0);
+            g.add_edge(eid, v0 + 1);
+            g.add_edge(eid, v1);
+            g.add_edge(eid, v1 + 1);
+        }
+    }
+    active_vertices_connected(solver, &gv, &g);
+
+    (is_passed, is_cross)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_graph_crossable_single_cycle_grid_edges_1() {
+        let mut solver = Solver::new();
+        let edges = crate::graph::BoolGridEdges::new(&mut solver, (3, 4));
+        solver.add_answer_key_bool(&edges.horizontal);
+        solver.add_answer_key_bool(&edges.vertical);
+
+        let (is_passed, is_cross) = crossable_single_cycle_grid_edges(&mut solver, &edges);
+        assert_eq!(is_passed.shape(), (4, 5));
+        assert_eq!(is_cross.shape(), (4, 5));
+
+        solver.add_expr(is_passed.at((0, 2)));
+        solver.add_expr(is_cross.at((1, 1)));
+        solver.add_expr(is_cross.at((1, 3)));
+        solver.add_expr(!is_passed.at((3, 0)));
+        solver.add_expr(is_passed.at((3, 2)));
+
+        let answer = solver.solve();
+        assert!(answer.is_some());
+        let answer = answer.unwrap();
+        assert_eq!(
+            answer.get(&edges.horizontal),
+            vec![
+                vec![false, true, true, false],
+                vec![true, true, true, true],
+                vec![true, false, true, false],
+                vec![false, false, true, true],
+            ]
+        );
+        assert_eq!(
+            answer.get(&edges.vertical),
+            vec![
+                vec![false, true, false, true, false],
+                vec![true, true, false, true, true],
+                vec![false, false, true, false, true],
+            ]
+        );
+    }
+}
