@@ -43,8 +43,13 @@ pub enum ItemKind {
     BoldWall,
     Slash,
     Backslash,
+    Plus,
     Text(&'static str),
     Num(i32),
+    NumUpperLeft(i32),
+    NumUpperRight(i32),
+    NumLowerLeft(i32),
+    NumLowerRight(i32),
     Compass(Compass),
     TapaClue([i32; 4]),
     SudokuCandidateSet(i32, Vec<i32>),
@@ -83,10 +88,27 @@ impl ItemKind {
             &ItemKind::BoldWall => String::from("\"boldWall\""),
             &ItemKind::Slash => String::from("\"slash\""),
             &ItemKind::Backslash => String::from("\"backslash\""),
+            &ItemKind::Plus => String::from("\"plus\""),
             &ItemKind::DottedHorizontalWall => String::from("\"dottedHorizontalWall\""),
             &ItemKind::DottedVerticalWall => String::from("\"dottedVerticalWall\""),
             &ItemKind::Text(text) => format!("{{\"kind\":\"text\",\"data\":\"{}\"}}", text),
             &ItemKind::Num(num) => format!("{{\"kind\":\"text\",\"data\":\"{}\"}}", num),
+            &ItemKind::NumUpperLeft(num) => format!(
+                "{{\"kind\":\"text\",\"data\":\"{}\",\"pos\":\"upperLeft\"}}",
+                num
+            ),
+            &ItemKind::NumUpperRight(num) => format!(
+                "{{\"kind\":\"text\",\"data\":\"{}\",\"pos\":\"upperRight\"}}",
+                num
+            ),
+            &ItemKind::NumLowerLeft(num) => format!(
+                "{{\"kind\":\"text\",\"data\":\"{}\",\"pos\":\"lowerLeft\"}}",
+                num
+            ),
+            &ItemKind::NumLowerRight(num) => format!(
+                "{{\"kind\":\"text\",\"data\":\"{}\",\"pos\":\"lowerRight\"}}",
+                num
+            ),
             ItemKind::Compass(compass) => format!(
                 "{{\"kind\":\"compass\",\"up\":{},\"down\":{},\"left\":{},\"right\":{}}}",
                 compass.up.unwrap_or(-1),

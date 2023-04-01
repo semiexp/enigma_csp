@@ -89,6 +89,8 @@ fn solve_puzz_link(puzzle_kind: String, url: &str) -> Result<Board, &'static str
         puzzle::pencils::solve_pencils(url)
     } else if puzzle_kind == "barns" {
         puzzle::barns::solve_barns(url)
+    } else if puzzle_kind == "reflect" {
+        puzzle::reflect::solve_reflect_link(url)
     } else {
         Err("unknown puzzle type")
     }
