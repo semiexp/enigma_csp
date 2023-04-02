@@ -17,12 +17,7 @@ pub fn solve_cocktail(
     let is_black = &solver.bool_var_2d((h, w));
     solver.add_answer_key_bool(is_black);
 
-    solver.add_expr(
-        !(is_black.slice((..(h - 1), ..(w - 1)))
-            & is_black.slice((..(h - 1), 1..))
-            & is_black.slice((1.., ..(w - 1)))
-            & is_black.slice((1.., 1..))),
-    );
+    solver.add_expr(!is_black.conv2d_and((2, 2)));
 
     let mut g = graph::Graph::new(h * w);
     for y in 0..h {

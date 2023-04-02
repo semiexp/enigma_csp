@@ -19,18 +19,11 @@ pub fn solve_aqre(
 
     graph::active_vertices_connected_2d(&mut solver, is_black);
 
-    for y in 0..h {
-        for x in 0..w {
-            if y <= h - 4 {
-                solver.add_expr(is_black.slice_fixed_x((y..(y + 4), x)).any());
-                solver.add_expr(!(is_black.slice_fixed_x((y..(y + 4), x)).all()));
-            }
-            if x <= w - 4 {
-                solver.add_expr(is_black.slice_fixed_y((y, x..(x + 4))).any());
-                solver.add_expr(!(is_black.slice_fixed_y((y, x..(x + 4))).all()));
-            }
-        }
-    }
+    solver.add_expr(!is_black.conv2d_and((1, 4)));
+    solver.add_expr(is_black.conv2d_or((1, 4)));
+    solver.add_expr(!is_black.conv2d_and((4, 1)));
+    solver.add_expr(is_black.conv2d_or((4, 1)));
+
     let rooms = graph::borders_to_rooms(borders);
     assert_eq!(rooms.len(), clues.len());
 

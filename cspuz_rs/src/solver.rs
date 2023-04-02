@@ -918,6 +918,49 @@ where
     ret
 }
 
+impl<T> Value<Array2DImpl<T>>
+where
+    T: Clone,
+    Value<Array2DImpl<T>>: Operand<Output = Array2DImpl<CSPBoolExpr>>,
+{
+    pub fn conv2d_and(&self, filter: (usize, usize)) -> Value<Array2DImpl<CSPBoolExpr>> {
+        self.conv2d_impl(filter, CSPBoolExpr::And)
+    }
+
+    pub fn conv2d_or(&self, filter: (usize, usize)) -> Value<Array2DImpl<CSPBoolExpr>> {
+        self.conv2d_impl(filter, CSPBoolExpr::Or)
+    }
+
+    fn conv2d_impl<F>(&self, filter: (usize, usize), op: F) -> Value<Array2DImpl<CSPBoolExpr>>
+    where
+        F: Fn(Vec<Box<CSPBoolExpr>>) -> CSPBoolExpr,
+    {
+        let orig = self.as_expr_array();
+        let (h, w) = orig.shape;
+        let (fh, fw) = filter;
+        assert!(h >= fh);
+        assert!(w >= fw);
+
+        let mut data = vec![];
+        for y in 0..=(h - fh) {
+            for x in 0..=(w - fw) {
+                let mut part = vec![];
+                for dy in 0..fh {
+                    for dx in 0..fw {
+                        part.push(Box::new(orig.data[(y + dy) * w + (x + dx)].clone()));
+                    }
+                }
+                data.push(op(part));
+            }
+        }
+
+        Value(Array2DImpl {
+            shape: (h - fh + 1, w - fw + 1),
+            data,
+        })
+    }
+}
+
 impl<T> Value<T>
 where
     Value<T>: IntoIterator + Clone,

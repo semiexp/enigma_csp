@@ -20,8 +20,8 @@ pub fn solve_yajilin(
     let is_passed = &graph::single_cycle_grid_edges(&mut solver, is_line);
     let is_black = &solver.bool_var_2d((h, w));
     solver.add_answer_key_bool(is_black);
-    solver.add_expr(!(is_black.slice((..(h - 1), ..)) & is_black.slice((1.., ..))));
-    solver.add_expr(!(is_black.slice((.., ..(w - 1))) & is_black.slice((.., 1..))));
+    solver.add_expr(!is_black.conv2d_and((1, 2)));
+    solver.add_expr(!is_black.conv2d_and((2, 1)));
 
     for y in 0..h {
         for x in 0..w {
