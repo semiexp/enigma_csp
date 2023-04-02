@@ -177,6 +177,24 @@ fn equivalent_bool_lit(env: &mut NormalizerEnv, expr: BoolExpr) -> NBoolLit {
     }
 }
 
+fn equivalent_int_var(env: &mut NormalizerEnv, expr: &IntExpr) -> NIntVar {
+    match expr {
+        IntExpr::Var(v) => env.convert_int_var(*v),
+        IntExpr::NVar(v) => *v,
+        _ => {
+            let x = normalize_int_expr(env, &expr);
+            let dom = env.norm.get_domain_linear_sum(&x);
+            let xvar = env.norm.new_int_var(dom);
+            {
+                let mut c = Constraint::new();
+                c.add_linear(LinearLit::new(x - LinearSum::singleton(xvar), CmpOp::Eq));
+                env.norm.add_constraint(c);
+            }
+            xvar
+        }
+    }
+}
+
 fn normalize_stmt(env: &mut NormalizerEnv, stmt: Stmt) {
     if env.config.verbose {
         let mut buf = Vec::<u8>::new();
@@ -609,15 +627,7 @@ fn normalize_int_expr(env: &mut NormalizerEnv, expr: &IntExpr) -> LinearSum {
             LinearSum::singleton(v)
         }
         IntExpr::Abs(x) => {
-            let x = normalize_int_expr(env, x);
-            let dom = env.norm.get_domain_linear_sum(&x);
-            let xvar = env.norm.new_int_var(dom);
-            {
-                let mut c = Constraint::new();
-                c.add_linear(LinearLit::new(x - LinearSum::singleton(xvar), CmpOp::Eq));
-                env.norm.add_constraint(c);
-            }
-
+            let xvar = equivalent_int_var(env, x);
             let aux_expr = IntExpr::If(
                 Box::new(IntExpr::NVar(xvar).ge(IntExpr::Const(0))),
                 Box::new(IntExpr::NVar(xvar)),
