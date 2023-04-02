@@ -1,5 +1,5 @@
 use crate::graph::{borders_to_rooms, InnerGridEdges};
-use crate::items::NumberedArrow;
+use crate::items::{Arrow, NumberedArrow};
 
 pub fn is_dec(c: u8) -> bool {
     return '0' as u8 <= c && c <= '9' as u8;
@@ -1039,13 +1039,14 @@ impl Combinator<NumberedArrow> for NumberedArrowCombinator {
         if input.len() == 0 {
             return None;
         }
-        let (dir, n) = match input[0] {
-            NumberedArrow::Unspecified(n) => (0, n),
-            NumberedArrow::Up(n) => (1, n),
-            NumberedArrow::Down(n) => (2, n),
-            NumberedArrow::Left(n) => (3, n),
-            NumberedArrow::Right(n) => (4, n),
+        let dir = match input[0].0 {
+            Arrow::Unspecified => 0,
+            Arrow::Up => 1,
+            Arrow::Down => 2,
+            Arrow::Left => 3,
+            Arrow::Right => 4,
         };
+        let n = input[0].1;
         if n == -1 {
             Some((1, vec![dir + ('0' as u8), '.' as u8]))
         } else if 0 <= n && n < 16 {
@@ -1089,14 +1090,17 @@ impl Combinator<NumberedArrow> for NumberedArrowCombinator {
         }
         Some((
             n_read,
-            vec![match dir % 5 {
-                0 => NumberedArrow::Unspecified(n),
-                1 => NumberedArrow::Up(n),
-                2 => NumberedArrow::Down(n),
-                3 => NumberedArrow::Left(n),
-                4 => NumberedArrow::Right(n),
-                _ => unreachable!(),
-            }],
+            vec![(
+                match dir % 5 {
+                    0 => Arrow::Unspecified,
+                    1 => Arrow::Up,
+                    2 => Arrow::Down,
+                    3 => Arrow::Left,
+                    4 => Arrow::Right,
+                    _ => unreachable!(),
+                },
+                n,
+            )],
         ))
     }
 }
@@ -1921,38 +1925,38 @@ mod tests {
 
         assert_eq!(combinator.serialize(ctx, &[]), None);
         assert_eq!(
-            combinator.serialize(ctx, &[NumberedArrow::Up(0)]),
+            combinator.serialize(ctx, &[(Arrow::Up, 0)]),
             Some((1, Vec::from("10")))
         );
         assert_eq!(
-            combinator.serialize(ctx, &[NumberedArrow::Down(3)]),
+            combinator.serialize(ctx, &[(Arrow::Down, 3)]),
             Some((1, Vec::from("23")))
         );
         assert_eq!(
-            combinator.serialize(ctx, &[NumberedArrow::Left(-1)]),
+            combinator.serialize(ctx, &[(Arrow::Left, -1)]),
             Some((1, Vec::from("3.")))
         );
         assert_eq!(
-            combinator.serialize(ctx, &[NumberedArrow::Right(63)]),
+            combinator.serialize(ctx, &[(Arrow::Right, 63)]),
             Some((1, Vec::from("93f")))
         );
 
         assert_eq!(combinator.deserialize(ctx, "".as_bytes()), None);
         assert_eq!(
             combinator.deserialize(ctx, "105".as_bytes()),
-            Some((2, vec![NumberedArrow::Up(0)]))
+            Some((2, vec![(Arrow::Up, 0)]))
         );
         assert_eq!(
             combinator.deserialize(ctx, "23".as_bytes()),
-            Some((2, vec![NumberedArrow::Down(3)]))
+            Some((2, vec![(Arrow::Down, 3)]))
         );
         assert_eq!(
             combinator.deserialize(ctx, "3.".as_bytes()),
-            Some((2, vec![NumberedArrow::Left(-1)]))
+            Some((2, vec![(Arrow::Left, -1)]))
         );
         assert_eq!(
             combinator.deserialize(ctx, "93f".as_bytes()),
-            Some((3, vec![NumberedArrow::Right(63)]))
+            Some((3, vec![(Arrow::Right, 63)]))
         );
     }
 

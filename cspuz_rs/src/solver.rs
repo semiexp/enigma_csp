@@ -1,6 +1,6 @@
 use std::ops::{Add, BitAnd, BitOr, BitXor, Bound, Not, RangeBounds, Sub};
 
-use crate::items::NumberedArrow;
+use crate::items::Arrow;
 pub use enigma_csp::csp::BoolExpr as CSPBoolExpr;
 pub use enigma_csp::csp::BoolVar as CSPBoolVar;
 pub use enigma_csp::csp::IntExpr as CSPIntExpr;
@@ -296,15 +296,15 @@ impl<T: Clone> Value<Array2DImpl<T>> {
     pub fn pointing_cells(
         &self,
         cell: (usize, usize),
-        arrow: NumberedArrow,
+        arrow: Arrow,
     ) -> Option<Value<Array1DImpl<T>>> {
         let (y, x) = cell;
         match arrow {
-            NumberedArrow::Unspecified(_) => None,
-            NumberedArrow::Up(_) => Some(self.slice_fixed_x((..y, x))),
-            NumberedArrow::Down(_) => Some(self.slice_fixed_x(((y + 1).., x))),
-            NumberedArrow::Left(_) => Some(self.slice_fixed_y((y, ..x))),
-            NumberedArrow::Right(_) => Some(self.slice_fixed_y((y, (x + 1)..))),
+            Arrow::Unspecified => None,
+            Arrow::Up => Some(self.slice_fixed_x((..y, x))),
+            Arrow::Down => Some(self.slice_fixed_x(((y + 1).., x))),
+            Arrow::Left => Some(self.slice_fixed_y((y, ..x))),
+            Arrow::Right => Some(self.slice_fixed_y((y, (x + 1)..))),
         }
     }
 }

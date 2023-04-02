@@ -1,6 +1,6 @@
 use super::util;
 use crate::graph;
-use crate::items::NumberedArrow;
+use crate::items::{Arrow, NumberedArrow};
 use crate::serializer::{
     problem_to_url, url_to_problem, Choice, Combinator, Dict, Grid, NumberedArrowCombinator,
     Optionalize, Spaces, Tuple2,
@@ -76,24 +76,21 @@ pub fn solve_castle_wall(
                         }
                     }
                 }
-                match arrow {
-                    NumberedArrow::Unspecified(_) => (),
-                    NumberedArrow::Up(n) => {
-                        if n >= 0 {
+                let (dir, n) = arrow;
+                if n >= 0 {
+                    match dir {
+                        Arrow::Unspecified => (),
+                        Arrow::Up => {
                             solver.add_expr(
                                 is_line.vertical.slice_fixed_x((..y, x)).count_true().eq(n),
                             );
                         }
-                    }
-                    NumberedArrow::Down(n) => {
-                        if n >= 0 {
+                        Arrow::Down => {
                             solver.add_expr(
                                 is_line.vertical.slice_fixed_x((y.., x)).count_true().eq(n),
                             );
                         }
-                    }
-                    NumberedArrow::Left(n) => {
-                        if n >= 0 {
+                        Arrow::Left => {
                             solver.add_expr(
                                 is_line
                                     .horizontal
@@ -102,9 +99,7 @@ pub fn solve_castle_wall(
                                     .eq(n),
                             );
                         }
-                    }
-                    NumberedArrow::Right(n) => {
-                        if n >= 0 {
+                        Arrow::Right => {
                             solver.add_expr(
                                 is_line
                                     .horizontal
@@ -155,18 +150,18 @@ mod tests {
         let height = 10;
         let width = 10;
         let mut ret = vec![vec![None; width]; height];
-        ret[0][0] = Some((Side::Unspecified, NumberedArrow::Down(3)));
-        ret[0][3] = Some((Side::Unspecified, NumberedArrow::Down(2)));
-        ret[0][6] = Some((Side::Unspecified, NumberedArrow::Down(3)));
-        ret[2][9] = Some((Side::Outside, NumberedArrow::Down(4)));
-        ret[3][3] = Some((Side::Unspecified, NumberedArrow::Left(2)));
-        ret[4][0] = Some((Side::Unspecified, NumberedArrow::Right(4)));
-        ret[5][7] = Some((Side::Inside, NumberedArrow::Up(3)));
-        ret[6][1] = Some((Side::Unspecified, NumberedArrow::Right(4)));
-        ret[6][4] = Some((Side::Unspecified, NumberedArrow::Up(4)));
-        ret[8][8] = Some((Side::Outside, NumberedArrow::Up(4)));
-        ret[9][1] = Some((Side::Unspecified, NumberedArrow::Up(4)));
-        ret[9][4] = Some((Side::Unspecified, NumberedArrow::Up(4)));
+        ret[0][0] = Some((Side::Unspecified, (Arrow::Down, 3)));
+        ret[0][3] = Some((Side::Unspecified, (Arrow::Down, 2)));
+        ret[0][6] = Some((Side::Unspecified, (Arrow::Down, 3)));
+        ret[2][9] = Some((Side::Outside, (Arrow::Down, 4)));
+        ret[3][3] = Some((Side::Unspecified, (Arrow::Left, 2)));
+        ret[4][0] = Some((Side::Unspecified, (Arrow::Right, 4)));
+        ret[5][7] = Some((Side::Inside, (Arrow::Up, 3)));
+        ret[6][1] = Some((Side::Unspecified, (Arrow::Right, 4)));
+        ret[6][4] = Some((Side::Unspecified, (Arrow::Up, 4)));
+        ret[8][8] = Some((Side::Outside, (Arrow::Up, 4)));
+        ret[9][1] = Some((Side::Unspecified, (Arrow::Up, 4)));
+        ret[9][4] = Some((Side::Unspecified, (Arrow::Up, 4)));
         ret
     }
 

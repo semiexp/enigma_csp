@@ -25,12 +25,12 @@ pub fn solve_yajilin(
 
     for y in 0..h {
         for x in 0..w {
-            if let Some(clue) = clues[y][x] {
+            if let Some((dir, n)) = clues[y][x] {
                 solver.add_expr(!is_passed.at((y, x)));
                 solver.add_expr(!is_black.at((y, x)));
 
-                if let Some(cells) = is_black.pointing_cells((y, x), clue) {
-                    solver.add_expr(cells.count_true().eq(clue.num()));
+                if let Some(cells) = is_black.pointing_cells((y, x), dir) {
+                    solver.add_expr(cells.count_true().eq(n));
                 }
             } else {
                 solver.add_expr(is_passed.at((y, x)) ^ is_black.at((y, x)));
@@ -66,22 +66,23 @@ pub fn deserialize_problem(url: &str) -> Option<Problem> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::items::Arrow;
 
     #[test]
     fn test_yajilin_problem() {
         // https://puzsq.jp/main/puzzle_play.php?pid=8218
         let mut problem = vec![vec![None; 10]; 10];
-        problem[2][3] = Some(NumberedArrow::Left(2));
-        problem[2][5] = Some(NumberedArrow::Right(1));
-        problem[2][8] = Some(NumberedArrow::Down(1));
-        problem[3][0] = Some(NumberedArrow::Down(1));
-        problem[4][3] = Some(NumberedArrow::Down(2));
-        problem[4][9] = Some(NumberedArrow::Left(0));
-        problem[6][3] = Some(NumberedArrow::Down(1));
-        problem[6][5] = Some(NumberedArrow::Up(2));
-        problem[6][8] = Some(NumberedArrow::Up(1));
-        problem[8][7] = Some(NumberedArrow::Down(0));
-        problem[9][2] = Some(NumberedArrow::Left(0));
+        problem[2][3] = Some((Arrow::Left, 2));
+        problem[2][5] = Some((Arrow::Right, 1));
+        problem[2][8] = Some((Arrow::Down, 1));
+        problem[3][0] = Some((Arrow::Down, 1));
+        problem[4][3] = Some((Arrow::Down, 2));
+        problem[4][9] = Some((Arrow::Left, 0));
+        problem[6][3] = Some((Arrow::Down, 1));
+        problem[6][5] = Some((Arrow::Up, 2));
+        problem[6][8] = Some((Arrow::Up, 1));
+        problem[8][7] = Some((Arrow::Down, 0));
+        problem[9][2] = Some((Arrow::Left, 0));
 
         assert_eq!(
             serialize_problem(&problem),
