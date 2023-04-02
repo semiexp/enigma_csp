@@ -159,6 +159,24 @@ pub fn normalize(csp: &mut CSP, norm: &mut NormCSP, map: &mut NormalizeMap, conf
     }
 }
 
+fn equivalent_bool_lit(env: &mut NormalizerEnv, expr: BoolExpr) -> NBoolLit {
+    let simplified = match &expr {
+        BoolExpr::Var(v) => Some(env.convert_bool_var(*v)),
+        BoolExpr::Not(e) => match e.as_ref() {
+            BoolExpr::Var(v) => Some(!env.convert_bool_var(*v)),
+            _ => None,
+        },
+        _ => None,
+    };
+    if let Some(l) = simplified {
+        l
+    } else {
+        let aux = env.norm.new_bool_var();
+        normalize_and_register_expr(env, BoolExpr::NVar(aux).iff(expr));
+        NBoolLit::new(aux, false)
+    }
+}
+
 fn normalize_stmt(env: &mut NormalizerEnv, stmt: Stmt) {
     if env.config.verbose {
         let mut buf = Vec::<u8>::new();
@@ -219,24 +237,10 @@ fn normalize_stmt(env: &mut NormalizerEnv, stmt: Stmt) {
             }
         }
         Stmt::ActiveVerticesConnected(vertices, edges) => {
-            let mut vertices_converted = vec![];
-            for e in vertices {
-                let simplified = match &e {
-                    BoolExpr::Var(v) => Some(env.convert_bool_var(*v)),
-                    BoolExpr::Not(e) => match e.as_ref() {
-                        BoolExpr::Var(v) => Some(!env.convert_bool_var(*v)),
-                        _ => None,
-                    },
-                    _ => None,
-                };
-                if let Some(l) = simplified {
-                    vertices_converted.push(l);
-                } else {
-                    let aux = env.norm.new_bool_var();
-                    normalize_and_register_expr(env, BoolExpr::NVar(aux).iff(e));
-                    vertices_converted.push(NBoolLit::new(aux, false));
-                }
-            }
+            let vertices_converted = vertices
+                .into_iter()
+                .map(|e| equivalent_bool_lit(env, e))
+                .collect::<Vec<_>>();
             env.norm
                 .add_extra_constraint(ExtraConstraint::ActiveVerticesConnected(
                     vertices_converted,
@@ -253,25 +257,10 @@ fn normalize_stmt(env: &mut NormalizerEnv, stmt: Stmt) {
                 .map(|v| v.map(|v| env.convert_int_var(v)))
                 .collect::<Vec<_>>();
 
-            // TODO: remove duplicated codes
-            let mut edge_lits_converted = vec![];
-            for e in edge_lits {
-                let simplified = match &e {
-                    BoolExpr::Var(v) => Some(env.convert_bool_var(*v)),
-                    BoolExpr::Not(e) => match e.as_ref() {
-                        BoolExpr::Var(v) => Some(!env.convert_bool_var(*v)),
-                        _ => None,
-                    },
-                    _ => None,
-                };
-                if let Some(l) = simplified {
-                    edge_lits_converted.push(l);
-                } else {
-                    let aux = env.norm.new_bool_var();
-                    normalize_and_register_expr(env, BoolExpr::NVar(aux).iff(e));
-                    edge_lits_converted.push(NBoolLit::new(aux, false));
-                }
-            }
+            let edge_lits_converted = edge_lits
+                .into_iter()
+                .map(|e| equivalent_bool_lit(env, e))
+                .collect::<Vec<_>>();
             env.norm
                 .add_extra_constraint(ExtraConstraint::GraphDivision(
                     sizes,
