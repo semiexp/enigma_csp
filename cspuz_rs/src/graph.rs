@@ -2,7 +2,7 @@ use std::ops::Index;
 
 use super::solver::{
     count_true, Array0DImpl, Array2DImpl, BoolVar, BoolVarArray1D, BoolVarArray2D, CSPBoolExpr,
-    CSPIntVar, FromModel, FromOwnedPartialModel, Model, Operand, OwnedPartialModel, Solver, Value,
+    CSPIntExpr, FromModel, FromOwnedPartialModel, Model, Operand, OwnedPartialModel, Solver, Value,
 };
 
 pub struct Graph {
@@ -425,13 +425,17 @@ pub fn single_cycle_grid_edges(solver: &mut Solver, grid_frame: &BoolGridEdges) 
     is_passed_flat.reshape_as_2d((height + 1, width + 1))
 }
 
-pub fn graph_division_2d(
-    solver: &mut Solver,
-    sizes: &Value<Array2DImpl<CSPIntVar>>,
-    edges: &BoolInnerGridEdges,
-) {
+pub fn graph_division_2d<T>(solver: &mut Solver, sizes: &T, edges: &BoolInnerGridEdges)
+where
+    T: Operand<Output = Array2DImpl<CSPIntExpr>> + Clone,
+{
     let (edges, graph) = edges.clone().dual().representation();
-    let sizes = sizes.into_iter().map(Some).collect::<Vec<_>>();
+    let sizes = sizes
+        .clone()
+        .as_expr_array_value()
+        .into_iter()
+        .map(Some)
+        .collect::<Vec<_>>();
     solver.add_graph_division(&sizes, &graph.edges, edges)
 }
 

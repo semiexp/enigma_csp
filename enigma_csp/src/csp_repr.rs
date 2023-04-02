@@ -49,7 +49,7 @@ pub enum Stmt {
     ActiveVerticesConnected(Vec<BoolExpr>, Vec<(usize, usize)>),
     Circuit(Vec<IntVar>),
     ExtensionSupports(Vec<IntVar>, Vec<Vec<Option<i32>>>),
-    GraphDivision(Vec<Option<IntVar>>, Vec<(usize, usize)>, Vec<BoolExpr>),
+    GraphDivision(Vec<Option<IntExpr>>, Vec<(usize, usize)>, Vec<BoolExpr>),
 }
 
 impl Stmt {

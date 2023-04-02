@@ -561,7 +561,7 @@ mod tests {
                     Stmt::GraphDivision(sizes, edges, edges_lit) => {
                         let sizes = sizes
                             .iter()
-                            .map(|v| v.map(|v| assignment.get_int(v).unwrap()))
+                            .map(|e| e.as_ref().map(|e| assignment.eval_int_expr(e)))
                             .collect::<Vec<_>>();
                         let edge_disconnected = edges_lit
                             .iter()
@@ -1534,7 +1534,17 @@ mod tests {
         let b = tester.new_int_var(Domain::range(4, 5));
 
         tester.add_constraint(Stmt::GraphDivision(
-            vec![Some(a), None, None, None, None, None, None, None, Some(b)],
+            vec![
+                Some(a.expr()),
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                None,
+                Some(b.expr()),
+            ],
             vec![
                 (0, 1),
                 (1, 2),

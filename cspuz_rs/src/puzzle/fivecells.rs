@@ -1,7 +1,7 @@
 use super::util;
 use crate::graph;
 use crate::serializer::{problem_to_url, url_to_problem, Choice, Combinator, Dict, Grid, Spaces};
-use crate::solver::{count_true, Solver};
+use crate::solver::{count_true, int_constant, Solver};
 
 pub fn solve_fivecells(
     clues: &[Vec<Option<i32>>],
@@ -46,8 +46,7 @@ pub fn solve_fivecells(
             }
         }
     }
-    let five = solver.int_var(5, 5);
-    solver.add_graph_division(&vec![Some(five); id_last], &edges, &edge_vars);
+    solver.add_graph_division(&vec![Some(int_constant(5)); id_last], &edges, &edge_vars);
 
     for y in 0..h {
         for x in 0..w {

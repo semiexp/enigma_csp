@@ -272,7 +272,7 @@ fn normalize_stmt(env: &mut NormalizerEnv, stmt: Stmt) {
         Stmt::GraphDivision(sizes, edges, edge_lits) => {
             let sizes = sizes
                 .into_iter()
-                .map(|v| v.map(|v| env.convert_int_var(v)))
+                .map(|e| e.map(|e| equivalent_int_var(env, &e)))
                 .collect::<Vec<_>>();
 
             let edge_lits_converted = edge_lits

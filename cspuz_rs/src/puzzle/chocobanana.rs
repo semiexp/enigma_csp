@@ -3,7 +3,7 @@ use crate::graph;
 use crate::serializer::{
     problem_to_url, url_to_problem, Choice, Combinator, Dict, Grid, HexInt, Optionalize, Spaces,
 };
-use crate::solver::{any, Solver, TRUE};
+use crate::solver::{any, int_constant, Solver, TRUE};
 
 pub fn solve_chocobanana(clues: &[Vec<Option<i32>>]) -> Option<Vec<Vec<Option<bool>>>> {
     let (h, w) = util::infer_shape(clues);
@@ -24,8 +24,7 @@ pub fn solve_chocobanana(clues: &[Vec<Option<i32>>]) -> Option<Vec<Vec<Option<bo
     for y in 0..h {
         for x in 0..w {
             if let Some(n) = clues[y][x] {
-                let v = solver.int_var(n, n);
-                sizes.push(Some(v));
+                sizes.push(Some(int_constant(n)));
             } else {
                 sizes.push(None);
             }

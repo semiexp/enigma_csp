@@ -1121,7 +1121,7 @@ impl<'a> Solver<'a> {
 
     pub fn add_graph_division<T>(
         &mut self,
-        sizes: &[Option<Value<Array0DImpl<CSPIntVar>>>],
+        sizes: &[Option<Value<Array0DImpl<CSPIntExpr>>>],
         edges: &[(usize, usize)],
         edge_values: T,
     ) where
