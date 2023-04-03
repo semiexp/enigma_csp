@@ -617,7 +617,7 @@ pub fn encode(norm: &mut NormCSP, sat: &mut SAT, map: &mut EncodeMap, config: &C
             }
         }
     }
-    norm.num_encoded_vars = norm.vars.int_var.len();
+    norm.num_encoded_vars = norm.vars.num_int_vars();
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]

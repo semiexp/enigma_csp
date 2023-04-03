@@ -54,9 +54,8 @@ impl IntVarData {
 }
 
 pub(super) struct CSPVars {
-    // TODO: remove `pub(super)`
-    pub(super) bool_var: Vec<BoolVarData>,
-    pub(super) int_var: Vec<IntVarData>,
+    bool_var: Vec<BoolVarData>,
+    int_var: Vec<IntVarData>,
 }
 
 impl CSPVars {

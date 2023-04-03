@@ -194,9 +194,8 @@ impl IntVarRepresentation {
 }
 
 pub(super) struct NormCSPVars {
-    // TODO: remove `pub(super)`
     num_bool_var: usize,
-    pub(super) int_var: Vec<IntVarRepresentation>,
+    int_var: Vec<IntVarRepresentation>,
 }
 
 impl NormCSPVars {
@@ -218,6 +217,10 @@ impl NormCSPVars {
 
     pub(super) fn int_var(&self, var: IntVar) -> &IntVarRepresentation {
         &self.int_var[var.0]
+    }
+
+    pub(super) fn num_int_vars(&self) -> usize {
+        self.int_var.len()
     }
 
     pub(super) fn new_int_var(&mut self, domain: IntVarRepresentation) -> IntVar {
