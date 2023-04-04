@@ -1,9 +1,9 @@
 use std::ops::Not;
 
-use crate::glucose::Lit as GlucoseLit;
-use crate::glucose::Model as GlucoseModel;
-use crate::glucose::Solver as GlucoseSolver;
-use crate::glucose::Var as GlucoseVar;
+use crate::backend::glucose::Lit as GlucoseLit;
+use crate::backend::glucose::Model as GlucoseModel;
+use crate::backend::glucose::Solver as GlucoseSolver;
+use crate::backend::glucose::Var as GlucoseVar;
 
 #[derive(Clone, Copy)]
 pub struct Var(GlucoseVar);
