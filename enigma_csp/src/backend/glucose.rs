@@ -59,11 +59,11 @@ extern "C" {
 }
 
 #[derive(Clone, Copy)]
-pub struct Var(i32);
+pub struct Var(pub(crate) i32);
 
 #[repr(C)]
 #[derive(Clone, Copy, Debug)]
-pub struct Lit(i32);
+pub struct Lit(pub(crate) i32);
 
 impl Lit {
     pub fn new(var: Var, negated: bool) -> Lit {

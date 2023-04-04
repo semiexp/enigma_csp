@@ -6,25 +6,41 @@ use crate::backend::glucose::Solver as GlucoseSolver;
 use crate::backend::glucose::Var as GlucoseVar;
 
 #[derive(Clone, Copy)]
-pub struct Var(GlucoseVar);
+pub struct Var(i32);
 
 impl Var {
     pub fn as_lit(self, negated: bool) -> Lit {
-        Lit(GlucoseLit::new(self.0, negated))
+        Lit(self.0 * 2 + if negated { 1 } else { 0 })
+    }
+
+    pub fn from_glucose(var: GlucoseVar) -> Var {
+        Var(var.0)
+    }
+
+    pub fn as_glucose(self) -> GlucoseVar {
+        GlucoseVar(self.0)
     }
 }
 
 #[repr(C)]
 #[derive(Clone, Copy, Debug)]
-pub struct Lit(GlucoseLit);
+pub struct Lit(i32);
 
 impl Lit {
     pub fn var(self) -> Var {
-        Var(self.0.var())
+        Var(self.0 / 2)
     }
 
     pub fn is_negated(self) -> bool {
-        self.0.is_negated()
+        self.0 % 2 == 1
+    }
+
+    pub fn from_glucose(lit: GlucoseLit) -> Lit {
+        Lit(lit.0)
+    }
+
+    pub fn as_glucose(self) -> GlucoseLit {
+        GlucoseLit(self.0)
     }
 }
 
@@ -32,7 +48,7 @@ impl Not for Lit {
     type Output = Lit;
 
     fn not(self) -> Self::Output {
-        Lit(!self.0)
+        Lit(self.0 ^ 1)
     }
 }
 
@@ -61,17 +77,21 @@ impl SAT {
     }
 
     pub fn all_vars(&self) -> Vec<Var> {
-        self.solver.all_vars().into_iter().map(|v| Var(v)).collect()
+        self.solver
+            .all_vars()
+            .into_iter()
+            .map(|v| Var::from_glucose(v))
+            .collect()
     }
 
     #[cfg(feature = "sat-analyzer")]
     pub fn new_var(&mut self, name: &str) -> Var {
-        Var(self.solver.new_named_var(name))
+        Var::from_glucose(self.solver.new_named_var(name))
     }
 
     #[cfg(not(feature = "sat-analyzer"))]
     pub fn new_var(&mut self) -> Var {
-        Var(self.solver.new_var())
+        Var::from_glucose(self.solver.new_var())
     }
 
     #[cfg(feature = "sat-analyzer")]
@@ -116,10 +136,7 @@ impl SAT {
         coefs: Vec<i32>,
         constant: i32,
     ) -> bool {
-        let lits = lits
-            .iter()
-            .map(|x| x.iter().map(|l| l.0).collect::<Vec<_>>())
-            .collect::<Vec<_>>();
+        let lits = unsafe { std::mem::transmute::<_, &Vec<Vec<GlucoseLit>>>(&lits) };
         self.solver
             .add_order_encoding_linear(&lits, &domain, &coefs, constant)
     }
@@ -129,7 +146,7 @@ impl SAT {
         lits: Vec<Lit>,
         edges: Vec<(usize, usize)>,
     ) -> bool {
-        let lits = lits.iter().map(|x| x.0).collect::<Vec<_>>();
+        let lits = unsafe { std::mem::transmute::<_, &Vec<GlucoseLit>>(&lits) };
         self.solver.add_active_vertices_connected(&lits, &edges)
     }
 
@@ -148,10 +165,7 @@ impl SAT {
         vars: &[Vec<Lit>],
         supports: &[Vec<Option<usize>>],
     ) -> bool {
-        let vars = vars
-            .iter()
-            .map(|x| x.iter().map(|l| l.0).collect::<Vec<_>>())
-            .collect::<Vec<_>>();
+        let vars = unsafe { std::mem::transmute::<_, &[Vec<GlucoseLit>]>(vars) };
         self.solver
             .add_direct_encoding_extension_supports(&vars, supports)
     }
@@ -163,13 +177,11 @@ impl SAT {
         edges: &[(usize, usize)],
         edge_lits: &[Lit],
     ) -> bool {
-        let dom_lits = dom_lits
-            .iter()
-            .map(|x| x.iter().map(|l| l.0).collect::<Vec<_>>())
-            .collect::<Vec<_>>();
-        let edge_lits = edge_lits.iter().map(|x| x.0).collect::<Vec<_>>();
+        let dom_lits = unsafe { std::mem::transmute::<_, &[Vec<GlucoseLit>]>(dom_lits) };
+        let edge_lits = unsafe { std::mem::transmute::<_, &[GlucoseLit]>(edge_lits) };
+
         self.solver
-            .add_graph_division(domains, &dom_lits, edges, &edge_lits)
+            .add_graph_division(domains, dom_lits, edges, edge_lits)
     }
 
     pub fn set_seed(&mut self, seed: f64) {
@@ -213,10 +225,10 @@ pub struct SATModel<'a> {
 
 impl<'a> SATModel<'a> {
     pub fn assignment(&self, var: Var) -> bool {
-        self.model.assignment(var.0)
+        self.model.assignment(var.as_glucose())
     }
 
     pub fn assignment_lit(&self, lit: Lit) -> bool {
-        self.model.assignment(lit.var().0) ^ lit.is_negated()
+        self.model.assignment(lit.var().as_glucose()) ^ lit.is_negated()
     }
 }
