@@ -1,9 +1,6 @@
 use std::ops::Not;
 
-use crate::backend::glucose::Lit as GlucoseLit;
-use crate::backend::glucose::Model as GlucoseModel;
-use crate::backend::glucose::Solver as GlucoseSolver;
-use crate::backend::glucose::Var as GlucoseVar;
+use crate::backend::glucose;
 
 #[derive(Clone, Copy)]
 pub struct Var(i32);
@@ -13,12 +10,12 @@ impl Var {
         Lit(self.0 * 2 + if negated { 1 } else { 0 })
     }
 
-    pub fn from_glucose(var: GlucoseVar) -> Var {
+    pub fn from_glucose(var: glucose::Var) -> Var {
         Var(var.0)
     }
 
-    pub fn as_glucose(self) -> GlucoseVar {
-        GlucoseVar(self.0)
+    pub fn as_glucose(self) -> glucose::Var {
+        glucose::Var(self.0)
     }
 }
 
@@ -35,12 +32,12 @@ impl Lit {
         self.0 % 2 == 1
     }
 
-    pub fn from_glucose(lit: GlucoseLit) -> Lit {
+    pub fn from_glucose(lit: glucose::Lit) -> Lit {
         Lit(lit.0)
     }
 
-    pub fn as_glucose(self) -> GlucoseLit {
-        GlucoseLit(self.0)
+    pub fn as_glucose(self) -> glucose::Lit {
+        glucose::Lit(self.0)
     }
 }
 
@@ -62,13 +59,13 @@ pub struct SATSolverStats {
 /// To support other SAT solver without changing previous stages, we introduce an adapter instead of
 /// using `glucose::Solver` directly from the encoder.
 pub struct SAT {
-    solver: GlucoseSolver,
+    solver: glucose::Solver,
 }
 
 impl SAT {
     pub fn new() -> SAT {
         SAT {
-            solver: GlucoseSolver::new(),
+            solver: glucose::Solver::new(),
         }
     }
 
@@ -126,7 +123,7 @@ impl SAT {
 
     pub fn add_clause(&mut self, clause: &[Lit]) {
         self.solver
-            .add_clause(unsafe { std::mem::transmute::<&[Lit], &[GlucoseLit]>(clause) });
+            .add_clause(unsafe { std::mem::transmute::<&[Lit], &[glucose::Lit]>(clause) });
     }
 
     pub fn add_order_encoding_linear(
@@ -136,7 +133,7 @@ impl SAT {
         coefs: Vec<i32>,
         constant: i32,
     ) -> bool {
-        let lits = unsafe { std::mem::transmute::<_, &Vec<Vec<GlucoseLit>>>(&lits) };
+        let lits = unsafe { std::mem::transmute::<_, &Vec<Vec<glucose::Lit>>>(&lits) };
         self.solver
             .add_order_encoding_linear(&lits, &domain, &coefs, constant)
     }
@@ -146,7 +143,7 @@ impl SAT {
         lits: Vec<Lit>,
         edges: Vec<(usize, usize)>,
     ) -> bool {
-        let lits = unsafe { std::mem::transmute::<_, &Vec<GlucoseLit>>(&lits) };
+        let lits = unsafe { std::mem::transmute::<_, &Vec<glucose::Lit>>(&lits) };
         self.solver.add_active_vertices_connected(&lits, &edges)
     }
 
@@ -165,7 +162,7 @@ impl SAT {
         vars: &[Vec<Lit>],
         supports: &[Vec<Option<usize>>],
     ) -> bool {
-        let vars = unsafe { std::mem::transmute::<_, &[Vec<GlucoseLit>]>(vars) };
+        let vars = unsafe { std::mem::transmute::<_, &[Vec<glucose::Lit>]>(vars) };
         self.solver
             .add_direct_encoding_extension_supports(&vars, supports)
     }
@@ -177,8 +174,8 @@ impl SAT {
         edges: &[(usize, usize)],
         edge_lits: &[Lit],
     ) -> bool {
-        let dom_lits = unsafe { std::mem::transmute::<_, &[Vec<GlucoseLit>]>(dom_lits) };
-        let edge_lits = unsafe { std::mem::transmute::<_, &[GlucoseLit]>(edge_lits) };
+        let dom_lits = unsafe { std::mem::transmute::<_, &[Vec<glucose::Lit>]>(dom_lits) };
+        let edge_lits = unsafe { std::mem::transmute::<_, &[glucose::Lit]>(edge_lits) };
 
         self.solver
             .add_graph_division(domains, dom_lits, edges, edge_lits)
@@ -220,7 +217,7 @@ impl SAT {
 }
 
 pub struct SATModel<'a> {
-    model: GlucoseModel<'a>,
+    model: glucose::Model<'a>,
 }
 
 impl<'a> SATModel<'a> {
