@@ -1,5 +1,7 @@
 use std::ops::Not;
 
+#[cfg(feature = "backend-external")]
+use crate::backend::external;
 use crate::backend::glucose;
 
 #[derive(Clone, Copy)]
@@ -10,12 +12,23 @@ impl Var {
         Lit(self.0 * 2 + if negated { 1 } else { 0 })
     }
 
-    pub fn from_glucose(var: glucose::Var) -> Var {
+    fn from_glucose(var: glucose::Var) -> Var {
         Var(var.0)
     }
 
-    pub fn as_glucose(self) -> glucose::Var {
+    #[allow(unused)]
+    #[cfg(feature = "backend-external")]
+    fn from_external(var: external::Var) -> Var {
+        Var(var.0)
+    }
+
+    fn as_glucose(self) -> glucose::Var {
         glucose::Var(self.0)
+    }
+
+    #[cfg(feature = "backend-external")]
+    fn as_external(self) -> external::Var {
+        external::Var(self.0)
     }
 }
 
@@ -30,14 +43,6 @@ impl Lit {
 
     pub fn is_negated(self) -> bool {
         self.0 % 2 == 1
-    }
-
-    pub fn from_glucose(lit: glucose::Lit) -> Lit {
-        Lit(lit.0)
-    }
-
-    pub fn as_glucose(self) -> glucose::Lit {
-        glucose::Lit(self.0)
     }
 }
 
@@ -58,37 +63,63 @@ pub struct SATSolverStats {
 /// Adapter to SAT solver.
 /// To support other SAT solver without changing previous stages, we introduce an adapter instead of
 /// using `glucose::Solver` directly from the encoder.
-pub struct SAT {
-    solver: glucose::Solver,
+pub enum SAT {
+    Glucose(glucose::Solver),
+    #[cfg(feature = "backend-external")]
+    External(external::Solver),
 }
 
 impl SAT {
     pub fn new() -> SAT {
-        SAT {
-            solver: glucose::Solver::new(),
-        }
+        SAT::new_glucose()
+    }
+
+    pub fn new_glucose() -> SAT {
+        SAT::Glucose(glucose::Solver::new())
+    }
+
+    #[cfg(feature = "backend-external")]
+    pub fn new_external() -> SAT {
+        SAT::External(external::Solver::new())
     }
 
     pub fn num_var(&self) -> usize {
-        self.solver.num_var() as usize
+        match self {
+            SAT::Glucose(solver) => solver.num_var() as usize,
+            #[cfg(feature = "backend-external")]
+            SAT::External(solver) => solver.num_var() as usize,
+        }
     }
 
     pub fn all_vars(&self) -> Vec<Var> {
-        self.solver
-            .all_vars()
-            .into_iter()
-            .map(|v| Var::from_glucose(v))
-            .collect()
+        match self {
+            SAT::Glucose(solver) => {
+                let ret = solver.all_vars();
+                unsafe { std::mem::transmute::<_, Vec<Var>>(ret) }
+            }
+            #[cfg(feature = "backend-external")]
+            SAT::External(solver) => {
+                let ret = solver.all_vars();
+                unsafe { std::mem::transmute::<_, Vec<Var>>(ret) }
+            }
+        }
     }
 
     #[cfg(feature = "sat-analyzer")]
     pub fn new_var(&mut self, name: &str) -> Var {
-        Var::from_glucose(self.solver.new_named_var(name))
+        match self {
+            SAT::Glucose(solver) => Var::from_glucose(solver.new_named_var(name)),
+            SAT::External(_) => panic!("new_var is not supported in external backend"),
+        }
     }
 
     #[cfg(not(feature = "sat-analyzer"))]
     pub fn new_var(&mut self) -> Var {
-        Var::from_glucose(self.solver.new_var())
+        match self {
+            SAT::Glucose(solver) => Var::from_glucose(solver.new_var()),
+            #[cfg(feature = "backend-external")]
+            SAT::External(solver) => Var::from_external(solver.new_var()),
+        }
     }
 
     #[cfg(feature = "sat-analyzer")]
@@ -122,8 +153,17 @@ impl SAT {
     }
 
     pub fn add_clause(&mut self, clause: &[Lit]) {
-        self.solver
-            .add_clause(unsafe { std::mem::transmute::<&[Lit], &[glucose::Lit]>(clause) });
+        match self {
+            SAT::Glucose(solver) => {
+                solver
+                    .add_clause(unsafe { std::mem::transmute::<&[Lit], &[glucose::Lit]>(clause) });
+            }
+            #[cfg(feature = "backend-external")]
+            SAT::External(solver) => {
+                solver
+                    .add_clause(unsafe { std::mem::transmute::<&[Lit], &[external::Lit]>(clause) });
+            }
+        }
     }
 
     pub fn add_order_encoding_linear(
@@ -133,9 +173,16 @@ impl SAT {
         coefs: Vec<i32>,
         constant: i32,
     ) -> bool {
-        let lits = unsafe { std::mem::transmute::<_, &Vec<Vec<glucose::Lit>>>(&lits) };
-        self.solver
-            .add_order_encoding_linear(&lits, &domain, &coefs, constant)
+        match self {
+            SAT::Glucose(solver) => {
+                let lits = unsafe { std::mem::transmute::<_, &Vec<Vec<glucose::Lit>>>(&lits) };
+                solver.add_order_encoding_linear(&lits, &domain, &coefs, constant)
+            }
+            #[cfg(feature = "backend-external")]
+            SAT::External(_) => {
+                panic!("add_order_encoding_linear is not supported in external backend")
+            }
+        }
     }
 
     pub fn add_active_vertices_connected(
@@ -143,8 +190,16 @@ impl SAT {
         lits: Vec<Lit>,
         edges: Vec<(usize, usize)>,
     ) -> bool {
-        let lits = unsafe { std::mem::transmute::<_, &Vec<glucose::Lit>>(&lits) };
-        self.solver.add_active_vertices_connected(&lits, &edges)
+        match self {
+            SAT::Glucose(solver) => {
+                let lits = unsafe { std::mem::transmute::<_, &Vec<glucose::Lit>>(&lits) };
+                solver.add_active_vertices_connected(&lits, &edges)
+            }
+            #[cfg(feature = "backend-external")]
+            SAT::External(_) => {
+                panic!("add_active_vertices_connected is not supported in external backend")
+            }
+        }
     }
 
     #[cfg(not(feature = "csp-extra-constraints"))]
@@ -162,9 +217,16 @@ impl SAT {
         vars: &[Vec<Lit>],
         supports: &[Vec<Option<usize>>],
     ) -> bool {
-        let vars = unsafe { std::mem::transmute::<_, &[Vec<glucose::Lit>]>(vars) };
-        self.solver
-            .add_direct_encoding_extension_supports(&vars, supports)
+        match self {
+            SAT::Glucose(solver) => {
+                let vars = unsafe { std::mem::transmute::<_, &[Vec<glucose::Lit>]>(vars) };
+                solver.add_direct_encoding_extension_supports(&vars, supports)
+            }
+            #[cfg(feature = "backend-external")]
+            SAT::External(_) => panic!(
+                "add_direct_encoding_extension_supports is not supported in external backend"
+            ),
+        }
     }
 
     pub fn add_graph_division(
@@ -174,58 +236,99 @@ impl SAT {
         edges: &[(usize, usize)],
         edge_lits: &[Lit],
     ) -> bool {
-        let dom_lits = unsafe { std::mem::transmute::<_, &[Vec<glucose::Lit>]>(dom_lits) };
-        let edge_lits = unsafe { std::mem::transmute::<_, &[glucose::Lit]>(edge_lits) };
+        match self {
+            SAT::Glucose(solver) => {
+                let dom_lits = unsafe { std::mem::transmute::<_, &[Vec<glucose::Lit>]>(dom_lits) };
+                let edge_lits = unsafe { std::mem::transmute::<_, &[glucose::Lit]>(edge_lits) };
 
-        self.solver
-            .add_graph_division(domains, dom_lits, edges, edge_lits)
+                solver.add_graph_division(domains, dom_lits, edges, edge_lits)
+            }
+            #[cfg(feature = "backend-external")]
+            SAT::External(_) => panic!("add_graph_division is not supported in external backend"),
+        }
     }
 
     pub fn set_seed(&mut self, seed: f64) {
-        self.solver.set_seed(seed);
+        match self {
+            SAT::Glucose(solver) => solver.set_seed(seed),
+            #[cfg(feature = "backend-external")]
+            SAT::External(_) => (), // TODO: add warning
+        }
     }
 
     pub fn set_rnd_init_act(&mut self, rnd_init_act: bool) {
-        self.solver.set_rnd_init_act(rnd_init_act);
+        match self {
+            SAT::Glucose(solver) => solver.set_rnd_init_act(rnd_init_act),
+            #[cfg(feature = "backend-external")]
+            SAT::External(_) => (), // TODO: add warning
+        }
     }
 
     pub fn set_dump_analysis_info(&mut self, dump_analysis_info: bool) {
-        self.solver.set_dump_analysis_info(dump_analysis_info);
+        match self {
+            SAT::Glucose(solver) => solver.set_dump_analysis_info(dump_analysis_info),
+            #[cfg(feature = "backend-external")]
+            SAT::External(_) => (), // TODO: add warning
+        }
     }
 
     pub fn solve<'a>(&'a mut self) -> Option<SATModel<'a>> {
-        self.solver.solve().map(|model| SATModel { model })
+        match self {
+            SAT::Glucose(solver) => solver.solve().map(|model| SATModel::Glucose(model)),
+            #[cfg(feature = "backend-external")]
+            SAT::External(solver) => solver.solve().map(|model| SATModel::External(model)),
+        }
     }
 
     pub fn solve_without_model(&mut self) -> bool {
-        self.solver.solve_without_model()
+        match self {
+            SAT::Glucose(solver) => solver.solve_without_model(),
+            #[cfg(feature = "backend-external")]
+            SAT::External(solver) => solver.solve_without_model(),
+        }
     }
 
     pub(crate) unsafe fn model<'a>(&'a self) -> SATModel<'a> {
-        SATModel {
-            model: self.solver.model(),
+        match self {
+            SAT::Glucose(solver) => SATModel::Glucose(solver.model()),
+            #[cfg(feature = "backend-external")]
+            SAT::External(solver) => SATModel::External(solver.model()),
         }
     }
 
     pub fn stats(&self) -> SATSolverStats {
-        SATSolverStats {
-            decisions: Some(self.solver.stats_decisions()),
-            propagations: Some(self.solver.stats_propagations()),
-            conflicts: Some(self.solver.stats_conflicts()),
+        match self {
+            SAT::Glucose(solver) => SATSolverStats {
+                decisions: Some(solver.stats_decisions()),
+                propagations: Some(solver.stats_propagations()),
+                conflicts: Some(solver.stats_conflicts()),
+            },
+            #[cfg(feature = "backend-external")]
+            SAT::External(_) => SATSolverStats {
+                decisions: None,
+                propagations: None,
+                conflicts: None,
+            },
         }
     }
 }
 
-pub struct SATModel<'a> {
-    model: glucose::Model<'a>,
+pub enum SATModel<'a> {
+    Glucose(glucose::Model<'a>),
+    #[cfg(feature = "backend-external")]
+    External(external::Model<'a>),
 }
 
 impl<'a> SATModel<'a> {
     pub fn assignment(&self, var: Var) -> bool {
-        self.model.assignment(var.as_glucose())
+        match self {
+            SATModel::Glucose(model) => model.assignment(var.as_glucose()),
+            #[cfg(feature = "backend-external")]
+            SATModel::External(model) => model.assignment(var.as_external()),
+        }
     }
 
     pub fn assignment_lit(&self, lit: Lit) -> bool {
-        self.model.assignment(lit.var().as_glucose()) ^ lit.is_negated()
+        self.assignment(lit.var()) ^ lit.is_negated()
     }
 }
