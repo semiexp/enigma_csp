@@ -537,7 +537,10 @@ mod tests {
 
         solver.add_expr(is_passed.at((0, 2)));
         solver.add_expr(is_cross.at((1, 1)));
+        solver.add_expr(!is_cross.at((1, 2)));
         solver.add_expr(is_cross.at((1, 3)));
+        solver.add_expr(!is_cross.at((2, 1)));
+        solver.add_expr(!is_cross.at((2, 3)));
         solver.add_expr(!is_passed.at((3, 0)));
         solver.add_expr(is_passed.at((3, 2)));
 
