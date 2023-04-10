@@ -58,6 +58,13 @@ pub enum SAT {
     CaDiCaL(cadical::Solver),
 }
 
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub enum Backend {
+    Glucose,
+    External,
+    CaDiCaL,
+}
+
 impl SAT {
     pub fn new() -> SAT {
         SAT::new_glucose()
@@ -75,6 +82,20 @@ impl SAT {
     #[cfg(feature = "backend-cadical")]
     pub fn new_cadical() -> SAT {
         SAT::CaDiCaL(cadical::Solver::new())
+    }
+
+    pub fn new_with_backend(backend: Backend) -> SAT {
+        match backend {
+            Backend::Glucose => SAT::new_glucose(),
+            #[cfg(feature = "backend-external")]
+            Backend::External => SAT::new_external(),
+            #[cfg(not(feature = "backend-external"))]
+            Backend::External => panic!("external backend is not enabled"),
+            #[cfg(feature = "backend-cadical")]
+            Backend::CaDiCaL => SAT::new_cadical(),
+            #[cfg(not(feature = "backend-cadical"))]
+            Backend::CaDiCaL => panic!("CaDiCaL backend is not enabled"),
+        }
     }
 
     pub fn num_var(&self) -> usize {

@@ -1,3 +1,5 @@
+use crate::sat::Backend;
+
 #[derive(Clone)]
 pub struct Config {
     pub use_constant_folding: bool,
@@ -16,6 +18,7 @@ pub struct Config {
     pub glucose_random_seed: Option<f64>,
     pub glucose_rnd_init_act: bool,
     pub dump_analysis_info: bool,
+    pub backend: Backend,
     pub verbose: bool,
 }
 
@@ -38,6 +41,7 @@ impl Config {
             glucose_random_seed: None,
             glucose_rnd_init_act: false,
             dump_analysis_info: false,
+            backend: Backend::Glucose,
             verbose: false,
         }
     }
@@ -132,6 +136,9 @@ impl Config {
         opts.optopt("", "domain-product-threshold", "Specify the threshold of domain product for introducing an auxiliary variable by Tseitin transformation.", "THRESHOLD");
         opts.optopt("", "native-linear-encoding-terms", "Specify the maximum number of terms in a linear sum which is encoded by the native linear constraint (0 for disabling this).", "TERMS");
         opts.optopt("", "native-linear-encoding-domain-product", "Specify the minimum domain product of linear sums which are encoded by the native linear constraint.", "DOMAIN_PRODUCT");
+
+        opts.optopt("", "backend", "Specify the SAT backend", "BACKEND");
+
         opts.optflag("h", "help", "Display this help");
 
         let matches = match opts.parse(&args[1..]) {
@@ -205,6 +212,18 @@ impl Config {
                 }
             };
             config.native_linear_encoding_domain_product_threshold = v;
+        }
+        if let Some(s) = matches.opt_str("backend") {
+            if s == "glucose" {
+                config.backend = Backend::Glucose;
+            } else if s == "external" {
+                config.backend = Backend::External;
+            } else if s == "cadical" {
+                config.backend = Backend::CaDiCaL;
+            } else {
+                println!("error: unknown backend: {}", s);
+                std::process::exit(1);
+            }
         }
 
         config

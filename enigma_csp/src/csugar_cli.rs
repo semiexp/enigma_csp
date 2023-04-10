@@ -8,8 +8,7 @@ use super::parser::{parse, ParseResult, Var, VarMap};
 
 pub fn csugar_cli<R: BufRead>(input: &mut R, config: Config) -> (String, PerfStats) {
     let mut var_map = VarMap::new();
-    let mut solver = IntegratedSolver::new();
-    solver.set_config(config);
+    let mut solver = IntegratedSolver::with_config(config);
 
     let perf_stats = PerfStats::new();
     solver.set_perf_stats(&perf_stats);

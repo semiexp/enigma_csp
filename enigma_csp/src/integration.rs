@@ -71,26 +71,27 @@ pub struct IntegratedSolver<'a> {
 
 impl<'a> IntegratedSolver<'a> {
     pub fn new() -> IntegratedSolver<'a> {
-        IntegratedSolver {
+        IntegratedSolver::with_config(Config::default())
+    }
+
+    pub fn with_config(config: Config) -> IntegratedSolver<'a> {
+        let mut ret = IntegratedSolver {
             csp: CSP::new(),
             normalize_map: NormalizeMap::new(),
             norm: NormCSP::new(),
             encode_map: EncodeMap::new(),
-            sat: SAT::new(),
+            sat: SAT::new_with_backend(config.backend),
             already_used: false,
-            config: Config::default(),
+            config,
             perf_stats: None,
+        };
+        ret.sat.set_rnd_init_act(ret.config.glucose_rnd_init_act);
+        ret.sat
+            .set_dump_analysis_info(ret.config.dump_analysis_info);
+        if let Some(seed) = ret.config.glucose_random_seed {
+            ret.sat.set_seed(seed);
         }
-    }
-
-    pub fn set_config(&mut self, config: Config) {
-        self.config = config;
-        self.sat.set_rnd_init_act(self.config.glucose_rnd_init_act);
-        self.sat
-            .set_dump_analysis_info(self.config.dump_analysis_info);
-        if let Some(seed) = self.config.glucose_random_seed {
-            self.sat.set_seed(seed);
-        }
+        ret
     }
 
     pub fn new_bool_var(&mut self) -> BoolVar {
@@ -422,8 +423,13 @@ mod tests {
             }
         }
 
-        fn set_config(&mut self, config: Config) {
-            self.solver.set_config(config);
+        fn with_config(config: Config) -> IntegrationTester<'a> {
+            IntegrationTester {
+                original_constr: vec![],
+                solver: IntegratedSolver::with_config(config),
+                bool_vars: vec![],
+                int_vars: vec![],
+            }
         }
 
         fn new_bool_var(&mut self) -> BoolVar {
@@ -841,8 +847,7 @@ mod tests {
     fn test_integration_bool_lit_after_decomposition() {
         let mut config = Config::default();
         config.domain_product_threshold = 1;
-        let mut solver = IntegratedSolver::new();
-        solver.set_config(config);
+        let mut solver = IntegratedSolver::with_config(config);
 
         let x = solver.new_bool_var();
 
@@ -1170,10 +1175,9 @@ mod tests {
     #[cfg(feature = "csp-extra-constraints")]
     #[test]
     fn test_integration_exhaustive_mul2() {
-        let mut tester = IntegrationTester::new();
         let mut config = Config::default();
         config.force_use_log_encoding = true;
-        tester.set_config(config);
+        let mut tester = IntegrationTester::with_config(config);
 
         let a = tester.new_int_var(Domain::range(1, 100));
         let b = tester.new_int_var(Domain::range(1, 100));
@@ -1376,10 +1380,9 @@ mod tests {
 
     #[test]
     fn test_integration_exhaustive_binary4() {
-        let mut tester = IntegrationTester::new();
         let mut config = Config::default();
         config.direct_encoding_for_binary_vars = true;
-        tester.set_config(config);
+        let mut tester = IntegrationTester::with_config(config);
 
         let x = tester.new_bool_var();
         tester.add_expr(
@@ -1455,8 +1458,7 @@ mod tests {
         for use_native in [false, true] {
             let mut config = Config::default();
             config.use_native_extension_supports = use_native;
-            let mut tester = IntegrationTester::new();
-            tester.set_config(config);
+            let mut tester = IntegrationTester::with_config(config);
 
             let a = tester.new_int_var_from_list(vec![0, 2, 3, 4]);
             let b = tester.new_int_var(Domain::range(0, 4));
