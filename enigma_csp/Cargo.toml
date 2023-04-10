@@ -10,11 +10,12 @@ name = "enigma_csp"
 crate-type = ["cdylib", "lib"]
 
 [features]
-default = ["csp-extra-constraints", "parser", "cli", "backend-external"]
+default = ["csp-extra-constraints", "parser", "cli", "backend-external", "backend-cadical"]
 sat-analyzer = []
 parser = ["dep:nom"]
 cli = ["parser", "dep:getopts"]
 backend-external = []
+backend-cadical = []
 
 # Enable support for extra CSP constraints which are not used in puzzle solvers.
 csp-extra-constraints = []
