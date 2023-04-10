@@ -1,6 +1,8 @@
 use std::ffi::CString;
-use std::ops::{Drop, Not};
+use std::ops::Drop;
 use std::os::raw::c_char;
+
+use crate::sat::{Lit, Var};
 
 #[repr(C)]
 struct Opaque {
@@ -56,35 +58,6 @@ extern "C" {
     fn Glucose_Set_random_seed(solver: *mut Opaque, random_seed: f64);
     fn Glucose_Set_rnd_init_act(solver: *mut Opaque, rnd_init_act: i32);
     fn Glucose_Set_dump_analysis_info(solver: *mut Opaque, value: i32);
-}
-
-#[derive(Clone, Copy)]
-pub struct Var(pub(crate) i32);
-
-#[repr(C)]
-#[derive(Clone, Copy, Debug)]
-pub struct Lit(pub(crate) i32);
-
-impl Lit {
-    pub fn new(var: Var, negated: bool) -> Lit {
-        Lit(var.0 * 2 + if negated { 1 } else { 0 })
-    }
-
-    pub fn var(self) -> Var {
-        Var(self.0 / 2)
-    }
-
-    pub fn is_negated(self) -> bool {
-        self.0 % 2 == 1
-    }
-}
-
-impl Not for Lit {
-    type Output = Lit;
-
-    fn not(self) -> Self::Output {
-        Lit(self.0 ^ 1)
-    }
 }
 
 pub struct Solver {

@@ -6,46 +6,23 @@ use crate::backend::external;
 use crate::backend::glucose;
 
 #[derive(Clone, Copy)]
-pub struct Var(i32);
+pub struct Var(pub(crate) i32);
 
 impl Var {
     pub fn as_lit(self, negated: bool) -> Lit {
         Lit(self.0 * 2 + if negated { 1 } else { 0 })
     }
-
-    fn from_glucose(var: glucose::Var) -> Var {
-        Var(var.0)
-    }
-
-    #[allow(unused)]
-    #[cfg(feature = "backend-external")]
-    fn from_external(var: external::Var) -> Var {
-        Var(var.0)
-    }
-
-    fn from_cadical(var: cadical::Var) -> Var {
-        Var(var.0)
-    }
-
-    fn as_glucose(self) -> glucose::Var {
-        glucose::Var(self.0)
-    }
-
-    #[cfg(feature = "backend-external")]
-    fn as_external(self) -> external::Var {
-        external::Var(self.0)
-    }
-
-    fn as_cadical(self) -> cadical::Var {
-        cadical::Var(self.0)
-    }
 }
 
 #[repr(C)]
 #[derive(Clone, Copy, Debug)]
-pub struct Lit(i32);
+pub struct Lit(pub(crate) i32);
 
 impl Lit {
+    pub fn new(var: Var, negated: bool) -> Lit {
+        Lit(var.0 * 2 + if negated { 1 } else { 0 })
+    }
+
     pub fn var(self) -> Var {
         Var(self.0 / 2)
     }
@@ -127,7 +104,7 @@ impl SAT {
     #[cfg(feature = "sat-analyzer")]
     pub fn new_var(&mut self, name: &str) -> Var {
         match self {
-            SAT::Glucose(solver) => Var::from_glucose(solver.new_named_var(name)),
+            SAT::Glucose(solver) => solver.new_named_var(name),
             SAT::External(_) => panic!("new_var is not supported in external backend"),
             SAT::CaDiCaL(_) => panic!("new_var is not supported in cadical backend"),
         }
@@ -136,10 +113,10 @@ impl SAT {
     #[cfg(not(feature = "sat-analyzer"))]
     pub fn new_var(&mut self) -> Var {
         match self {
-            SAT::Glucose(solver) => Var::from_glucose(solver.new_var()),
+            SAT::Glucose(solver) => solver.new_var(),
             #[cfg(feature = "backend-external")]
-            SAT::External(solver) => Var::from_external(solver.new_var()),
-            SAT::CaDiCaL(solver) => Var::from_cadical(solver.new_var()),
+            SAT::External(solver) => solver.new_var(),
+            SAT::CaDiCaL(solver) => solver.new_var(),
         }
     }
 
@@ -176,17 +153,14 @@ impl SAT {
     pub fn add_clause(&mut self, clause: &[Lit]) {
         match self {
             SAT::Glucose(solver) => {
-                solver
-                    .add_clause(unsafe { std::mem::transmute::<&[Lit], &[glucose::Lit]>(clause) });
+                solver.add_clause(clause);
             }
             #[cfg(feature = "backend-external")]
             SAT::External(solver) => {
-                solver
-                    .add_clause(unsafe { std::mem::transmute::<&[Lit], &[external::Lit]>(clause) });
+                solver.add_clause(clause);
             }
             SAT::CaDiCaL(solver) => {
-                solver
-                    .add_clause(unsafe { std::mem::transmute::<&[Lit], &[cadical::Lit]>(clause) });
+                solver.add_clause(clause);
             }
         }
     }
@@ -200,7 +174,6 @@ impl SAT {
     ) -> bool {
         match self {
             SAT::Glucose(solver) => {
-                let lits = unsafe { std::mem::transmute::<_, &Vec<Vec<glucose::Lit>>>(&lits) };
                 solver.add_order_encoding_linear(&lits, &domain, &coefs, constant)
             }
             #[cfg(feature = "backend-external")]
@@ -217,18 +190,12 @@ impl SAT {
         edges: Vec<(usize, usize)>,
     ) -> bool {
         match self {
-            SAT::Glucose(solver) => {
-                let lits = unsafe { std::mem::transmute::<_, &Vec<glucose::Lit>>(&lits) };
-                solver.add_active_vertices_connected(&lits, &edges)
-            }
+            SAT::Glucose(solver) => solver.add_active_vertices_connected(&lits, &edges),
             #[cfg(feature = "backend-external")]
             SAT::External(_) => {
                 panic!("add_active_vertices_connected is not supported in external backend")
             }
-            SAT::CaDiCaL(solver) => {
-                let lits = unsafe { std::mem::transmute::<_, &Vec<cadical::Lit>>(&lits) };
-                solver.add_active_vertices_connected(&lits, &edges)
-            }
+            SAT::CaDiCaL(solver) => solver.add_active_vertices_connected(&lits, &edges),
         }
     }
 
@@ -248,10 +215,7 @@ impl SAT {
         supports: &[Vec<Option<usize>>],
     ) -> bool {
         match self {
-            SAT::Glucose(solver) => {
-                let vars = unsafe { std::mem::transmute::<_, &[Vec<glucose::Lit>]>(vars) };
-                solver.add_direct_encoding_extension_supports(&vars, supports)
-            }
+            SAT::Glucose(solver) => solver.add_direct_encoding_extension_supports(&vars, supports),
             #[cfg(feature = "backend-external")]
             SAT::External(_) => panic!(
                 "add_direct_encoding_extension_supports is not supported in external backend"
@@ -268,12 +232,7 @@ impl SAT {
         edge_lits: &[Lit],
     ) -> bool {
         match self {
-            SAT::Glucose(solver) => {
-                let dom_lits = unsafe { std::mem::transmute::<_, &[Vec<glucose::Lit>]>(dom_lits) };
-                let edge_lits = unsafe { std::mem::transmute::<_, &[glucose::Lit]>(edge_lits) };
-
-                solver.add_graph_division(domains, dom_lits, edges, edge_lits)
-            }
+            SAT::Glucose(solver) => solver.add_graph_division(domains, dom_lits, edges, edge_lits),
             #[cfg(feature = "backend-external")]
             SAT::External(_) => panic!("add_graph_division is not supported in external backend"),
             SAT::CaDiCaL(_) => todo!(),
@@ -366,10 +325,10 @@ pub enum SATModel<'a> {
 impl<'a> SATModel<'a> {
     pub fn assignment(&self, var: Var) -> bool {
         match self {
-            SATModel::Glucose(model) => model.assignment(var.as_glucose()),
+            SATModel::Glucose(model) => model.assignment(var),
             #[cfg(feature = "backend-external")]
-            SATModel::External(model) => model.assignment(var.as_external()),
-            SATModel::CaDiCaL(model) => model.assignment(var.as_cadical()),
+            SATModel::External(model) => model.assignment(var),
+            SATModel::CaDiCaL(model) => model.assignment(var),
         }
     }
 

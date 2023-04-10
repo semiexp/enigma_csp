@@ -1,40 +1,7 @@
 use std::io::{Read, Write};
-use std::ops::Not;
 use std::process::{Command, Stdio};
 
-#[derive(Clone, Copy, Debug)]
-pub struct Var(pub(crate) i32);
-
-impl Var {
-    pub fn as_lit(&self, negated: bool) -> Lit {
-        Lit::new(*self, negated)
-    }
-}
-
-#[derive(Clone, Copy, Debug)]
-pub struct Lit(pub(crate) i32);
-
-impl Lit {
-    pub fn new(var: Var, negated: bool) -> Lit {
-        Lit(var.0 * 2 + if negated { 1 } else { 0 })
-    }
-
-    pub fn var(self) -> Var {
-        Var(self.0 / 2)
-    }
-
-    pub fn is_negated(self) -> bool {
-        self.0 % 2 == 1
-    }
-}
-
-impl Not for Lit {
-    type Output = Lit;
-
-    fn not(self) -> Self::Output {
-        Lit(self.0 ^ 1)
-    }
-}
+use crate::sat::{Lit, Var};
 
 pub struct Solver {
     num_vars: i32,
