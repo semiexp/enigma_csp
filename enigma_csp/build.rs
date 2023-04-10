@@ -1,6 +1,7 @@
 use std::env;
+use std::fs;
 
-fn main() {
+fn build_glucose() {
     let arch = env::var("CARGO_CFG_TARGET_ARCH").unwrap();
 
     let build_target = vec![
@@ -48,4 +49,40 @@ fn main() {
             .compile("calc");
     }
     println!("cargo:rerun-if-changed=lib/glucose_bridge.cpp");
+}
+
+fn build_cadical() {
+    let arch = env::var("CARGO_CFG_TARGET_ARCH").unwrap();
+    if arch == "wasm32" {
+        return;
+    }
+
+    let mut build_target = vec![];
+    for name in fs::read_dir("lib/cadical/src").unwrap() {
+        let name = name.unwrap();
+        let name = name.path().to_str().map(|x| x.to_owned()).unwrap();
+        if name.ends_with(".cpp")
+            && !name.ends_with("/cadical.cpp")
+            && !name.ends_with("/mobical.cpp")
+        {
+            build_target.push(name.to_owned());
+        }
+    }
+
+    cc::Build::new()
+        .cpp(true)
+        .file("lib/cadical_bridge.cpp")
+        .files(&build_target)
+        .include("lib/cadical/src")
+        .flag("-std=c++17")
+        .flag("-DVERSION=\"1.5.3\"") // TODO
+        .warnings(false)
+        .compile("cadical");
+
+    println!("cargo:rerun-if-changed=lib/cadical_bridge.cpp");
+}
+
+fn main() {
+    build_glucose();
+    build_cadical();
 }
