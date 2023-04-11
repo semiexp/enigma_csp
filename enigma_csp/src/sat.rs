@@ -225,7 +225,10 @@ impl SAT {
                 panic!("add_active_vertices_connected is not supported in external backend")
             }
             #[cfg(feature = "backend-cadical")]
-            SAT::CaDiCaL(solver) => solver.add_active_vertices_connected(&lits, &edges),
+            SAT::CaDiCaL(solver) => {
+                solver.add_active_vertices_connected(&lits, &edges);
+                true
+            }
         }
     }
 

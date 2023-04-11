@@ -19,7 +19,7 @@ extern "C" {
         lits: *const i32,
         n_edges: i32,
         edges: *const i32,
-    ) -> i32;
+    );
 }
 
 pub struct Solver {
@@ -61,11 +61,7 @@ impl Solver {
         unsafe { CaDiCaL_AddClause(self.ptr, clause.as_ptr(), clause.len() as i32) };
     }
 
-    pub fn add_active_vertices_connected(
-        &mut self,
-        lits: &[Lit],
-        edges: &[(usize, usize)],
-    ) -> bool {
+    pub fn add_active_vertices_connected(&mut self, lits: &[Lit], edges: &[(usize, usize)]) {
         assert!(lits.len() <= i32::max_value() as usize);
         assert!(edges.len() <= i32::max_value() as usize);
 
@@ -82,7 +78,7 @@ impl Solver {
             edges_flat.push(v as i32);
         }
 
-        let res = unsafe {
+        unsafe {
             CaDiCaL_AddActiveVerticesConnected(
                 self.ptr,
                 lits.len() as i32,
@@ -91,7 +87,6 @@ impl Solver {
                 edges_flat.as_ptr(),
             )
         };
-        res != 0
     }
 
     pub fn solve<'a>(&'a mut self) -> Option<Model<'a>> {
