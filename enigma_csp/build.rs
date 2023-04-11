@@ -52,11 +52,6 @@ fn build_glucose() {
 }
 
 fn build_cadical() {
-    let arch = env::var("CARGO_CFG_TARGET_ARCH").unwrap();
-    if arch == "wasm32" {
-        return;
-    }
-
     let mut build_target = vec![];
     for name in fs::read_dir("lib/cadical/src").unwrap() {
         let name = name.unwrap();
@@ -76,6 +71,7 @@ fn build_cadical() {
         .include("lib/cadical/src")
         .flag("-std=c++17")
         .flag("-DVERSION=\"1.5.3\"") // TODO
+        .flag("-DNBUILD")
         .warnings(false)
         .compile("cadical");
 
