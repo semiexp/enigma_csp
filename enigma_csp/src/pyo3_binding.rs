@@ -18,7 +18,7 @@ impl PyConfig {
     #[new]
     const fn new() -> PyConfig {
         PyConfig {
-            config: Config::default(),
+            config: Config::initial_default(),
         }
     }
 

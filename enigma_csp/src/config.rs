@@ -1,6 +1,6 @@
 use crate::sat::Backend;
 
-#[derive(Clone)]
+#[derive(Clone, Copy)]
 pub struct Config {
     pub use_constant_folding: bool,
     pub use_constant_propagation: bool,
@@ -22,8 +22,20 @@ pub struct Config {
     pub verbose: bool,
 }
 
+thread_local! {
+    static DEFAULT_CONFIG: std::cell::Cell<Config> = std::cell::Cell::new(Config::initial_default());
+}
+
 impl Config {
-    pub const fn default() -> Config {
+    pub fn default() -> Config {
+        DEFAULT_CONFIG.with(|f| f.get())
+    }
+
+    pub fn set_default(new_default: Config) {
+        DEFAULT_CONFIG.with(|f| f.set(new_default));
+    }
+
+    pub const fn initial_default() -> Config {
         Config {
             use_constant_folding: true,
             use_constant_propagation: true,
