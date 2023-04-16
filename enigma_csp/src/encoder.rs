@@ -1642,9 +1642,16 @@ fn encode_linear_eq_direct(env: &EncoderEnv, sum: &LinearSum) -> ClauseSet {
             .len()
             .cmp(&encoding2.encoding.lits.len())
     });
+    encode_linear_eq_direct_from_info(env, &info, sum.constant)
+}
 
+fn encode_linear_eq_direct_from_info(
+    _env: &EncoderEnv,
+    info: &[LinearInfoForDirectEncoding],
+    constant: CheckedInt,
+) -> ClauseSet {
     if info.len() == 2 {
-        return encode_linear_eq_direct_two_terms(&info, sum.constant);
+        return encode_linear_eq_direct_two_terms(&info, constant);
     }
 
     fn encode_sub(
@@ -1754,9 +1761,9 @@ fn encode_linear_eq_direct(env: &EncoderEnv, sum: &LinearSum) -> ClauseSet {
         );
     }
 
-    let mut lower_bound = sum.constant;
-    let mut upper_bound = sum.constant;
-    for direct_encoding in &info {
+    let mut lower_bound = constant;
+    let mut upper_bound = constant;
+    for direct_encoding in info {
         lower_bound += direct_encoding.domain_min();
         upper_bound += direct_encoding.domain_max();
     }
@@ -1869,6 +1876,43 @@ fn encode_linear_ne_direct(env: &EncoderEnv, sum: &LinearSum) -> ClauseSet {
 #[cfg(feature = "csp-extra-constraints")]
 fn encode_linear_log(env: &mut EncoderEnv, sum: &LinearSum, op: CmpOp) -> ClauseSet {
     // TODO: some clauses should be directly added to `env`
+    if op == CmpOp::Eq {
+        let mut values = vec![];
+        for (&var, &coef) in sum.iter() {
+            let encoding = env.map.int_map[var].as_ref().unwrap();
+            let log_encoding = encoding.log_encoding.as_ref().unwrap();
+
+            if coef > 0 {
+                let mut coef = coef.get() as u32;
+                for i in 0usize.. {
+                    if (coef & 1) == 1 {
+                        for j in 0..log_encoding.lits.len() {
+                            values.push((i + j, CheckedInt::new(1), log_encoding.lits[j]));
+                        }
+                    }
+                    coef >>= 1;
+                    if coef == 0 {
+                        break;
+                    }
+                }
+            } else {
+                let mut coef = (-coef).get() as u32;
+                for i in 0usize.. {
+                    if (coef & 1) == 1 {
+                        for j in 0..log_encoding.lits.len() {
+                            values.push((i + j, CheckedInt::new(-1), log_encoding.lits[j]));
+                        }
+                    }
+                    coef >>= 1;
+                    if coef == 0 {
+                        break;
+                    }
+                }
+            }
+        }
+        return log_encoding_adder2(env, values, sum.constant);
+    }
+
     let mut values_positive = vec![];
     let mut values_negative = vec![];
 
@@ -2137,6 +2181,266 @@ fn log_encoding_adder(
     }
 
     (clause_set, result)
+}
+
+#[cfg(feature = "csp-extra-constraints")]
+fn log_encoding_adder2(
+    env: &mut EncoderEnv,
+    values: Vec<(usize, CheckedInt, Lit)>,
+    constant: CheckedInt,
+) -> ClauseSet {
+    if values.len() == 0 {
+        let mut ret = ClauseSet::new();
+        if constant != 0 {
+            ret.push(&[]);
+        }
+        return ret;
+    }
+
+    let max_ofs = values.iter().map(|(ofs, _, _)| *ofs).max().unwrap() + 1;
+    assert!(max_ofs < i32::BITS as usize);
+
+    let mut lits_by_ofs: Vec<Vec<(CheckedInt, Lit)>> = vec![vec![]; max_ofs];
+    for (ofs, coef, lit) in values {
+        lits_by_ofs[ofs].push((coef, lit));
+    }
+
+    let mut clause_set = ClauseSet::new();
+
+    let mut carry_low = CheckedInt::new(0);
+    let mut carry_high = CheckedInt::new(0);
+    let mut carry_lits: Vec<Lit> = vec![];
+
+    for i in 0..max_ofs {
+        let mut low = carry_low;
+        let mut high = carry_high;
+
+        let mut order_encodings = vec![];
+
+        for &(coef, lit) in &lits_by_ofs[i] {
+            if coef < 0 {
+                low += coef;
+                order_encodings.push(OrderEncoding {
+                    domain: vec![coef, CheckedInt::new(0)],
+                    lits: vec![!lit],
+                });
+            } else if coef > 0 {
+                high += coef;
+                order_encodings.push(OrderEncoding {
+                    domain: vec![CheckedInt::new(0), coef],
+                    lits: vec![lit],
+                });
+            }
+        }
+
+        assert_eq!(carry_high - carry_low, carry_lits.len() as i32);
+        {
+            let domain = (carry_low.get()..=carry_high.get())
+                .map(CheckedInt::new)
+                .collect::<Vec<_>>();
+            order_encodings.push(OrderEncoding {
+                domain,
+                lits: carry_lits.clone(),
+            });
+        }
+
+        let target;
+        if i + 1 == max_ofs {
+            target = CheckedInt::new(constant.get() >> i);
+        } else {
+            target = CheckedInt::new((constant.get() >> i) & 1);
+        }
+
+        let new_carry_low;
+        let new_carry_high;
+
+        if i + 1 == max_ofs {
+            new_carry_low = CheckedInt::new(0);
+            new_carry_high = CheckedInt::new(0);
+        } else {
+            new_carry_low = (low + target).div_ceil(CheckedInt::new(2));
+            new_carry_high = (high + target).div_floor(CheckedInt::new(2));
+            if new_carry_low > new_carry_high {
+                let mut ret = ClauseSet::new();
+                ret.push(&[]);
+                return ret;
+            }
+        }
+
+        let mut new_carry_lits = vec![];
+        for _ in 0..(new_carry_high - new_carry_low).get() {
+            new_carry_lits.push(new_var!(env.sat).as_lit(false));
+        }
+        for i in 1..new_carry_lits.len() {
+            env.sat
+                .add_clause(&[new_carry_lits[i - 1], !new_carry_lits[i]]);
+        }
+
+        {
+            let domain = (new_carry_low.get()..=new_carry_high.get())
+                .rev()
+                .map(|x| CheckedInt::new(x) * CheckedInt::new(-2))
+                .collect::<Vec<_>>();
+            let lits = new_carry_lits.iter().rev().map(|x| !*x).collect();
+            order_encodings.push(OrderEncoding { domain, lits });
+        }
+
+        let mut infos = vec![];
+        for encoding in &order_encodings {
+            infos.push(LinearInfo::Order(LinearInfoForOrderEncoding {
+                coef: CheckedInt::new(1),
+                encoding,
+            }));
+        }
+
+        {
+            let c = encode_linear_ge_mixed_from_info(&infos, target);
+            clause_set.append(c);
+        }
+        {
+            for info in &mut infos {
+                match info {
+                    LinearInfo::Order(ord) => ord.coef *= CheckedInt::new(-1),
+                    _ => unreachable!(),
+                }
+            }
+            let c = encode_linear_ge_mixed_from_info(&infos, -target);
+            clause_set.append(c);
+        }
+
+        carry_low = new_carry_low;
+        carry_high = new_carry_high;
+        carry_lits = new_carry_lits;
+    }
+
+    clause_set
+}
+
+#[allow(unused)]
+#[cfg(feature = "csp-extra-constraints")]
+fn log_encoding_adder2_direct(
+    env: &mut EncoderEnv,
+    values: Vec<(usize, CheckedInt, Lit)>,
+    constant: CheckedInt,
+) -> ClauseSet {
+    if values.len() == 0 {
+        let mut ret = ClauseSet::new();
+        if constant != 0 {
+            ret.push(&[]);
+        }
+        return ret;
+    }
+
+    let max_ofs = values.iter().map(|(ofs, _, _)| *ofs).max().unwrap() + 1;
+    assert!(max_ofs < i32::BITS as usize);
+
+    let mut lits_by_ofs: Vec<Vec<(CheckedInt, Lit)>> = vec![vec![]; max_ofs];
+    for (ofs, coef, lit) in values {
+        lits_by_ofs[ofs].push((coef, lit));
+    }
+
+    let mut clause_set = ClauseSet::new();
+
+    let mut carry_low = CheckedInt::new(0);
+    let mut carry_high = CheckedInt::new(0);
+    let t = new_var!(env.sat).as_lit(false);
+    env.sat.add_clause(&[t]);
+    let mut carry_lits: Vec<Lit> = vec![t];
+
+    for i in 0..max_ofs {
+        let mut low = carry_low;
+        let mut high = carry_high;
+
+        let mut direct_encodings = vec![];
+
+        for &(coef, lit) in &lits_by_ofs[i] {
+            if coef < 0 {
+                low += coef;
+                direct_encodings.push(DirectEncoding {
+                    domain: vec![coef, CheckedInt::new(0)],
+                    lits: vec![lit, !lit],
+                });
+            } else if coef > 0 {
+                high += coef;
+                direct_encodings.push(DirectEncoding {
+                    domain: vec![CheckedInt::new(0), coef],
+                    lits: vec![!lit, lit],
+                });
+            }
+        }
+
+        assert_eq!(carry_high - carry_low, carry_lits.len() as i32 - 1);
+        {
+            let domain = (carry_low.get()..=carry_high.get())
+                .map(CheckedInt::new)
+                .collect::<Vec<_>>();
+            direct_encodings.push(DirectEncoding {
+                domain,
+                lits: carry_lits.clone(),
+            });
+        }
+
+        let target;
+        if i + 1 == max_ofs {
+            target = CheckedInt::new(constant.get() >> i);
+        } else {
+            target = CheckedInt::new((constant.get() >> i) & 1);
+        }
+
+        let new_carry_low;
+        let new_carry_high;
+
+        if i + 1 == max_ofs {
+            new_carry_low = CheckedInt::new(0);
+            new_carry_high = CheckedInt::new(0);
+        } else {
+            new_carry_low = (low + target).div_ceil(CheckedInt::new(2));
+            new_carry_high = (high + target).div_floor(CheckedInt::new(2));
+            if new_carry_low > new_carry_high {
+                let mut ret = ClauseSet::new();
+                ret.push(&[]);
+                return ret;
+            }
+        }
+
+        let mut new_carry_lits = vec![];
+        for _ in 0..=(new_carry_high - new_carry_low).get() {
+            new_carry_lits.push(new_var!(env.sat).as_lit(false));
+        }
+        env.sat.add_clause(&new_carry_lits);
+        for i in 1..new_carry_lits.len() {
+            for j in 0..i {
+                env.sat
+                    .add_clause(&[!new_carry_lits[j], !new_carry_lits[i]]);
+            }
+        }
+
+        {
+            let domain = (new_carry_low.get()..=new_carry_high.get())
+                .rev()
+                .map(|x| CheckedInt::new(x) * CheckedInt::new(-2))
+                .collect::<Vec<_>>();
+            let lits = new_carry_lits.iter().rev().map(|x| *x).collect();
+            direct_encodings.push(DirectEncoding { domain, lits });
+        }
+
+        let mut infos = vec![];
+        for encoding in &direct_encodings {
+            infos.push(LinearInfoForDirectEncoding {
+                coef: CheckedInt::new(1),
+                encoding,
+            });
+        }
+
+        let c = encode_linear_eq_direct_from_info(env, &infos, target);
+        clause_set.append(c);
+
+        carry_low = new_carry_low;
+        carry_high = new_carry_high;
+        carry_lits = new_carry_lits;
+    }
+
+    clause_set
 }
 
 #[cfg(feature = "csp-extra-constraints")]
