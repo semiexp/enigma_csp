@@ -1501,6 +1501,19 @@ fn encode_linear_ge_mixed(env: &EncoderEnv, sum: &LinearSum) -> ClauseSet {
     encode_linear_ge_mixed_from_info(&info, sum.constant)
 }
 
+/// Encode the equation "sum(info) + constant == 0" using encode_linear_ge_mixed_from_info twice.
+fn encode_linear_eq_mixed_from_info(mut info: Vec<LinearInfo>, constant: CheckedInt) -> ClauseSet {
+    let mut ret = encode_linear_ge_mixed_from_info(&info, constant);
+    for x in &mut info {
+        match x {
+            LinearInfo::Direct(x) => x.coef *= CheckedInt::new(-1),
+            LinearInfo::Order(x) => x.coef *= CheckedInt::new(-1),
+        }
+    }
+    ret.append(encode_linear_ge_mixed_from_info(&info, -constant));
+    ret
+}
+
 fn encode_linear_ge_mixed_from_info(info: &[LinearInfo], constant: CheckedInt) -> ClauseSet {
     fn encode_sub(
         info: &[LinearInfo],
@@ -2293,20 +2306,8 @@ fn log_encoding_adder2(
             }));
         }
 
-        {
-            let c = encode_linear_ge_mixed_from_info(&infos, target);
-            clause_set.append(c);
-        }
-        {
-            for info in &mut infos {
-                match info {
-                    LinearInfo::Order(ord) => ord.coef *= CheckedInt::new(-1),
-                    _ => unreachable!(),
-                }
-            }
-            let c = encode_linear_ge_mixed_from_info(&infos, -target);
-            clause_set.append(c);
-        }
+        let c = encode_linear_eq_mixed_from_info(infos, target);
+        clause_set.append(c);
 
         carry_low = new_carry_low;
         carry_high = new_carry_high;
