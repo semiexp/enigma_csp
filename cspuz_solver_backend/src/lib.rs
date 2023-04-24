@@ -91,6 +91,8 @@ fn solve_puzz_link(puzzle_kind: String, url: &str) -> Result<Board, &'static str
         puzzle::barns::solve_barns(url)
     } else if puzzle_kind == "reflect" {
         puzzle::reflect::solve_reflect_link(url)
+    } else if puzzle_kind == "ringring" {
+        puzzle::ringring::solve_ringring(url)
     } else {
         Err("unknown puzzle type")
     }

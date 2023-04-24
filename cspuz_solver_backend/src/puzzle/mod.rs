@@ -26,6 +26,7 @@ pub mod nurimisaki;
 pub mod parrot_loop;
 pub mod pencils;
 pub mod reflect;
+pub mod ringring;
 pub mod sashigane;
 pub mod shakashaka;
 pub mod shikaku;
