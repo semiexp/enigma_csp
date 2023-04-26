@@ -21,6 +21,7 @@ pub mod kropki;
 pub mod kurotto;
 pub mod lits;
 pub mod lohkous;
+pub mod loop_special;
 pub mod masyu;
 pub mod moonsun;
 pub mod norinori;
