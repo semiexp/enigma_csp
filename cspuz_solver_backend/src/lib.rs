@@ -95,6 +95,8 @@ fn solve_puzz_link(puzzle_kind: String, url: &str) -> Result<Board, &'static str
         puzzle::ringring::solve_ringring(url)
     } else if puzzle_kind == "loopsp" {
         puzzle::loop_special::solve_loop_speical(url)
+    } else if puzzle_kind == "nagenawa" {
+        puzzle::nagenawa::solve_nagenawa(url)
     } else {
         Err("unknown puzzle type")
     }

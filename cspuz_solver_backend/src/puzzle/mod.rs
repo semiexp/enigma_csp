@@ -21,6 +21,7 @@ pub mod lohkous;
 pub mod loop_special;
 pub mod masyu;
 pub mod moonsun;
+pub mod nagenawa;
 pub mod norinori;
 pub mod nurikabe;
 pub mod nurimisaki;
