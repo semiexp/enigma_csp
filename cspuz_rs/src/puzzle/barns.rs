@@ -22,7 +22,11 @@ pub fn solve_barns(
     for y in 0..h {
         for x in 0..w {
             if icebarn[y][x] {
-                if x != 0 && x != w - 1 {
+                if x == 0 {
+                    solver.add_expr(!is_line.horizontal.at((y, x)));
+                } else if x == w - 1 {
+                    solver.add_expr(!is_line.horizontal.at((y, x - 1)));
+                } else {
                     solver.add_expr(
                         is_line
                             .horizontal
@@ -30,7 +34,11 @@ pub fn solve_barns(
                             .iff(is_line.horizontal.at((y, x))),
                     );
                 }
-                if y != 0 && y != h - 1 {
+                if y == 0 {
+                    solver.add_expr(!is_line.vertical.at((y, x)));
+                } else if y == h - 1 {
+                    solver.add_expr(!is_line.vertical.at((y - 1, x)));
+                } else {
                     solver.add_expr(
                         is_line
                             .vertical
