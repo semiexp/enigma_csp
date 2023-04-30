@@ -313,6 +313,14 @@ impl<T: Clone + PartialEq> Spaces<T> {
             maximum: from_base36('z' as u8).unwrap(),
         }
     }
+
+    pub fn new_with_maximum(space: T, minimum: char, maximum: char) -> Spaces<T> {
+        Spaces {
+            space,
+            minimum: from_base36(minimum as u8).unwrap(),
+            maximum: from_base36(maximum as u8).unwrap(),
+        }
+    }
 }
 
 impl<T: Clone + PartialEq> Combinator<T> for Spaces<T> {
@@ -838,11 +846,21 @@ where
 
 pub struct Size<S> {
     base_serializer: S,
+    offset: i32,
 }
 
 impl<S> Size<S> {
     pub fn new(base_serializer: S) -> Size<S> {
-        Size { base_serializer }
+        Size {
+            base_serializer,
+            offset: 0,
+        }
+    }
+    pub fn with_offset(base_serializer: S, offset: i32) -> Size<S> {
+        Size {
+            base_serializer,
+            offset,
+        }
     }
 }
 
@@ -855,10 +873,10 @@ where
         let width = ctx.width.unwrap();
 
         let mut ret = vec![];
-        let (_, app) = DecInt.serialize(ctx, &[width as i32])?;
+        let (_, app) = DecInt.serialize(ctx, &[width as i32 - self.offset])?;
         ret.extend(app);
         ret.push('/' as u8);
-        let (_, app) = DecInt.serialize(ctx, &[height as i32])?;
+        let (_, app) = DecInt.serialize(ctx, &[height as i32 - self.offset])?;
         ret.extend(app);
         ret.push('/' as u8);
 
@@ -873,12 +891,12 @@ where
 
         let width = sequencer.deserialize(ctx, DecInt)?;
         assert_eq!(width.len(), 1);
-        let width = width[0] as usize;
+        let width = (width[0] + self.offset) as usize;
         sequencer.deserialize(ctx, Dict::new((), "/"))?;
 
         let height = sequencer.deserialize(ctx, DecInt)?;
         assert_eq!(height.len(), 1);
-        let height = height[0] as usize;
+        let height = (height[0] + self.offset) as usize;
         sequencer.deserialize(ctx, Dict::new((), "/"))?;
 
         let ctx = Context {

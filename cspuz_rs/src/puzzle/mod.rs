@@ -18,6 +18,7 @@ pub mod hashi;
 pub mod herugolf;
 pub mod heyawake;
 pub mod icewalk;
+pub mod kouchoku;
 pub mod kropki;
 pub mod kurotto;
 pub mod lits;
