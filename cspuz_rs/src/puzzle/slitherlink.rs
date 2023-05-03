@@ -29,7 +29,7 @@ pub fn solve_slitherlink(
     solver.irrefutable_facts().map(|f| f.get(is_line))
 }
 
-struct SlitherlinkClueCombinator;
+pub struct SlitherlinkClueCombinator;
 
 impl Combinator<Option<i32>> for SlitherlinkClueCombinator {
     fn serialize(&self, _: &Context, input: &[Option<i32>]) -> Option<(usize, Vec<u8>)> {
