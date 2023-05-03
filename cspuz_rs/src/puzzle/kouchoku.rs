@@ -21,6 +21,12 @@ pub fn solve_kouchoku(clues: &[Vec<Option<i32>>]) -> Option<(Vec<(Pt, Pt)>, Vec<
             }
         }
     }
+    let mut num_points = vec![0; (max_num + 1) as usize];
+    for (_, n) in &points {
+        if *n >= 0 {
+            num_points[*n as usize] += 1;
+        }
+    }
 
     let mut g = graph::Graph::new(points.len());
     for i in 0..points.len() {
@@ -77,7 +83,9 @@ pub fn solve_kouchoku(clues: &[Vec<Option<i32>>]) -> Option<(Vec<(Pt, Pt)>, Vec<
         }
     }
     for i in 0..=(max_num as usize) {
-        solver.add_expr(count_true(&boundary[i]).eq(2));
+        if num_points[i] > 0 {
+            solver.add_expr(count_true(&boundary[i]).eq(2));
+        }
     }
 
     solver.irrefutable_facts().map(|f| {

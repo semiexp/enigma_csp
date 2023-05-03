@@ -36,6 +36,7 @@ pub enum ItemKind {
     PencilRight,
     Cross,
     Line,
+    DottedLine,
     DoubleLine,
     Wall,
     DottedHorizontalWall,
@@ -53,6 +54,7 @@ pub enum ItemKind {
     Compass(Compass),
     TapaClue([i32; 4]),
     SudokuCandidateSet(i32, Vec<i32>),
+    LineTo(i32, i32),
 }
 
 impl ItemKind {
@@ -83,6 +85,7 @@ impl ItemKind {
             &ItemKind::PencilRight => String::from("\"pencilRight\""),
             &ItemKind::Cross => String::from("\"cross\""),
             &ItemKind::Line => String::from("\"line\""),
+            &ItemKind::DottedLine => String::from("\"dottedLine\""),
             &ItemKind::DoubleLine => String::from("\"doubleLine\""),
             &ItemKind::Wall => String::from("\"wall\""),
             &ItemKind::BoldWall => String::from("\"boldWall\""),
@@ -128,6 +131,10 @@ impl ItemKind {
                     .map(|x| x.to_string())
                     .collect::<Vec<_>>()
                     .join(",")
+            ),
+            ItemKind::LineTo(dy, dx) => format!(
+                "{{\"kind\":\"lineTo\",\"destY\":{},\"destX\":{}}}",
+                *dy, *dx
             ),
         }
     }

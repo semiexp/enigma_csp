@@ -99,6 +99,8 @@ fn solve_puzz_link(puzzle_kind: String, url: &str) -> Result<Board, &'static str
         puzzle::nagenawa::solve_nagenawa(url)
     } else if puzzle_kind == "icewalk" {
         puzzle::icewalk::solve_icewalk(url)
+    } else if puzzle_kind == "kouchoku" {
+        puzzle::kouchoku::solve_kouchoku(url)
     } else {
         Err("unknown puzzle type")
     }
