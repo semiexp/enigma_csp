@@ -1566,4 +1566,34 @@ mod tests {
 
         tester.check();
     }
+
+    #[test]
+    fn test_integration_graph_division2() {
+        let mut tester = IntegrationTester::new();
+
+        let mut vars = vec![];
+        for _ in 0..10 {
+            vars.push(tester.new_bool_var().expr());
+        }
+
+        tester.add_expr(vars[5].clone());
+        tester.add_constraint(Stmt::GraphDivision(
+            vec![None; 8],
+            vec![
+                (0, 1),
+                (0, 3),
+                (1, 2),
+                (1, 4),
+                (2, 5),
+                (3, 4),
+                (3, 6),
+                (4, 5),
+                (4, 7),
+                (6, 7),
+            ],
+            vars,
+        ));
+
+        tester.check();
+    }
 }
