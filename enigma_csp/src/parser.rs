@@ -88,6 +88,7 @@ fn parse_to_tree(input: &str) -> Result<SyntaxTree, nom::error::Error<&str>> {
                 tag(")"),
             ),
             map(tag("graph-active-vertices-connected"), SyntaxTree::Ident),
+            map(tag("graph-division"), SyntaxTree::Ident),
             map(tag("extension-supports"), SyntaxTree::Ident),
             map(ident_or_op, SyntaxTree::Ident),
             map(digit1, |s: &str| SyntaxTree::Int(s.parse::<i32>().unwrap())), // TODO
@@ -208,6 +209,32 @@ pub fn parse<'a, 'b>(var_map: &'a VarMap, input: &'b str) -> ParseResult<'b> {
             })
             .collect::<Vec<_>>();
         ParseResult::Stmt(Stmt::ActiveVerticesConnected(vertices, edges))
+    } else if op_name == "graph-division" {
+        let num_vertices = child[1].as_usize();
+        let num_edges = child[2].as_usize();
+        assert_eq!(child.len(), 3 + num_vertices + num_edges * 3);
+
+        let vertices = (0..num_vertices)
+            .map(|i| {
+                if child[i + 3] == SyntaxTree::Ident("*") {
+                    None
+                } else {
+                    Some(parse_int_expr(var_map, &child[i + 3]))
+                }
+            })
+            .collect::<Vec<_>>();
+        let edges = (0..num_edges)
+            .map(|i| {
+                (
+                    child[i * 2 + 3 + num_vertices].as_usize(),
+                    child[i * 2 + 4 + num_vertices].as_usize(),
+                )
+            })
+            .collect::<Vec<_>>();
+        let edge_exprs = (0..num_edges)
+            .map(|i| parse_bool_expr(var_map, &child[i + 3 + num_vertices + num_edges * 2]))
+            .collect::<Vec<_>>();
+        ParseResult::Stmt(Stmt::GraphDivision(vertices, edges, edge_exprs))
     } else if op_name == "extension-supports" {
         assert_eq!(child.len(), 3);
         let mut vars = vec![];
