@@ -121,6 +121,8 @@ fn decode_and_solve(url: &[u8]) -> Result<Board, &'static str> {
                 puzzle::tricklayer::solve_tricklayer(url)
             } else if kudamono.puzzle_kind == "parrot-loop" {
                 puzzle::parrot_loop::solve_parrot_loop(url)
+            } else if kudamono.puzzle_kind == "crosswall" {
+                puzzle::crosswall::solve_crosswall(url)
             } else {
                 Err("unknown puzzle type")
             }

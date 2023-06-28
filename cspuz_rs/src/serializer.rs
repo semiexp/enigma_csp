@@ -100,6 +100,18 @@ impl<'a, T> Sequencer<'a, T> {
             None
         }
     }
+
+    pub fn peek(&mut self) -> Option<T>
+    where
+        T: Clone,
+    {
+        if self.n_read == self.input.len() {
+            None
+        } else {
+            self.n_read += 1;
+            Some(self.input[self.n_read - 1].clone())
+        }
+    }
 }
 
 impl<'a> Sequencer<'a, u8> {
@@ -1261,7 +1273,7 @@ where
     }
 }
 
-fn lexicographic_order(n: usize) -> Vec<usize> {
+pub fn lexicographic_order(n: usize) -> Vec<usize> {
     if n < 10 {
         return (0..n).collect();
     }
