@@ -41,6 +41,7 @@ pub mod simpleloop;
 pub mod slalom;
 pub mod slashpack;
 pub mod slitherlink;
+pub mod square_jam;
 pub mod stostone;
 pub mod sudoku;
 pub mod tapa;
