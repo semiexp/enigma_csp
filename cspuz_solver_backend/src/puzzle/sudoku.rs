@@ -9,12 +9,14 @@ pub fn solve_sudoku(url: &str) -> Result<Board, &'static str> {
     let width = ans[0].len();
     let mut board = Board::new(BoardKind::Grid, height, width);
 
-    let mut s = None;
-    for i in 2..=5 {
-        if i * i == height {
-            s = Some(i);
-        }
-    }
+    let (bh, bw) = match height {
+        4 => (2, 2),
+        6 => (2, 3),
+        9 => (3, 3),
+        16 => (4, 4),
+        25 => (5, 5),
+        _ => return Err("invalid size"),
+    };
 
     for y in 0..height {
         for x in 0..width {
@@ -29,37 +31,35 @@ pub fn solve_sudoku(url: &str) -> Result<Board, &'static str> {
                 }
                 if cands.len() == 1 {
                     board.push(Item::cell(y, x, "green", ItemKind::Num(cands[0])));
-                } else if let Some(s) = s {
+                } else {
                     board.push(Item::cell(
                         y,
                         x,
                         "green",
-                        ItemKind::SudokuCandidateSet(s as i32, cands),
+                        ItemKind::SudokuCandidateSet(bw as i32, cands),
                     ));
                 }
             }
         }
     }
-    if let Some(s) = s {
-        for x in 0..s {
-            for y in 0..height {
-                board.push(Item {
-                    y: 2 * y + 1,
-                    x: 2 * x * s,
-                    color: "black",
-                    kind: ItemKind::BoldWall,
-                });
-            }
+    for x in 0..bh {
+        for y in 0..height {
+            board.push(Item {
+                y: 2 * y + 1,
+                x: 2 * x * bw,
+                color: "black",
+                kind: ItemKind::BoldWall,
+            });
         }
-        for y in 0..s {
-            for x in 0..width {
-                board.push(Item {
-                    y: 2 * y * s,
-                    x: 2 * x + 1,
-                    color: "black",
-                    kind: ItemKind::BoldWall,
-                });
-            }
+    }
+    for y in 0..bw {
+        for x in 0..width {
+            board.push(Item {
+                y: 2 * y * bh,
+                x: 2 * x + 1,
+                color: "black",
+                kind: ItemKind::BoldWall,
+            });
         }
     }
 

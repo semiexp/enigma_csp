@@ -10,14 +10,14 @@ pub fn solve_sudoku(clues: &[Vec<Option<i32>>]) -> Option<Vec<Vec<Option<i32>>>>
         return None;
     }
     let n = h;
-    let mut s = None;
-    for i in 2..=5 {
-        if n == i * i {
-            s = Some(i);
-            break;
-        }
-    }
-    let s = s?;
+    let (bh, bw) = match n {
+        4 => (2, 2),
+        6 => (2, 3),
+        9 => (3, 3),
+        16 => (4, 4),
+        25 => (5, 5),
+        _ => return None,
+    };
 
     let mut solver = Solver::new();
     let num = &solver.int_var_2d((n, n), 1, n as i32);
@@ -27,9 +27,9 @@ pub fn solve_sudoku(clues: &[Vec<Option<i32>>]) -> Option<Vec<Vec<Option<i32>>>>
         solver.all_different(num.slice_fixed_y((i, ..)));
         solver.all_different(num.slice_fixed_x((.., i)));
     }
-    for i in 0..s {
-        for j in 0..s {
-            solver.all_different(num.slice((((i * s)..((i + 1) * s)), ((j * s)..((j + 1) * s)))));
+    for i in 0..bw {
+        for j in 0..bh {
+            solver.all_different(num.slice((((i * bh)..((i + 1) * bh)), ((j * bw)..((j + 1) * bw)))));
         }
     }
     for y in 0..n {
@@ -51,14 +51,14 @@ pub fn solve_sudoku_as_cands(clues: &[Vec<Option<i32>>]) -> Option<Vec<Vec<Vec<b
         return None;
     }
     let n = h;
-    let mut s = None;
-    for i in 2..=5 {
-        if n == i * i {
-            s = Some(i);
-            break;
-        }
-    }
-    let s = s?;
+    let (bh, bw) = match n {
+        4 => (2, 2),
+        6 => (2, 3),
+        9 => (3, 3),
+        16 => (4, 4),
+        25 => (5, 5),
+        _ => return None,
+    };
 
     let mut solver = Solver::new();
     let num = &solver.int_var_2d((n, n), 1, n as i32);
@@ -85,9 +85,9 @@ pub fn solve_sudoku_as_cands(clues: &[Vec<Option<i32>>]) -> Option<Vec<Vec<Vec<b
         solver.all_different(num.slice_fixed_y((i, ..)));
         solver.all_different(num.slice_fixed_x((.., i)));
     }
-    for i in 0..s {
-        for j in 0..s {
-            solver.all_different(num.slice((((i * s)..((i + 1) * s)), ((j * s)..((j + 1) * s)))));
+    for i in 0..bw {
+        for j in 0..bh {
+            solver.all_different(num.slice((((i * bh)..((i + 1) * bh)), ((j * bw)..((j + 1) * bw)))));
         }
     }
     for y in 0..n {
