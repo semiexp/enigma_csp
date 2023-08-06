@@ -1,6 +1,18 @@
 use std::env;
 use std::fs;
 
+fn cpp17_build() -> cc::Build {
+    let mut ret = cc::Build::new();
+
+    if ret.get_compiler().is_like_msvc() {
+        ret.flag("/std:c++17");
+    } else {
+        ret.flag("-std=c++17");
+    }
+
+    ret
+}
+
 fn build_glucose() {
     let arch = env::var("CARGO_CFG_TARGET_ARCH").unwrap();
 
@@ -26,19 +38,18 @@ fn build_glucose() {
     if arch == "wasm32" {
         // TODO: enigma_csp can be built for wasm32-unknown-emscripten target, but the produced
         // library is hard to use (only a .wasm file is generated without any glue .js files).
-        cc::Build::new()
+        cpp17_build()
             .cpp(true)
             .file("lib/glucose_bridge.cpp")
             .files(&build_target)
             .include("lib/glucose")
-            .flag("-std=c++17")
             .flag("-DGLUCOSE_FIX_OPTIONS")
             .flag("-DGLUCOSE_UNUSE_STDIO")
             .flag(puzzle_solver_minimal_flag)
             .warnings(false)
             .compile("calc");
     } else {
-        cc::Build::new()
+        cpp17_build()
             .cpp(true)
             .file("lib/glucose_bridge.cpp")
             .files(&build_target)
@@ -64,7 +75,7 @@ fn build_cadical() {
         }
     }
 
-    cc::Build::new()
+    cpp17_build()
         .cpp(true)
         .file("lib/cadical_bridge.cpp")
         .files(&build_target)
