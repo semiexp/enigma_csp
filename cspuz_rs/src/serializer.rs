@@ -2008,13 +2008,13 @@ mod tests {
     #[test]
     fn test_kudamono_url_info() {
         let url =
-            "https://pedros.works/paper-puzzle-player?W=13&H=12&L=x3x37x19x18x12&G=tricklayer";
+            "https://pedros.works/paper-puzzle-player?W=14x13&L=x11x23x110x16x18&G=tricklayer";
         let info = get_kudamono_url_info(url);
         assert!(info.is_some());
         let info = info.unwrap();
         assert_eq!(info.height, 13);
         assert_eq!(info.width, 14);
         assert_eq!(info.puzzle_kind, "tricklayer");
-        assert_eq!(info.content, "x3x37x19x18x12");
+        assert_eq!(info.content, "x11x23x110x16x18");
     }
 }

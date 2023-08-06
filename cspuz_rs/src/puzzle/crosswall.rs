@@ -269,7 +269,7 @@ mod tests {
     #[test]
     fn test_crosswall_serializer() {
         let problem = problem_for_tests();
-        let url = "https://pedros.works/paper-puzzle-player?W=4&H=4&L=(2)16(3)1(4)2(0)10(4)1(1)1(2)11(2)16(6)4&G=crosswall";
+        let url = "https://pedros.works/paper-puzzle-player?W=5x5&L=(2)16(3)1(4)2(0)10(4)1(1)1(2)11(2)16(6)4&G=crosswall";
         assert_eq!(deserialize_problem(url), Some(problem));
     }
 }
