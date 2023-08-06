@@ -1452,11 +1452,8 @@ where
         .1;
     let desc = String::from_utf8(desc).ok()?;
     let url = format!(
-        "https://pedros.works/paper-puzzle-player?W={}&H={}&L={}&G={}",
-        width - 1,
-        height - 1,
-        desc,
-        puzzle_kind
+        "https://pedros.works/paper-puzzle-player?W={}x{}&L={}&G={}",
+        width, height, desc, puzzle_kind
     );
     Some(url)
 }
