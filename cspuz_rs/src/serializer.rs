@@ -1426,9 +1426,12 @@ pub fn get_kudamono_url_info(url: &str) -> Option<KudamonoURLInfo> {
         }
 
         if kind == "W" {
-            width = Some(body[idx..end].parse::<usize>().ok()? + 1);
-        } else if kind == "H" {
-            height = Some(body[idx..end].parse::<usize>().ok()? + 1);
+            let wxh = &body[idx..end];
+            let x = wxh.find("x");
+            let w = idx + x?;
+            let h = idx + x? + 1;
+            width = Some(body[idx..w].parse::<usize>().ok()?);
+            height = Some(body[h..end].parse::<usize>().ok()?);
         } else if kind == "G" {
             puzzle_kind = Some(&body[idx..end]);
         } else if kind == "L" {
