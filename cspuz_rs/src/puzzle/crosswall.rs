@@ -1,6 +1,6 @@
 use super::util;
 use crate::graph;
-use crate::serializer::{get_kudamono_url_info, lexicographic_order, Context, DecInt, Sequencer};
+use crate::serializer::{get_kudamono_url_info, numeric_order, Context, DecInt, Sequencer};
 use crate::solver::{any, int_constant, Solver, TRUE};
 
 pub fn solve_crosswall(
@@ -170,10 +170,10 @@ pub fn deserialize_problem(url: &str) -> Option<Problem> {
     let mut sequencer = Sequencer::new(content);
     let mut pos = 0;
     let ctx = Context::new();
-    let y_ord0 = lexicographic_order(desc.height);
-    let y_ord2 = lexicographic_order(desc.height - 1);
+    let y_ord0 = numeric_order(desc.height);
+    let y_ord2 = numeric_order(desc.height - 1);
 
-    let x_ord_base = lexicographic_order(desc.width);
+    let x_ord_base = numeric_order(desc.width);
     let mut x_ord = vec![(0, 0)];
     for n in x_ord_base {
         // n, n + eps, n + 1 - eps
