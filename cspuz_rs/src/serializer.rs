@@ -1213,8 +1213,8 @@ where
         for y in 1..height {
             assert_eq!(data[y].len(), width);
         }
-        let y_ord = lexicographic_order(height);
-        let x_ord = lexicographic_order(width);
+        let y_ord = numeric_order(height);
+        let x_ord = numeric_order(width);
 
         let mut ret = vec![];
         let mut last_nonempty = 0;
@@ -1239,8 +1239,8 @@ where
     fn deserialize(&self, ctx: &Context, input: &[u8]) -> Option<(usize, Vec<Vec<Vec<T>>>)> {
         let height = ctx.height.unwrap();
         let width = ctx.width.unwrap();
-        let y_ord = lexicographic_order(height);
-        let x_ord = lexicographic_order(width);
+        let y_ord = numeric_order(height);
+        let x_ord = numeric_order(width);
 
         let mut ret = vec![];
         let mut row = vec![];
@@ -1273,29 +1273,8 @@ where
     }
 }
 
-pub fn lexicographic_order(n: usize) -> Vec<usize> {
-    if n < 10 {
-        return (0..n).collect();
-    }
-
-    let mut ret = vec![];
-    fn traverse(x: usize, lim: usize, res: &mut Vec<usize>) {
-        res.push(x);
-        for i in 0..10 {
-            if x == 0 && i == 0 {
-                continue;
-            }
-            let x2 = x * 10 + i;
-            if x2 < lim {
-                traverse(x2, lim, res);
-            } else {
-                break;
-            }
-        }
-    }
-
-    traverse(0, n, &mut ret);
-    ret
+pub fn numeric_order(n: usize) -> Vec<usize> {
+    return (0..n).collect();
 }
 
 pub fn problem_to_url_with_context<T, C>(
@@ -1988,21 +1967,13 @@ mod tests {
     }
 
     #[test]
-    fn test_lexicographic_order() {
-        assert_eq!(lexicographic_order(1), vec![0]);
-        assert_eq!(lexicographic_order(8), vec![0, 1, 2, 3, 4, 5, 6, 7]);
+    fn test_numeric_order() {
+        assert_eq!(numeric_order(1), vec![0]);
+        assert_eq!(numeric_order(8), vec![0, 1, 2, 3, 4, 5, 6, 7]);
         assert_eq!(
-            lexicographic_order(12),
-            vec![0, 1, 10, 11, 2, 3, 4, 5, 6, 7, 8, 9]
+            numeric_order(12),
+            vec![0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
         );
-
-        {
-            let long_seq = lexicographic_order(150);
-            // 0, 1, 10, 100, 101, ..., 109, 11, 110, 111, ..., 119, ...
-            assert_eq!(&long_seq[0..5], &[0, 1, 10, 100, 101]);
-            assert_eq!(long_seq[13], 11);
-            assert_eq!(long_seq[14], 110);
-        }
     }
 
     #[test]
