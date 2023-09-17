@@ -1588,6 +1588,7 @@ mod tests {
         }
     }
 
+    #[cfg(feature = "csp-extra-constraints")]
     #[test]
     fn test_normalization_circuit_1() {
         let mut tester = NormalizerTester::new();
