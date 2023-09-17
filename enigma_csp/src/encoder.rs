@@ -1501,6 +1501,7 @@ fn encode_linear_ge_mixed(env: &EncoderEnv, sum: &LinearSum) -> ClauseSet {
     encode_linear_ge_mixed_from_info(&info, sum.constant)
 }
 
+#[allow(unused)]
 /// Encode the equation "sum(info) + constant == 0" using encode_linear_ge_mixed_from_info twice.
 fn encode_linear_eq_mixed_from_info(mut info: Vec<LinearInfo>, constant: CheckedInt) -> ClauseSet {
     let mut ret = encode_linear_ge_mixed_from_info(&info, constant);
@@ -2601,6 +2602,7 @@ mod tests {
             v
         }
 
+        #[allow(unused)]
         fn add_int_var_log_encoding(&mut self, domain: Domain) -> IntVar {
             let v = self
                 .norm_vars
