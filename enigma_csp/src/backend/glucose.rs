@@ -1,4 +1,4 @@
-use std::ffi::CString;
+use std::ffi::{c_void, CString};
 use std::ops::Drop;
 use std::os::raw::c_char;
 
@@ -62,6 +62,7 @@ extern "C" {
 
 pub struct Solver {
     ptr: *mut Opaque,
+    custom_constraints: Vec<Box<Box<dyn CustomConstraint>>>,
 }
 
 const NUM_VAR_MAX: i32 = 0x3fffffff;
@@ -70,6 +71,7 @@ impl Solver {
     pub fn new() -> Solver {
         Solver {
             ptr: unsafe { Glucose_CreateSolver() },
+            custom_constraints: vec![],
         }
     }
 
@@ -248,6 +250,15 @@ impl Solver {
         res != 0
     }
 
+    pub fn add_custom_constraint(&mut self, constraint: Box<dyn CustomConstraint>) -> bool {
+        self.custom_constraints.push(Box::new(constraint));
+        let c: &Box<dyn CustomConstraint> =
+            &self.custom_constraints[self.custom_constraints.len() - 1];
+        let c = unsafe { std::mem::transmute::<_, *mut c_void>(c) };
+        let res = unsafe { Glucose_AddRustExtraConstraint(self.ptr, c) };
+        res != 0
+    }
+
     pub fn set_seed(&mut self, seed: f64) {
         unsafe {
             Glucose_Set_random_seed(self.ptr, seed);
@@ -302,6 +313,8 @@ impl Drop for Solver {
     }
 }
 
+const LIT_UNDEF: Lit = Lit(-2);
+
 #[derive(Clone, Copy)]
 pub struct Model<'a> {
     solver: &'a Solver,
@@ -312,6 +325,142 @@ impl<'a> Model<'a> {
         assert!(0 <= var.0 && var.0 < self.solver.num_var());
         unsafe { Glucose_GetModelValueVar(self.solver.ptr, var.0) != 0 }
     }
+}
+
+// Interface for implementing custom constraints in Rust
+
+extern "C" {
+    fn Glucose_AddRustExtraConstraint(solver: *mut Opaque, trait_object: *mut c_void) -> i32;
+    fn Glucose_CustomConstraintCopyReason(reason_vec: *mut c_void, n_lits: i32, lits: *const Lit);
+    fn Glucose_SolverValue(solver: *mut Opaque, lit: Lit) -> i32;
+    fn Glucose_SolverAddWatch(solver: *mut Opaque, lit: Lit, wrapper_object: *mut c_void);
+    fn Glucose_SolverEnqueue(solver: *mut Opaque, lit: Lit, wrapper_object: *mut c_void) -> i32;
+}
+
+#[derive(Clone, Copy)]
+pub struct SolverManipulator {
+    ptr: *mut Opaque,
+    wrapper_object: Option<*mut c_void>,
+}
+
+impl SolverManipulator {
+    pub unsafe fn value(&self, lit: Lit) -> Option<bool> {
+        let v = Glucose_SolverValue(self.ptr, lit);
+        match v {
+            0 => Some(true),
+            1 => Some(false),
+            2 => None,
+            _ => unreachable!(),
+        }
+    }
+
+    pub unsafe fn add_watch(&mut self, lit: Lit) {
+        assert!(self.wrapper_object.is_some());
+        Glucose_SolverAddWatch(self.ptr, lit, self.wrapper_object.unwrap());
+    }
+
+    pub unsafe fn enqueue(&mut self, lit: Lit) -> bool {
+        assert!(self.wrapper_object.is_some());
+        Glucose_SolverEnqueue(self.ptr, lit, self.wrapper_object.unwrap()) != 0
+    }
+}
+
+pub unsafe trait CustomConstraint {
+    fn initialize(&mut self, solver: SolverManipulator) -> bool;
+    fn propagate(&mut self, solver: SolverManipulator, p: Lit) -> bool;
+    fn calc_reason(
+        &mut self,
+        solver: SolverManipulator,
+        p: Option<Lit>,
+        extra: Option<Lit>,
+    ) -> Vec<Lit>;
+    fn undo(&mut self, solver: SolverManipulator, p: Lit);
+}
+
+#[no_mangle]
+extern "C" fn Glucose_CallCustomConstraintInitialize(
+    solver: *mut Opaque,
+    wrapper_object: *mut c_void,
+    trait_object: *mut c_void,
+) -> i32 {
+    let trait_object =
+        unsafe { std::mem::transmute::<_, &mut Box<dyn CustomConstraint>>(trait_object) };
+    let res = trait_object.initialize(SolverManipulator {
+        ptr: solver,
+        wrapper_object: Some(wrapper_object),
+    });
+    if res {
+        1
+    } else {
+        0
+    }
+}
+
+#[no_mangle]
+extern "C" fn Glucose_CallCustomConstraintPropagate(
+    solver: *mut Opaque,
+    wrapper_object: *mut c_void,
+    trait_object: *mut c_void,
+    p: Lit,
+) -> i32 {
+    let trait_object =
+        unsafe { std::mem::transmute::<_, &mut Box<dyn CustomConstraint>>(trait_object) };
+    let res = trait_object.propagate(
+        SolverManipulator {
+            ptr: solver,
+            wrapper_object: Some(wrapper_object),
+        },
+        p,
+    );
+    if res {
+        1
+    } else {
+        0
+    }
+}
+
+#[no_mangle]
+extern "C" fn Glucose_CallCustomConstraintCalcReason(
+    solver: *mut Opaque,
+    trait_object: *mut c_void,
+    p: Lit,
+    extra: Lit,
+    out_reason: *mut c_void,
+) {
+    let trait_object =
+        unsafe { std::mem::transmute::<_, &mut Box<dyn CustomConstraint>>(trait_object) };
+    let res = trait_object.calc_reason(
+        SolverManipulator {
+            ptr: solver,
+            wrapper_object: None,
+        },
+        if p != LIT_UNDEF { Some(p) } else { None },
+        if extra != LIT_UNDEF {
+            Some(extra)
+        } else {
+            None
+        },
+    );
+    unsafe {
+        Glucose_CustomConstraintCopyReason(out_reason, res.len() as i32, res.as_ptr());
+    }
+}
+
+#[no_mangle]
+extern "C" fn Glucose_CallCustomConstraintUndo(
+    solver: *mut Opaque,
+    trait_object: *mut c_void,
+    p: Lit,
+) {
+    let trait_object =
+        unsafe { std::mem::transmute::<_, &mut Box<dyn CustomConstraint>>(trait_object) };
+    trait_object.undo(
+        SolverManipulator {
+            ptr: solver,
+            wrapper_object: None,
+        },
+        p,
+    );
 }
 
 #[cfg(test)]
@@ -349,5 +498,191 @@ mod tests {
                 None => panic!(),
             }
         }
+    }
+
+    struct Xor {
+        vars: Vec<Var>,
+        values: Vec<Option<bool>>,
+        parity: bool,
+        n_undecided: usize,
+    }
+
+    impl Xor {
+        fn new(vars: Vec<Var>, parity: bool) -> Xor {
+            // This implementation is just for testing.
+            // For practical use, we need to add deduplication of literals.
+            let size = vars.len();
+            Xor {
+                vars,
+                values: vec![None; size],
+                parity,
+                n_undecided: size,
+            }
+        }
+
+        fn var_index(&self, var: Var) -> Option<usize> {
+            for i in 0..self.vars.len() {
+                if self.vars[i] == var {
+                    return Some(i);
+                }
+            }
+            None
+        }
+    }
+
+    unsafe impl CustomConstraint for Xor {
+        fn initialize(&mut self, mut solver: SolverManipulator) -> bool {
+            for &var in &self.vars {
+                unsafe {
+                    solver.add_watch(var.as_lit(false));
+                    solver.add_watch(var.as_lit(true));
+                }
+            }
+
+            for var in self.vars.clone() {
+                // TODO: this `clone` is just for silencing the borrow checker
+                if let Some(v) = unsafe { solver.value(var.as_lit(false)) } {
+                    let lit_sign = var.as_lit(!v);
+                    if !self.propagate(solver, lit_sign) {
+                        return false;
+                    }
+                }
+            }
+            true
+        }
+
+        fn propagate(&mut self, mut solver: SolverManipulator, p: Lit) -> bool {
+            let s = !p.is_negated();
+            let v = p.var();
+
+            let idx = self.var_index(v).unwrap();
+            assert!(self.values[idx].is_none());
+            self.values[idx] = Some(s);
+            self.parity ^= s;
+            assert_ne!(self.n_undecided, 0);
+            self.n_undecided -= 1;
+
+            if self.n_undecided == 0 {
+                if self.parity {
+                    return false;
+                }
+            } else if self.n_undecided == 1 {
+                for i in 0..self.vars.len() {
+                    if self.values[i].is_none() {
+                        if !unsafe { solver.enqueue(self.vars[i].as_lit(!self.parity)) } {
+                            return false;
+                        }
+                    }
+                }
+            }
+
+            true
+        }
+
+        fn calc_reason(
+            &mut self,
+            _: SolverManipulator,
+            p: Option<Lit>,
+            extra: Option<Lit>,
+        ) -> Vec<Lit> {
+            let mut ret = vec![];
+            for i in 0..self.vars.len() {
+                if let Some(v) = self.values[i] {
+                    ret.push(self.vars[i].as_lit(!v));
+                } else if p.is_none() && extra.is_some() {
+                    ret.push(self.vars[i].as_lit(self.parity));
+                }
+            }
+            assert_eq!(if p.is_some() { 1 } else { 0 } + ret.len(), self.vars.len());
+            ret
+        }
+
+        fn undo(&mut self, _: SolverManipulator, p: Lit) {
+            let v = p.var();
+
+            let idx = self.var_index(v).unwrap();
+            assert!(self.values[idx] == Some(!p.is_negated()));
+            self.parity ^= self.values[idx].unwrap();
+            self.values[idx] = None;
+            self.n_undecided += 1;
+        }
+    }
+
+    #[test]
+    fn test_custom_constraint_xor1() {
+        let mut solver = Solver::new();
+        let x = solver.new_var();
+        let y = solver.new_var();
+
+        assert!(solver.add_clause(&[Lit::new(x, false), Lit::new(y, true)]));
+        assert!(solver.add_custom_constraint(Box::new(Xor::new(vec![x, y], true))));
+        let model = solver.solve().unwrap();
+        assert!(model.assignment(x));
+        assert!(!model.assignment(y));
+    }
+
+    #[test]
+    fn test_custom_constraint_xor2() {
+        let mut solver = Solver::new();
+        let mut vars = vec![];
+        for _ in 0..10 {
+            vars.push(solver.new_var());
+        }
+
+        assert!(solver.add_custom_constraint(Box::new(Xor::new(
+            vec![vars[0], vars[1], vars[2], vars[3], vars[4]],
+            false
+        ))));
+        assert!(solver.add_custom_constraint(Box::new(Xor::new(
+            vec![vars[3], vars[4], vars[5], vars[6], vars[7]],
+            true
+        ))));
+        assert!(solver.add_custom_constraint(Box::new(Xor::new(
+            vec![vars[7], vars[8], vars[9], vars[0], vars[1]],
+            true
+        ))));
+
+        let mut n_assignments = 0;
+        loop {
+            match solver.solve() {
+                Some(model) => {
+                    n_assignments += 1;
+                    let mut new_clause = vec![];
+                    for &v in &vars {
+                        new_clause.push(v.as_lit(model.assignment(v)));
+                    }
+                    solver.add_clause(&new_clause);
+                }
+                None => break,
+            }
+        }
+
+        assert_eq!(n_assignments, 128);
+    }
+
+    #[test]
+    fn test_custom_constraint_xor3() {
+        let mut solver = Solver::new();
+        let mut vars = vec![];
+        for _ in 0..10 {
+            vars.push(solver.new_var());
+        }
+
+        assert!(solver.add_custom_constraint(Box::new(Xor::new(
+            vec![vars[0], vars[1], vars[2], vars[3], vars[4]],
+            false
+        ))));
+        assert!(solver.add_custom_constraint(Box::new(Xor::new(
+            vec![vars[3], vars[4], vars[5], vars[6], vars[7]],
+            true
+        ))));
+        assert!(solver.add_custom_constraint(Box::new(Xor::new(
+            vec![vars[7], vars[8], vars[9], vars[0], vars[1]],
+            true
+        ))));
+        assert!(
+            solver.add_custom_constraint(Box::new(Xor::new(vec![vars[2], vars[5], vars[6]], true)))
+        );
+        assert!(solver.solve().is_none());
     }
 }

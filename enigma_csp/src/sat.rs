@@ -6,7 +6,7 @@ use crate::backend::cadical;
 use crate::backend::external;
 use crate::backend::glucose;
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Var(pub(crate) i32);
 
 impl Var {
@@ -16,7 +16,7 @@ impl Var {
 }
 
 #[repr(C)]
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Lit(pub(crate) i32);
 
 impl Lit {

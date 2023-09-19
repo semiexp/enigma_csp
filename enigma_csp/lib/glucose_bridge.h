@@ -1,8 +1,25 @@
 #include <cstdint>
 
+#include "glucose/core/Constraint.h"
+
 namespace Glucose {
 
 struct Solver;
+
+class RustExtraConstraint : public Constraint {
+public:
+    RustExtraConstraint(void* trait_object) : trait_object_(trait_object) {}
+
+    ~RustExtraConstraint() override = default;
+
+    virtual bool initialize(Solver& solver) override;
+    virtual bool propagate(Solver& solver, Lit p) override;
+    virtual void calcReason(Solver& solver, Lit p, Lit extra, vec<Lit>& out_reason) override;
+    virtual void undo(Solver& solver, Lit p) override;
+
+private:
+    void* trait_object_;
+};
 
 }
 
@@ -23,5 +40,17 @@ int32_t Glucose_AddGraphDivision(Glucose::Solver* solver, int32_t n_vertices, co
 void Glucose_Set_random_seed(Glucose::Solver* solver, double random_seed);
 void Glucose_Set_rnd_init_act(Glucose::Solver* solver, int32_t rnd_init_act);
 void Glucose_Set_dump_analysis_info(Glucose::Solver* solver, int32_t value);
+
+int32_t Glucose_AddRustExtraConstraint(Glucose::Solver* solver, void* trait_object);
+void Glucose_CustomConstraintCopyReason(void* reason_vec, int32_t n_lits, int32_t* lits);
+int32_t Glucose_SolverValue(Glucose::Solver* solver, int32_t lit);
+void Glucose_SolverAddWatch(Glucose::Solver* solver, int32_t lit, void* wrapper_object);
+int32_t Glucose_SolverEnqueue(Glucose::Solver* solver, int32_t lit, void* wrapper_object);
+
+// Implement functions below in Rust
+int32_t Glucose_CallCustomConstraintInitialize(Glucose::Solver* solver, void* wrapper_object, void* trait_object);
+int32_t Glucose_CallCustomConstraintPropagate(Glucose::Solver* solver, void* wrapper_object, void* trait_object, int32_t p);
+void Glucose_CallCustomConstraintCalcReason(Glucose::Solver* solver, void* trait_object, int32_t p, int32_t extra, void* out_reason);
+void Glucose_CallCustomConstraintUndo(Glucose::Solver* solver, void* trait_object, int32_t p);
 
 }

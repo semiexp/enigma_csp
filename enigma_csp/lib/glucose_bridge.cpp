@@ -6,6 +6,27 @@
 #include "constraints/GraphDivision.h"
 #include "constraints/OrderEncodingLinear.h"
 
+namespace Glucose {
+
+bool RustExtraConstraint::initialize(Solver& solver) {
+    return Glucose_CallCustomConstraintInitialize(&solver, this, trait_object_) != 0;
+}
+
+bool RustExtraConstraint::propagate(Solver& solver, Lit p) {
+    solver.registerUndo(var(p), this);
+    return Glucose_CallCustomConstraintPropagate(&solver, this, trait_object_, p.x) != 0;
+}
+
+void RustExtraConstraint::calcReason(Solver& solver, Lit p, Lit extra, vec<Lit>& out_reason) {
+    Glucose_CallCustomConstraintCalcReason(&solver, trait_object_, p.x, extra.x, &out_reason);
+}
+
+void RustExtraConstraint::undo(Solver& solver, Lit p) {
+    Glucose_CallCustomConstraintUndo(&solver, trait_object_, p.x);
+}
+
+}
+
 extern "C" {
 
 Glucose::Solver* Glucose_CreateSolver() {
@@ -154,6 +175,29 @@ void Glucose_Set_rnd_init_act(Glucose::Solver* solver, int32_t rnd_init_act) {
 
 void Glucose_Set_dump_analysis_info(Glucose::Solver* solver, int32_t value) {
     solver->dump_analysis_info = value != 0;
+}
+
+int32_t Glucose_AddRustExtraConstraint(Glucose::Solver* solver, void* trait_object) {
+    return solver->addConstraint(std::make_unique<Glucose::RustExtraConstraint>(trait_object)) ? 1 : 0;
+}
+
+void Glucose_CustomConstraintCopyReason(void* reason_vec, int32_t n_lits, int32_t* lits) {
+    Glucose::vec<Glucose::Lit>* v = static_cast<Glucose::vec<Glucose::Lit>*>(reason_vec);
+    for (int i = 0; i < n_lits; ++i) {
+        v->push(Glucose::Lit{lits[i]});
+    }
+}
+
+int32_t Glucose_SolverValue(Glucose::Solver* solver, int32_t lit) {
+    return Glucose::toInt(solver->value(Glucose::Lit{lit}));
+}
+
+void Glucose_SolverAddWatch(Glucose::Solver* solver, int32_t lit, void* wrapper_object) {
+    solver->addWatch(Glucose::Lit{lit}, static_cast<Glucose::Constraint*>(wrapper_object));
+}
+
+int32_t Glucose_SolverEnqueue(Glucose::Solver* solver, int32_t lit, void* wrapper_object) {
+    return solver->enqueue(Glucose::Lit{lit}, static_cast<Glucose::Constraint*>(wrapper_object)) ? 1 : 0;
 }
 
 }
