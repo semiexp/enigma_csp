@@ -16,7 +16,7 @@ impl Var {
 }
 
 #[repr(C)]
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Lit(pub(crate) i32);
 
 impl Lit {
@@ -63,6 +63,13 @@ pub enum Backend {
     Glucose,
     External,
     CaDiCaL,
+}
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub enum OrderEncodingLinearMode {
+    Cpp,
+    Rust,
+    RustOptimized,
 }
 
 impl SAT {
@@ -207,6 +214,20 @@ impl SAT {
             #[cfg(feature = "backend-external")]
             SAT::External(_) => {
                 panic!("add_order_encoding_linear is not supported in external backend")
+            }
+            #[cfg(feature = "backend-cadical")]
+            SAT::CaDiCaL(_) => todo!(),
+        }
+    }
+
+    pub fn set_order_encoding_linear_mode(&mut self, mode: OrderEncodingLinearMode) {
+        match self {
+            SAT::Glucose(solver) => {
+                solver.set_order_encoding_linear_mode(mode);
+            }
+            #[cfg(feature = "backend-external")]
+            SAT::External(_) => {
+                panic!("set_order_encoding_linear_mode is not supported in external backend")
             }
             #[cfg(feature = "backend-cadical")]
             SAT::CaDiCaL(_) => todo!(),

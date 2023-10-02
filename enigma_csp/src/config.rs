@@ -1,4 +1,4 @@
-use crate::sat::Backend;
+use crate::sat::{Backend, OrderEncodingLinearMode};
 
 #[derive(Clone, Copy)]
 pub struct Config {
@@ -19,6 +19,7 @@ pub struct Config {
     pub glucose_rnd_init_act: bool,
     pub dump_analysis_info: bool,
     pub backend: Backend,
+    pub order_encoding_linear_mode: OrderEncodingLinearMode,
     pub verbose: bool,
 }
 
@@ -54,6 +55,7 @@ impl Config {
             glucose_rnd_init_act: false,
             dump_analysis_info: false,
             backend: Backend::Glucose,
+            order_encoding_linear_mode: OrderEncodingLinearMode::Cpp,
             verbose: false,
         }
     }
@@ -150,6 +152,12 @@ impl Config {
         opts.optopt("", "native-linear-encoding-domain-product", "Specify the minimum domain product of linear sums which are encoded by the native linear constraint.", "DOMAIN_PRODUCT");
 
         opts.optopt("", "backend", "Specify the SAT backend", "BACKEND");
+        opts.optopt(
+            "",
+            "order-encoding-linear-mode",
+            "Specify the implementation kind used for native linear constraints",
+            "MODE",
+        );
 
         opts.optflag("h", "help", "Display this help");
 
@@ -234,6 +242,18 @@ impl Config {
                 config.backend = Backend::CaDiCaL;
             } else {
                 println!("error: unknown backend: {}", s);
+                std::process::exit(1);
+            }
+        }
+        if let Some(s) = matches.opt_str("order-encoding-linear-mode") {
+            if s == "cpp" {
+                config.order_encoding_linear_mode = OrderEncodingLinearMode::Cpp;
+            } else if s == "rust" {
+                config.order_encoding_linear_mode = OrderEncodingLinearMode::Rust;
+            } else if s == "rust-optimized" {
+                config.order_encoding_linear_mode = OrderEncodingLinearMode::RustOptimized;
+            } else {
+                println!("error: unknown linear implementation: {}", s);
                 std::process::exit(1);
             }
         }
