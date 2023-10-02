@@ -1,8 +1,10 @@
 use std::collections::HashMap;
 
+use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 
 use crate::config::Config;
+use crate::sat::{Backend, OrderEncodingLinearMode};
 
 #[cfg(feature = "parser")]
 use crate::csugar_cli::csugar_cli;
@@ -154,6 +156,60 @@ impl PyConfig {
     #[setter]
     fn set_verbose(&mut self, value: bool) -> PyResult<()> {
         self.config.verbose = value;
+        Ok(())
+    }
+
+    #[getter]
+    fn get_backend(&self) -> PyResult<String> {
+        let mode = match self.config.backend {
+            Backend::Glucose => "glucose",
+            Backend::CaDiCaL => "cadical",
+            Backend::External => "external",
+        };
+        Ok(mode.to_owned())
+    }
+
+    #[setter]
+    fn set_backend(&mut self, backend: String) -> PyResult<()> {
+        if backend == "glucose" {
+            self.config.backend = Backend::Glucose;
+        } else if backend == "cadical" {
+            self.config.backend = Backend::CaDiCaL;
+        } else if backend == "external" {
+            self.config.backend = Backend::External;
+        } else {
+            return Err(PyErr::new::<PyValueError, _>(format!(
+                "unknown backend: {}",
+                backend
+            )));
+        }
+        Ok(())
+    }
+
+    #[getter]
+    fn get_order_encoding_linear_mode(&self) -> PyResult<String> {
+        let mode = match self.config.order_encoding_linear_mode {
+            OrderEncodingLinearMode::Cpp => "cpp",
+            OrderEncodingLinearMode::Rust => "rust",
+            OrderEncodingLinearMode::RustOptimized => "rust-optimized",
+        };
+        Ok(mode.to_owned())
+    }
+
+    #[setter]
+    fn set_order_encoding_linear_mode(&mut self, mode: String) -> PyResult<()> {
+        if mode == "cpp" {
+            self.config.order_encoding_linear_mode = OrderEncodingLinearMode::Cpp;
+        } else if mode == "rust" {
+            self.config.order_encoding_linear_mode = OrderEncodingLinearMode::Rust;
+        } else if mode == "rust-optimized" {
+            self.config.order_encoding_linear_mode = OrderEncodingLinearMode::RustOptimized;
+        } else {
+            return Err(PyErr::new::<PyValueError, _>(format!(
+                "unknown linear implementation: {}",
+                mode
+            )));
+        }
         Ok(())
     }
 }
