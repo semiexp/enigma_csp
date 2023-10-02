@@ -680,9 +680,10 @@ mod tests {
             vec![vars[7], vars[8], vars[9], vars[0], vars[1]],
             true
         ))));
-        assert!(
-            solver.add_custom_constraint(Box::new(Xor::new(vec![vars[2], vars[5], vars[6]], true)))
-        );
+        assert!(solver.add_custom_constraint(Box::new(Xor::new(
+            vec![vars[2], vars[5], vars[6], vars[8], vars[9]],
+            true
+        ))));
         assert!(solver.solve().is_none());
     }
 }
