@@ -29,7 +29,8 @@ pub fn solve_sudoku(clues: &[Vec<Option<i32>>]) -> Option<Vec<Vec<Option<i32>>>>
     }
     for i in 0..bw {
         for j in 0..bh {
-            solver.all_different(num.slice((((i * bh)..((i + 1) * bh)), ((j * bw)..((j + 1) * bw)))));
+            solver
+                .all_different(num.slice((((i * bh)..((i + 1) * bh)), ((j * bw)..((j + 1) * bw)))));
         }
     }
     for y in 0..n {
@@ -87,7 +88,8 @@ pub fn solve_sudoku_as_cands(clues: &[Vec<Option<i32>>]) -> Option<Vec<Vec<Vec<b
     }
     for i in 0..bw {
         for j in 0..bh {
-            solver.all_different(num.slice((((i * bh)..((i + 1) * bh)), ((j * bw)..((j + 1) * bw)))));
+            solver
+                .all_different(num.slice((((i * bh)..((i + 1) * bh)), ((j * bw)..((j + 1) * bw)))));
         }
     }
     for y in 0..n {
