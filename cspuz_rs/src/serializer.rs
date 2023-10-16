@@ -1385,8 +1385,19 @@ pub struct KudamonoURLInfo<'a> {
     pub content: &'a str,
 }
 
+pub fn get_kudamono_url_body(url: &str) -> Option<&str> {
+    if url.find("pedros.works").is_none() {
+        None
+    } else if url.find("?").is_none() {
+        None
+    } else {
+        let i = url.find("?")? + 1;
+        return url.get(i..);
+    }
+}
+
 pub fn get_kudamono_url_info(url: &str) -> Option<KudamonoURLInfo> {
-    let body = url.strip_prefix("https://pedros.works/paper-puzzle-player?")?;
+    let body = get_kudamono_url_body(url)?;
     let mut idx = 0;
 
     let mut height: Option<usize> = None;
@@ -2019,5 +2030,15 @@ mod tests {
         assert_eq!(info.width, 14);
         assert_eq!(info.puzzle_kind, "tricklayer");
         assert_eq!(info.content, "x3x37x19x18x12");
+
+        let url =
+            "file:///C://somefolder/pedros.works/paper-puzzle-player.html?W=4&H=4&L=x5&G=anygenre";
+        let info = get_kudamono_url_info(url);
+        assert!(info.is_some());
+        let info = info.unwrap();
+        assert_eq!(info.height, 5);
+        assert_eq!(info.width, 5);
+        assert_eq!(info.puzzle_kind, "anygenre");
+        assert_eq!(info.content, "x5");
     }
 }
