@@ -206,6 +206,22 @@ impl BoolGridEdges {
         }
     }
 
+    pub fn as_sequence(&self) -> BoolVarArray1D {
+        let (height, width) = self.base_shape();
+        let mut edges = vec![];
+        for y in 0..=height {
+            for x in 0..=width {
+                if y < height {
+                    edges.push(self.vertical.at((y, x)));
+                }
+                if x < width {
+                    edges.push(self.horizontal.at((y, x)));
+                }
+            }
+        }
+        BoolVarArray1D::new(edges)
+    }
+
     pub fn representation(&self) -> (Vec<BoolVar>, Graph) {
         let (height, width) = self.base_shape();
 

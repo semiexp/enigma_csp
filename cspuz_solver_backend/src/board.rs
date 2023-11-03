@@ -8,6 +8,14 @@ pub struct Compass {
     pub right: Option<i32>,
 }
 
+#[derive(PartialEq, Eq)]
+pub enum FireflyDir {
+    Up,
+    Down,
+    Left,
+    Right,
+}
+
 #[allow(unused)]
 #[derive(PartialEq, Eq)]
 pub enum ItemKind {
@@ -39,6 +47,7 @@ pub enum ItemKind {
     DottedLine,
     DoubleLine,
     Wall,
+    DottedWall,
     DottedHorizontalWall,
     DottedVerticalWall,
     BoldWall,
@@ -54,6 +63,7 @@ pub enum ItemKind {
     Compass(Compass),
     TapaClue([i32; 4]),
     SudokuCandidateSet(i32, Vec<i32>),
+    Firefly(FireflyDir, i32),
     LineTo(i32, i32),
 }
 
@@ -89,6 +99,7 @@ impl ItemKind {
             &ItemKind::DoubleLine => String::from("\"doubleLine\""),
             &ItemKind::Wall => String::from("\"wall\""),
             &ItemKind::BoldWall => String::from("\"boldWall\""),
+            &ItemKind::DottedWall => String::from("\"dottedWall\""),
             &ItemKind::Slash => String::from("\"slash\""),
             &ItemKind::Backslash => String::from("\"backslash\""),
             &ItemKind::Plus => String::from("\"plus\""),
@@ -131,6 +142,16 @@ impl ItemKind {
                     .map(|x| x.to_string())
                     .collect::<Vec<_>>()
                     .join(",")
+            ),
+            ItemKind::Firefly(dir, n) => format!(
+                "{{\"kind\":\"firefly\",\"dot\":\"{}\",\"value\":{}}}",
+                match *dir {
+                    FireflyDir::Up => "up",
+                    FireflyDir::Down => "down",
+                    FireflyDir::Left => "left",
+                    FireflyDir::Right => "right",
+                },
+                n
             ),
             ItemKind::LineTo(dy, dx) => format!(
                 "{{\"kind\":\"lineTo\",\"destY\":{},\"destX\":{}}}",

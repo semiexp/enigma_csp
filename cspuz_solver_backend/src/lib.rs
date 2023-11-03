@@ -105,6 +105,8 @@ fn solve_puzz_link(puzzle_kind: String, url: &str) -> Result<Board, &'static str
         puzzle::creek::solve_creek(url)
     } else if puzzle_kind == "squarejam" {
         puzzle::square_jam::solve_square_jam(url)
+    } else if puzzle_kind == "firefly" {
+        puzzle::firefly::solve_firefly(url)
     } else {
         Err("unknown puzzle type")
     }

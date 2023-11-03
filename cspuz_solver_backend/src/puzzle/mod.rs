@@ -12,6 +12,7 @@ pub mod creek;
 pub mod crosswall;
 pub mod curvedata;
 pub mod fillomino;
+pub mod firefly;
 pub mod fivecells;
 pub mod hashi;
 pub mod herugolf;
