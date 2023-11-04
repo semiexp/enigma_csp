@@ -311,6 +311,46 @@ where
     }
 }
 
+pub struct PrefixAndSuffix<C>(Vec<u8>, C, Vec<u8>);
+
+impl<C> PrefixAndSuffix<C> {
+    pub fn new<A1, A2>(prefix: A1, combinator: C, suffix: A2) -> PrefixAndSuffix<C>
+    where
+        Vec<u8>: From<A1>,
+        Vec<u8>: From<A2>,
+    {
+        PrefixAndSuffix(Vec::<u8>::from(prefix), combinator, Vec::<u8>::from(suffix))
+    }
+}
+
+impl<T, C> Combinator<T> for PrefixAndSuffix<C>
+where
+    C: Combinator<T>,
+{
+    fn serialize(&self, ctx: &Context, input: &[T]) -> Option<(usize, Vec<u8>)> {
+        let mut ret = self.0.clone();
+        let (n_read, ext) = self.1.serialize(ctx, input)?;
+        ret.extend(ext);
+        ret.extend(self.2.clone());
+
+        Some((n_read, ret))
+    }
+
+    fn deserialize(&self, ctx: &Context, input: &[u8]) -> Option<(usize, Vec<T>)> {
+        if input.len() < self.0.len() || input[..self.0.len()] != self.0 {
+            return None;
+        }
+        let input = &input[self.0.len()..];
+        let (n_read, res) = self.1.deserialize(ctx, input)?;
+        let input = &input[n_read..];
+        if input.len() < self.2.len() || input[..self.2.len()] != self.2 {
+            return None;
+        }
+
+        Some((self.0.len() + n_read + self.2.len(), res))
+    }
+}
+
 pub struct Spaces<T: Clone + PartialEq> {
     space: T,
     minimum: i32,
@@ -1686,6 +1726,25 @@ mod tests {
             combinator.deserialize(ctx, "!!c".as_bytes()),
             Some((3, vec![12]))
         );
+    }
+
+    #[test]
+    fn test_prefix_and_suffix() {
+        let ctx = &Context::new();
+        let combinator = PrefixAndSuffix::new("(", DecInt, ")");
+
+        assert_eq!(combinator.serialize(ctx, &[]), None);
+        assert_eq!(
+            combinator.serialize(ctx, &[42]),
+            Some((1, Vec::from("(42)")))
+        );
+        assert_eq!(combinator.deserialize(ctx, "".as_bytes()), None);
+        assert_eq!(
+            combinator.deserialize(ctx, "(42)".as_bytes()),
+            Some((4, vec![42]))
+        );
+        assert_eq!(combinator.deserialize(ctx, "42".as_bytes()), None);
+        assert_eq!(combinator.deserialize(ctx, "(42".as_bytes()), None);
     }
 
     #[test]
