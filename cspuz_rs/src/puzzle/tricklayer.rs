@@ -148,13 +148,18 @@ mod tests {
 
     #[test]
     fn test_tricklayer_serializer() {
-        let problem = problem_for_tests();
-        let url = "https://pedros.works/paper-puzzle-player?W=4&H=3&L=x1x2x8x7x1&G=tricklayer";
-        crate::puzzle::util::tests::serializer_test(
-            problem,
-            url,
-            serialize_problem,
-            deserialize_problem,
-        );
+        // v1
+        {
+            let problem = problem_for_tests();
+            let url = "https://pedros.works/paper-puzzle-player?W=4&H=3&L=x1x2x8x7x1&G=tricklayer";
+            assert_eq!(deserialize_problem(url), Some(problem));
+        }
+
+        // v2
+        {
+            let problem = problem_for_tests();
+            let url = "https://pedros.works/paper-puzzle-player?W=5x4&L=x1x2x8x7x1&G=tricklayer";
+            util::tests::serializer_test(problem, url, serialize_problem, deserialize_problem);
+        }
     }
 }

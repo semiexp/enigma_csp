@@ -267,13 +267,8 @@ pub fn deserialize_problem(url: &str) -> Option<Problem> {
         Box::new(Spaces::new(PieceId::None, 'g')),
         Box::new(Dict::new(PieceId::Block, "=")),
     ]));
-    let (_, mut piece_id) = piece_id_combinator.deserialize(
-        &Context {
-            height: Some(h),
-            width: Some(w),
-        },
-        toks[3].as_bytes(),
-    )?;
+    let (_, mut piece_id) =
+        piece_id_combinator.deserialize(&Context::sized(h, w), toks[3].as_bytes())?;
     assert_eq!(piece_id.len(), 1);
     let piece_id = piece_id.swap_remove(0);
 
@@ -282,13 +277,7 @@ pub fn deserialize_problem(url: &str) -> Option<Problem> {
     let offset;
     if toks[4].as_bytes()[0] == 'b' as u8 {
         let mut tmp = Rooms
-            .deserialize(
-                &Context {
-                    height: Some(h),
-                    width: Some(w),
-                },
-                &toks[4].as_bytes()[1..],
-            )?
+            .deserialize(&Context::sized(h, w), &toks[4].as_bytes()[1..])?
             .1;
         assert_eq!(tmp.len(), 1);
         borders = Some(tmp.swap_remove(0));

@@ -42,6 +42,7 @@ pub fn from_base16(c: u8) -> Option<i32> {
 pub struct Context {
     pub height: Option<usize>,
     pub width: Option<usize>,
+    pub kudamono_v2: Option<bool>,
 }
 
 impl Context {
@@ -49,6 +50,7 @@ impl Context {
         Context {
             height: None,
             width: None,
+            kudamono_v2: None,
         }
     }
 
@@ -56,6 +58,15 @@ impl Context {
         Context {
             height: Some(height),
             width: Some(width),
+            kudamono_v2: None,
+        }
+    }
+
+    pub fn sized_with_kudamono_mode(height: usize, width: usize, kudamono_v2: bool) -> Context {
+        Context {
+            height: Some(height),
+            width: Some(width),
+            kudamono_v2: Some(kudamono_v2),
         }
     }
 }
@@ -1253,8 +1264,8 @@ where
         for y in 1..height {
             assert_eq!(data[y].len(), width);
         }
-        let y_ord = lexicographic_order(height);
-        let x_ord = lexicographic_order(width);
+        let y_ord = kudamono_order(height, ctx.kudamono_v2?);
+        let x_ord = kudamono_order(width, ctx.kudamono_v2?);
 
         let mut ret = vec![];
         let mut last_nonempty = 0;
@@ -1279,8 +1290,8 @@ where
     fn deserialize(&self, ctx: &Context, input: &[u8]) -> Option<(usize, Vec<Vec<Vec<T>>>)> {
         let height = ctx.height.unwrap();
         let width = ctx.width.unwrap();
-        let y_ord = lexicographic_order(height);
-        let x_ord = lexicographic_order(width);
+        let y_ord = kudamono_order(height, ctx.kudamono_v2?);
+        let x_ord = kudamono_order(width, ctx.kudamono_v2?);
 
         let mut ret = vec![];
         let mut row = vec![];
@@ -1313,7 +1324,7 @@ where
     }
 }
 
-pub fn lexicographic_order(n: usize) -> Vec<usize> {
+fn lexicographic_order(n: usize) -> Vec<usize> {
     if n < 10 {
         return (0..n).collect();
     }
@@ -1336,6 +1347,18 @@ pub fn lexicographic_order(n: usize) -> Vec<usize> {
 
     traverse(0, n, &mut ret);
     ret
+}
+
+fn numeric_order(n: usize) -> Vec<usize> {
+    return (0..n).collect();
+}
+
+pub fn kudamono_order(n: usize, encoding_v2: bool) -> Vec<usize> {
+    if encoding_v2 {
+        numeric_order(n)
+    } else {
+        lexicographic_order(n)
+    }
 }
 
 pub fn problem_to_url_with_context<T, C>(
@@ -1423,6 +1446,7 @@ pub struct KudamonoURLInfo<'a> {
     pub width: usize,
     pub puzzle_kind: &'a str,
     pub content: &'a str,
+    pub encoding_v2: bool,
 }
 
 pub fn get_kudamono_url_info(url: &str) -> Option<KudamonoURLInfo> {
@@ -1433,6 +1457,7 @@ pub fn get_kudamono_url_info(url: &str) -> Option<KudamonoURLInfo> {
     let mut width: Option<usize> = None;
     let mut puzzle_kind: Option<&str> = None;
     let mut content: Option<&str> = None;
+    let mut encoding_v2: Option<bool> = None;
 
     while idx < body.len() {
         let kind = &body[idx..=idx];
@@ -1447,8 +1472,38 @@ pub fn get_kudamono_url_info(url: &str) -> Option<KudamonoURLInfo> {
         }
 
         if kind == "W" {
-            width = Some(body[idx..end].parse::<usize>().ok()? + 1);
+            let wxh = &body[idx..end];
+            let x = wxh.find("x");
+            match x {
+                Some(x) => {
+                    if encoding_v2 == Some(false) {
+                        return None;
+                    }
+                    encoding_v2 = Some(true);
+                    let w = idx + x;
+                    let h = idx + x + 1;
+                    width = Some(body[idx..w].parse::<usize>().ok()?);
+                    height = Some(body[h..end].parse::<usize>().ok()?);
+                }
+                None => {
+                    if width.is_some() {
+                        return None;
+                    }
+                    if encoding_v2 == Some(true) {
+                        return None;
+                    }
+                    encoding_v2 = Some(false);
+                    width = Some(body[idx..end].parse::<usize>().ok()? + 1);
+                }
+            }
         } else if kind == "H" {
+            if height.is_some() {
+                return None;
+            }
+            if encoding_v2 == Some(true) {
+                return None;
+            }
+            encoding_v2 = Some(false);
             height = Some(body[idx..end].parse::<usize>().ok()? + 1);
         } else if kind == "G" {
             puzzle_kind = Some(&body[idx..end]);
@@ -1464,6 +1519,7 @@ pub fn get_kudamono_url_info(url: &str) -> Option<KudamonoURLInfo> {
         width: width?,
         puzzle_kind: puzzle_kind?,
         content: content.unwrap_or(""),
+        encoding_v2: encoding_v2?,
     })
 }
 
@@ -1471,7 +1527,7 @@ pub fn kudamono_url_info_to_problem<T, C>(combinator: C, info: KudamonoURLInfo) 
 where
     C: Combinator<T>,
 {
-    let ctx = Context::sized(info.height, info.width);
+    let ctx = Context::sized_with_kudamono_mode(info.height, info.width, info.encoding_v2);
     let (_, mut problem) = combinator.deserialize(&ctx, info.content.as_bytes())?;
     assert_eq!(problem.len(), 1);
     problem.pop()
@@ -1487,16 +1543,17 @@ pub fn problem_to_kudamono_url<T, C>(
 where
     C: Combinator<T>,
 {
+    // In serialization, we always use v2 encoding
     let desc = combinator
-        .serialize(&Context::sized(height, width), &[problem])?
+        .serialize(
+            &Context::sized_with_kudamono_mode(height, width, true),
+            &[problem],
+        )?
         .1;
     let desc = String::from_utf8(desc).ok()?;
     let url = format!(
-        "https://pedros.works/paper-puzzle-player?W={}&H={}&L={}&G={}",
-        width - 1,
-        height - 1,
-        desc,
-        puzzle_kind
+        "https://pedros.works/paper-puzzle-player?W={}x{}&L={}&G={}",
+        width, height, desc, puzzle_kind
     );
     Some(url)
 }
@@ -1892,7 +1949,7 @@ mod tests {
         let combinator = KudamonoGrid::new(Dict::new(true, "x"), false);
 
         {
-            let ctx = &Context::sized(4, 5);
+            let ctx = &Context::sized_with_kudamono_mode(4, 5, false);
             assert_eq!(
                 combinator.deserialize(ctx, "".as_bytes()),
                 Some((
@@ -1934,7 +1991,7 @@ mod tests {
             );
         }
         {
-            let ctx = &Context::sized(13, 14);
+            let ctx = &Context::sized_with_kudamono_mode(13, 14, false);
             let deserialized = combinator.deserialize(ctx, "x3x37x19x18x12".as_bytes());
             assert!(deserialized.is_some());
             let (n, deserialized) = deserialized.unwrap();
@@ -2054,8 +2111,8 @@ mod tests {
         assert_eq!(lexicographic_order(1), vec![0]);
         assert_eq!(lexicographic_order(8), vec![0, 1, 2, 3, 4, 5, 6, 7]);
         assert_eq!(
-            lexicographic_order(12),
-            vec![0, 1, 10, 11, 2, 3, 4, 5, 6, 7, 8, 9]
+            numeric_order(12),
+            vec![0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
         );
 
         {
@@ -2068,15 +2125,38 @@ mod tests {
     }
 
     #[test]
+    fn test_numeric_order() {
+        assert_eq!(numeric_order(1), vec![0]);
+        assert_eq!(numeric_order(8), vec![0, 1, 2, 3, 4, 5, 6, 7]);
+        assert_eq!(
+            numeric_order(12),
+            vec![0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
+        );
+    }
+
+    #[test]
     fn test_kudamono_url_info() {
-        let url =
-            "https://pedros.works/paper-puzzle-player?W=13&H=12&L=x3x37x19x18x12&G=tricklayer";
-        let info = get_kudamono_url_info(url);
-        assert!(info.is_some());
-        let info = info.unwrap();
-        assert_eq!(info.height, 13);
-        assert_eq!(info.width, 14);
-        assert_eq!(info.puzzle_kind, "tricklayer");
-        assert_eq!(info.content, "x3x37x19x18x12");
+        {
+            let url =
+                "https://pedros.works/paper-puzzle-player?W=13&H=12&L=x3x37x19x18x12&G=tricklayer";
+            let info = get_kudamono_url_info(url);
+            assert!(info.is_some());
+            let info = info.unwrap();
+            assert_eq!(info.height, 13);
+            assert_eq!(info.width, 14);
+            assert_eq!(info.encoding_v2, false);
+        }
+        {
+            let url =
+                "https://pedros.works/paper-puzzle-player?W=14x13&L=x11x23x110x16x18&G=tricklayer";
+            let info = get_kudamono_url_info(url);
+            assert!(info.is_some());
+            let info = info.unwrap();
+            assert_eq!(info.height, 13);
+            assert_eq!(info.width, 14);
+            assert_eq!(info.puzzle_kind, "tricklayer");
+            assert_eq!(info.content, "x11x23x110x16x18");
+            assert_eq!(info.encoding_v2, true);
+        }
     }
 }

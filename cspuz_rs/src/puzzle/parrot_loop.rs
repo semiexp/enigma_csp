@@ -2,7 +2,7 @@ use super::util;
 use crate::graph;
 use crate::serializer::{
     get_kudamono_url_info, kudamono_url_info_to_problem, problem_to_kudamono_url_grid, AlphaToNum,
-    Choice, Combinator, Dict, KudamonoGrid, Optionalize,
+    Choice, Combinator, DecInt, Dict, KudamonoGrid, Optionalize, PrefixAndSuffix,
 };
 use crate::solver::{any, Solver};
 
@@ -75,6 +75,7 @@ fn combinator() -> impl Combinator<Problem> {
     KudamonoGrid::new(
         Optionalize::new(Choice::new(vec![
             Box::new(Dict::new(-1, "x")),
+            Box::new(PrefixAndSuffix::new("(", DecInt, ")")),
             Box::new(Dict::new(0, "z")),
             Box::new(AlphaToNum::new('a', 'w', 1)),
         ])),
@@ -135,8 +136,24 @@ mod tests {
 
     #[test]
     fn test_parrot_loop_serializer() {
-        let problem = problem_for_tests();
-        let url = "https://pedros.works/paper-puzzle-player?W=5&H=5&L=a4x3x9a5b2z6&G=parrot-loop";
-        util::tests::serializer_test(problem, url, serialize_problem, deserialize_problem);
+        // v1
+        {
+            let problem = problem_for_tests();
+            let url =
+                "https://pedros.works/paper-puzzle-player?W=5&H=5&L=a4x3x9a5b2z6&G=parrot-loop";
+            assert_eq!(deserialize_problem(url), Some(problem));
+        }
+        // v2
+        {
+            let problem = problem_for_tests();
+            let url = "https://pedros.works/paper-puzzle-player?W=6x6&L=a4x3x9a5b2z6&G=parrot-loop";
+            assert_eq!(deserialize_problem(url), Some(problem));
+        }
+        // v2 parenthesis format
+        {
+            let problem = problem_for_tests();
+            let url = "https://pedros.works/paper-puzzle-player?W=6x6&L=(1)4x3x9(1)5(2)2(0)6&G=parrot-loop";
+            util::tests::serializer_test(problem, url, serialize_problem, deserialize_problem);
+        }
     }
 }

@@ -1,6 +1,6 @@
 use super::util;
 use crate::graph;
-use crate::serializer::{get_kudamono_url_info, lexicographic_order, Context, DecInt, Sequencer};
+use crate::serializer::{get_kudamono_url_info, kudamono_order, Context, DecInt, Sequencer};
 use crate::solver::{any, int_constant, Solver, TRUE};
 
 pub fn solve_crosswall(
@@ -170,10 +170,10 @@ pub fn deserialize_problem(url: &str) -> Option<Problem> {
     let mut sequencer = Sequencer::new(content);
     let mut pos = 0;
     let ctx = Context::new();
-    let y_ord0 = lexicographic_order(desc.height);
-    let y_ord2 = lexicographic_order(desc.height - 1);
+    let y_ord0 = kudamono_order(desc.height, desc.encoding_v2);
+    let y_ord2 = kudamono_order(desc.height - 1, desc.encoding_v2);
 
-    let x_ord_base = lexicographic_order(desc.width);
+    let x_ord_base = kudamono_order(desc.width, desc.encoding_v2);
     let mut x_ord = vec![(0, 0)];
     for n in x_ord_base {
         // n, n + eps, n + 1 - eps
@@ -268,8 +268,18 @@ mod tests {
 
     #[test]
     fn test_crosswall_serializer() {
-        let problem = problem_for_tests();
-        let url = "https://pedros.works/paper-puzzle-player?W=4&H=4&L=(2)16(3)1(4)2(0)10(4)1(1)1(2)11(2)16(6)4&G=crosswall";
-        assert_eq!(deserialize_problem(url), Some(problem));
+        // v1
+        {
+            let problem = problem_for_tests();
+            let url = "https://pedros.works/paper-puzzle-player?W=4&H=4&L=(2)16(3)1(4)2(0)10(4)1(1)1(2)11(2)16(6)4&G=crosswall";
+            assert_eq!(deserialize_problem(url), Some(problem));
+        }
+
+        // v2
+        {
+            let problem = problem_for_tests();
+            let url = "https://pedros.works/paper-puzzle-player?W=5x5&L=(2)16(3)1(4)2(0)10(4)1(1)1(2)11(2)16(6)4&G=crosswall";
+            assert_eq!(deserialize_problem(url), Some(problem));
+        }
     }
 }
