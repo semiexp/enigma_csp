@@ -128,9 +128,9 @@ mod tests {
     }
 
     #[test]
-    fn test_parrot_loop_serializer() {
+    fn test_soulmates_serializer() {
         let problem = problem_for_tests();
-        let url = "https://pedros.works/paper-puzzle-player?W=3&H=3&L=(3)0(10)3(1)4&G=soulmates";
+        let url = "https://pedros.works/paper-puzzle-player?W=4x4&L=(3)0(10)3(1)4&G=soulmates";
         util::tests::serializer_test(problem, url, serialize_problem, deserialize_problem);
     }
 }
