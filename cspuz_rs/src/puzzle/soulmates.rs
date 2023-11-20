@@ -5,6 +5,8 @@ use crate::serializer::{
 };
 use crate::solver::Solver;
 
+use crate::graph;
+
 pub fn solve_soulmates(clues: &[Vec<Option<i32>>]) -> Option<Vec<Vec<Option<i32>>>> {
     let (h, w) = util::infer_shape(clues);
 
@@ -27,46 +29,73 @@ pub fn solve_soulmates(clues: &[Vec<Option<i32>>]) -> Option<Vec<Vec<Option<i32>
     let mut dists = vec![];
     for y in 0..h {
         for x in 0..w {
-            let dist = &solver.int_var_2d((h, w), 0, max_num + 1);
-            dists.push(dist.clone());
-
+            let reachable = &solver.bool_var_2d((h, w));
+            solver.add_expr(reachable.at((y, x)));
             for y2 in 0..h {
                 for x2 in 0..w {
-                    if y == y2 && x == x2 {
-                        solver.add_expr(dist.at((y2, x2)).eq(0));
-                    } else if y.abs_diff(y2) + x.abs_diff(x2) == 1 {
-                        solver.add_expr(dist.at((y2, x2)).eq(1));
-                    } else {
-                        solver.add_expr(dist.at((y2, x2)).ge(2));
+                    if !(y == y2 && x == x2) {
+                        solver.add_expr(reachable.at((y2, x2)).imp(!has_num.at((y2, x2))));
                     }
                 }
             }
-
-            for d in 2..=max_num {
-                for y2 in 0..h {
-                    for x2 in 0..w {
-                        solver.add_expr(
-                            dist.at((y2, x2)).le(d).iff(
-                                (dist.four_neighbors((y2, x2)).le(d - 1)
-                                    & !has_num.four_neighbors((y2, x2)))
-                                .any()
-                                    | dist.at((y2, x2)).le(d - 1),
-                            ),
-                        );
-                    }
-                }
+            for p in reachable.four_neighbor_indices((y, x)) {
+                solver.add_expr((!has_num.at(p)).imp(reachable.at(p)));
             }
-
             solver.add_expr(
-                has_num.at((y, x)).imp(
-                    (dist.le(max_num) & num.eq(num.at((y, x))))
-                        .count_true()
-                        .eq(2),
+                (!(has_num.slice((..(h - 1), ..)) | has_num.slice((1.., ..)))).imp(
+                    reachable
+                        .slice((..(h - 1), ..))
+                        .iff(reachable.slice((1.., ..))),
                 ),
             );
             solver.add_expr(
+                (!(has_num.slice((.., ..(w - 1))) | has_num.slice((.., 1..)))).imp(
+                    reachable
+                        .slice((.., ..(w - 1)))
+                        .iff(reachable.slice((.., 1..))),
+                ),
+            );
+            graph::active_vertices_connected_2d(&mut solver, reachable);
+
+            let reachable_ext = &solver.bool_var_2d((h, w));
+            for y2 in 0..h {
+                for x2 in 0..w {
+                    solver.add_expr(
+                        reachable_ext
+                            .at((y2, x2))
+                            .iff(reachable.at((y2, x2)) | reachable.four_neighbors((y2, x2)).any()),
+                    );
+                }
+            }
+
+            let dist = &solver.int_var_2d((h, w), 0, max_num);
+            solver.add_expr(dist.at((y, x)).eq(0));
+            for y2 in 0..h {
+                for x2 in 0..w {
+                    if y2 == y && x2 == x {
+                        continue;
+                    }
+                    solver.add_expr(
+                        reachable_ext.at((y2, x2)).imp(
+                            (dist.at((y2, x2)).le(dist.four_neighbors((y2, x2)) + 1)
+                                | !reachable.four_neighbors((y2, x2)))
+                            .all()
+                                & (dist.at((y2, x2)).eq(dist.four_neighbors((y2, x2)) + 1)
+                                    & reachable.four_neighbors((y2, x2)))
+                                .any(),
+                        ),
+                    );
+                }
+            }
+            dists.push(dist.clone());
+            solver.add_expr(
+                has_num
+                    .at((y, x))
+                    .imp((reachable_ext & num.eq(num.at((y, x)))).count_true().eq(2)),
+            );
+            solver.add_expr(
                 has_num.at((y, x)).imp(
-                    (dist.le(max_num) & num.eq(num.at((y, x))) & dist.eq(num.at((y, x))))
+                    (reachable_ext & num.eq(num.at((y, x))) & dist.eq(num.at((y, x))))
                         .count_true()
                         .eq(1),
                 ),
