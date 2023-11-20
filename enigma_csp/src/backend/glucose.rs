@@ -62,7 +62,7 @@ extern "C" {
 
 pub struct Solver {
     ptr: *mut Opaque,
-    custom_constraints: Vec<Box<Box<dyn CustomConstraint>>>,
+    custom_constraints: Vec<Box<Box<dyn CustomPropagator>>>,
     order_encoding_linear_mode: OrderEncodingLinearMode,
 }
 
@@ -277,9 +277,9 @@ impl Solver {
         res != 0
     }
 
-    pub fn add_custom_constraint(&mut self, constraint: Box<dyn CustomConstraint>) -> bool {
+    pub fn add_custom_constraint(&mut self, constraint: Box<dyn CustomPropagator>) -> bool {
         self.custom_constraints.push(Box::new(constraint));
-        let c: &Box<dyn CustomConstraint> =
+        let c: &Box<dyn CustomPropagator> =
             &self.custom_constraints[self.custom_constraints.len() - 1];
         let c = unsafe { std::mem::transmute::<_, *mut c_void>(c) };
         let res = unsafe { Glucose_AddRustExtraConstraint(self.ptr, c) };
@@ -358,7 +358,7 @@ impl<'a> Model<'a> {
 
 extern "C" {
     fn Glucose_AddRustExtraConstraint(solver: *mut Opaque, trait_object: *mut c_void) -> i32;
-    fn Glucose_CustomConstraintCopyReason(reason_vec: *mut c_void, n_lits: i32, lits: *const Lit);
+    fn Glucose_CustomPropagatorCopyReason(reason_vec: *mut c_void, n_lits: i32, lits: *const Lit);
     fn Glucose_SolverValue(solver: *mut Opaque, lit: Lit) -> i32;
     fn Glucose_SolverAddWatch(solver: *mut Opaque, lit: Lit, wrapper_object: *mut c_void);
     fn Glucose_SolverEnqueue(solver: *mut Opaque, lit: Lit, wrapper_object: *mut c_void) -> i32;
@@ -392,7 +392,7 @@ impl SolverManipulator {
     }
 }
 
-pub unsafe trait CustomConstraint {
+pub unsafe trait CustomPropagator {
     fn initialize(&mut self, solver: SolverManipulator) -> bool;
     fn propagate(&mut self, solver: SolverManipulator, p: Lit) -> bool;
     fn calc_reason(
@@ -405,13 +405,13 @@ pub unsafe trait CustomConstraint {
 }
 
 #[no_mangle]
-extern "C" fn Glucose_CallCustomConstraintInitialize(
+extern "C" fn Glucose_CallCustomPropagatorInitialize(
     solver: *mut Opaque,
     wrapper_object: *mut c_void,
     trait_object: *mut c_void,
 ) -> i32 {
     let trait_object =
-        unsafe { std::mem::transmute::<_, &mut Box<dyn CustomConstraint>>(trait_object) };
+        unsafe { std::mem::transmute::<_, &mut Box<dyn CustomPropagator>>(trait_object) };
     let res = trait_object.initialize(SolverManipulator {
         ptr: solver,
         wrapper_object: Some(wrapper_object),
@@ -424,14 +424,14 @@ extern "C" fn Glucose_CallCustomConstraintInitialize(
 }
 
 #[no_mangle]
-extern "C" fn Glucose_CallCustomConstraintPropagate(
+extern "C" fn Glucose_CallCustomPropagatorPropagate(
     solver: *mut Opaque,
     wrapper_object: *mut c_void,
     trait_object: *mut c_void,
     p: Lit,
 ) -> i32 {
     let trait_object =
-        unsafe { std::mem::transmute::<_, &mut Box<dyn CustomConstraint>>(trait_object) };
+        unsafe { std::mem::transmute::<_, &mut Box<dyn CustomPropagator>>(trait_object) };
     let res = trait_object.propagate(
         SolverManipulator {
             ptr: solver,
@@ -447,7 +447,7 @@ extern "C" fn Glucose_CallCustomConstraintPropagate(
 }
 
 #[no_mangle]
-extern "C" fn Glucose_CallCustomConstraintCalcReason(
+extern "C" fn Glucose_CallCustomPropagatorCalcReason(
     solver: *mut Opaque,
     trait_object: *mut c_void,
     p: Lit,
@@ -455,7 +455,7 @@ extern "C" fn Glucose_CallCustomConstraintCalcReason(
     out_reason: *mut c_void,
 ) {
     let trait_object =
-        unsafe { std::mem::transmute::<_, &mut Box<dyn CustomConstraint>>(trait_object) };
+        unsafe { std::mem::transmute::<_, &mut Box<dyn CustomPropagator>>(trait_object) };
     let res = trait_object.calc_reason(
         SolverManipulator {
             ptr: solver,
@@ -469,18 +469,18 @@ extern "C" fn Glucose_CallCustomConstraintCalcReason(
         },
     );
     unsafe {
-        Glucose_CustomConstraintCopyReason(out_reason, res.len() as i32, res.as_ptr());
+        Glucose_CustomPropagatorCopyReason(out_reason, res.len() as i32, res.as_ptr());
     }
 }
 
 #[no_mangle]
-extern "C" fn Glucose_CallCustomConstraintUndo(
+extern "C" fn Glucose_CallCustomPropagatorUndo(
     solver: *mut Opaque,
     trait_object: *mut c_void,
     p: Lit,
 ) {
     let trait_object =
-        unsafe { std::mem::transmute::<_, &mut Box<dyn CustomConstraint>>(trait_object) };
+        unsafe { std::mem::transmute::<_, &mut Box<dyn CustomPropagator>>(trait_object) };
     trait_object.undo(
         SolverManipulator {
             ptr: solver,
@@ -555,7 +555,7 @@ impl OrderEncodingLinear {
     }
 }
 
-unsafe impl CustomConstraint for OrderEncodingLinear {
+unsafe impl CustomPropagator for OrderEncodingLinear {
     fn initialize(&mut self, mut solver: SolverManipulator) -> bool {
         let mut unique_watchers = vec![];
         for &(lit, _, _) in &self.lits {
@@ -729,7 +729,7 @@ mod tests {
         }
     }
 
-    unsafe impl CustomConstraint for Xor {
+    unsafe impl CustomPropagator for Xor {
         fn initialize(&mut self, mut solver: SolverManipulator) -> bool {
             for &var in &self.vars {
                 unsafe {
