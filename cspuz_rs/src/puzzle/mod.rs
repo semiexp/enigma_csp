@@ -31,6 +31,7 @@ pub mod masyu;
 pub mod moonsun;
 pub mod nagenawa;
 pub mod norinori;
+pub mod nothree;
 pub mod nurikabe;
 pub mod nurimisaki;
 pub mod parrot_loop;
