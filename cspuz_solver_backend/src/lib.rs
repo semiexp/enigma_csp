@@ -109,6 +109,10 @@ fn solve_puzz_link(puzzle_kind: String, url: &str) -> Result<Board, &'static str
         puzzle::firefly::solve_firefly(url)
     } else if puzzle_kind == "nothree" {
         puzzle::nothree::solve_nothree(url)
+    } else if puzzle_kind == "invlitso" {
+        puzzle::inverse_litso::solve_inverse_litso(url)
+    } else if puzzle_kind == "tontonbeya" {
+        puzzle::tontonbeya::solve_tontonbeya(url)
     } else {
         Err("unknown puzzle type")
     }

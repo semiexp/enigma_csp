@@ -21,6 +21,8 @@ pub enum FireflyDir {
 pub enum ItemKind {
     Dot,
     Block,
+    Square,
+    Triangle,
     Fill,
     Circle,
     FilledCircle,
@@ -72,6 +74,8 @@ impl ItemKind {
         match self {
             &ItemKind::Dot => String::from("\"dot\""),
             &ItemKind::Block => String::from("\"block\""),
+            &ItemKind::Square => String::from("\"square\""),
+            &ItemKind::Triangle => String::from("\"triangle\""),
             &ItemKind::Fill => String::from("\"fill\""),
             &ItemKind::Circle => String::from("\"circle\""),
             &ItemKind::FilledCircle => String::from("\"filledCircle\""),
