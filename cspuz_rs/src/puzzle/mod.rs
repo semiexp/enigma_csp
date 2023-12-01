@@ -17,6 +17,7 @@ pub mod curvedata;
 pub mod fillomino;
 pub mod firefly;
 pub mod fivecells;
+pub mod guidearrow;
 pub mod hashi;
 pub mod herugolf;
 pub mod heyawake;

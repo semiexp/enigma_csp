@@ -113,6 +113,8 @@ fn solve_puzz_link(puzzle_kind: String, url: &str) -> Result<Board, &'static str
         puzzle::inverse_litso::solve_inverse_litso(url)
     } else if puzzle_kind == "tontonbeya" {
         puzzle::tontonbeya::solve_tontonbeya(url)
+    } else if puzzle_kind == "guidearrow" {
+        puzzle::guidearrow::solve_guidearrow(url)
     } else {
         Err("unknown puzzle type")
     }
