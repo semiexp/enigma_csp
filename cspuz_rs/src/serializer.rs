@@ -1,5 +1,6 @@
 use crate::graph::{borders_to_rooms, InnerGridEdges};
 use crate::items::{Arrow, NumberedArrow};
+use std::collections::BTreeMap;
 
 pub fn is_dec(c: u8) -> bool {
     return '0' as u8 <= c && c <= '9' as u8;
@@ -1449,77 +1450,73 @@ pub struct KudamonoURLInfo<'a> {
     pub encoding_v2: bool,
 }
 
-pub fn get_kudamono_url_info(url: &str) -> Option<KudamonoURLInfo> {
+pub fn get_kudamono_url_info_detailed<'a>(url: &'a str) -> Option<BTreeMap<String, &'a str>> {
     let body = url.strip_prefix("https://pedros.works/paper-puzzle-player?")?;
     let mut idx = 0;
 
-    let mut height: Option<usize> = None;
-    let mut width: Option<usize> = None;
-    let mut puzzle_kind: Option<&str> = None;
-    let mut content: Option<&str> = None;
-    let mut encoding_v2: Option<bool> = None;
+    let mut ret = BTreeMap::new();
 
     while idx < body.len() {
-        let kind = &body[idx..=idx];
-        idx += 1;
-        if idx >= body.len() || &body[idx..=idx] != "=" {
+        let mut kind_end = idx;
+        while kind_end < body.len() && &body[kind_end..=kind_end] != "=" {
+            kind_end += 1;
+        }
+
+        if kind_end >= body.len() {
             return None;
         }
-        idx += 1;
-        let mut end = idx;
-        while end < body.len() && &body[end..=end] != "&" {
-            end += 1;
+
+        let kind = &body[idx..kind_end];
+
+        let desc_start = kind_end + 1;
+        let mut desc_end = desc_start;
+        while desc_end < body.len() && &body[desc_end..=desc_end] != "&" {
+            desc_end += 1;
         }
 
-        if kind == "W" {
-            let wxh = &body[idx..end];
-            let x = wxh.find("x");
-            match x {
-                Some(x) => {
-                    if encoding_v2 == Some(false) {
-                        return None;
-                    }
-                    encoding_v2 = Some(true);
-                    let w = idx + x;
-                    let h = idx + x + 1;
-                    width = Some(body[idx..w].parse::<usize>().ok()?);
-                    height = Some(body[h..end].parse::<usize>().ok()?);
-                }
-                None => {
-                    if width.is_some() {
-                        return None;
-                    }
-                    if encoding_v2 == Some(true) {
-                        return None;
-                    }
-                    encoding_v2 = Some(false);
-                    width = Some(body[idx..end].parse::<usize>().ok()? + 1);
-                }
-            }
-        } else if kind == "H" {
-            if height.is_some() {
-                return None;
-            }
-            if encoding_v2 == Some(true) {
-                return None;
-            }
-            encoding_v2 = Some(false);
-            height = Some(body[idx..end].parse::<usize>().ok()? + 1);
-        } else if kind == "G" {
-            puzzle_kind = Some(&body[idx..end]);
-        } else if kind == "L" {
-            content = Some(&body[idx..end]);
-        }
+        ret.insert(kind.to_string(), &body[desc_start..desc_end]);
 
-        idx = end + 1;
+        idx = desc_end + 1;
     }
 
+    Some(ret)
+}
+
+pub fn parse_kudamono_dimension(dim: &str) -> Option<(usize, usize)> {
+    let x = dim.find("x")?;
+    let width = dim[..x].parse::<usize>().ok()?;
+    let height = dim[(x + 1)..].parse::<usize>().ok()?;
+    Some((width, height))
+}
+
+pub fn get_kudamono_url_info(url: &str) -> Option<KudamonoURLInfo> {
+    let parsed = get_kudamono_url_info_detailed(url)?;
+
+    let height;
+    let width;
+    let encoding_v2;
+    {
+        let wxh = parsed.get("W")?;
+        if let Some((w, h)) = parse_kudamono_dimension(wxh) {
+            encoding_v2 = true;
+            width = w;
+            height = h;
+        } else {
+            encoding_v2 = false;
+            width = wxh.parse::<usize>().ok()? + 1;
+            height = parsed.get("H")?.parse::<usize>().ok()? + 1;
+        }
+    }
+
+    let puzzle_kind = *parsed.get("G")?;
+    let content = parsed.get("L").map(|x| *x);
+
     Some(KudamonoURLInfo {
-        height: height?,
-        width: width?,
-        puzzle_kind: puzzle_kind?,
+        height,
+        width,
+        puzzle_kind,
         content: content.unwrap_or(""),
-        encoding_v2: encoding_v2?,
+        encoding_v2,
     })
 }
 
