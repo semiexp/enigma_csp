@@ -9,6 +9,7 @@ pub mod cocktail;
 pub mod compass;
 pub mod coral;
 pub mod creek;
+pub mod cross_border_parity_loop;
 pub mod crosswall;
 pub mod curvedata;
 pub mod fillomino;
