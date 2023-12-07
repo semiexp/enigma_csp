@@ -115,6 +115,8 @@ fn solve_puzz_link(puzzle_kind: String, url: &str) -> Result<Board, &'static str
         puzzle::tontonbeya::solve_tontonbeya(url)
     } else if puzzle_kind == "guidearrow" {
         puzzle::guidearrow::solve_guidearrow(url)
+    } else if puzzle_kind == "aquapelago" {
+        puzzle::aquapelago::solve_aquapelago(url)
     } else {
         Err("unknown puzzle type")
     }

@@ -2,6 +2,7 @@ pub mod util;
 
 pub mod akari;
 pub mod aqre;
+pub mod aquapelago;
 pub mod araf;
 pub mod ayeheya;
 pub mod barns;
