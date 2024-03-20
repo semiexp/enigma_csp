@@ -1,6 +1,7 @@
 pub mod util;
 
 pub mod akari;
+pub mod akichiwake;
 pub mod aqre;
 pub mod aquapelago;
 pub mod araf;
