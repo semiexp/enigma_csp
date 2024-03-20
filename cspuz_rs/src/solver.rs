@@ -1124,6 +1124,23 @@ impl<'a> Solver<'a> {
         })
     }
 
+    pub fn int_var_2d_from_ranges(
+        &mut self,
+        shape: (usize, usize),
+        range: &[Vec<(i32, i32)>],
+    ) -> IntVarArray2D {
+        let (h, w) = shape;
+        Value(Array2DImpl {
+            shape,
+            data: (0..(h * w))
+                .map(|i| {
+                    let (low, high) = range[i / w][i % w];
+                    self.solver.new_int_var(Domain::range(low, high))
+                })
+                .collect(),
+        })
+    }
+
     pub fn add_expr<T>(&mut self, exprs: T)
     where
         T: IntoIterator,

@@ -1,7 +1,8 @@
 use super::util;
 use crate::graph;
 use crate::serializer::{
-    problem_to_url, url_to_problem, Choice, Combinator, Grid, MultiDigit, Optionalize, Spaces,
+    problem_to_url_with_context, url_to_problem, Choice, Combinator, Context, ContextBasedGrid,
+    Dict, MultiDigit, Optionalize, Rooms, Size, Spaces, Tuple2,
 };
 use crate::solver::{all, any, Solver};
 
@@ -75,22 +76,63 @@ fn adjacent_edges(piece: &[(usize, usize)]) -> (Vec<(usize, usize)>, Vec<(usize,
 
 pub fn solve_pentominous(
     clues: &[Vec<Option<i32>>],
+    default_borders: &Option<graph::InnerGridEdges<Vec<Vec<bool>>>>,
 ) -> Option<graph::BoolInnerGridEdgesIrrefutableFacts> {
     let (h, w) = util::infer_shape(clues);
 
     let mut solver = Solver::new();
-    let kind = &solver.int_var_2d((h, w), 0, 11);
+    let kind_ranges = clues
+        .iter()
+        .map(|row| {
+            row.iter()
+                .map(|&x| if x == Some(-1) { (-1, -1) } else { (0, 11) })
+                .collect::<Vec<_>>()
+        })
+        .collect::<Vec<_>>();
+    let kind = &solver.int_var_2d_from_ranges((h, w), &kind_ranges);
 
     let is_border = graph::BoolInnerGridEdges::new(&mut solver, (h, w));
     solver.add_answer_key_bool(&is_border.horizontal);
     solver.add_answer_key_bool(&is_border.vertical);
 
-    solver
-        .add_expr(&is_border.horizontal ^ (kind.slice((..(h - 1), ..)).eq(kind.slice((1.., ..)))));
-    solver.add_expr(&is_border.vertical ^ (kind.slice((.., ..(w - 1))).eq(kind.slice((.., 1..)))));
+    if let Some(default_borders) = default_borders {
+        for y in 0..h {
+            for x in 0..(w - 1) {
+                if default_borders.vertical[y][x] {
+                    solver.add_expr(is_border.vertical.at((y, x)));
+                }
+            }
+        }
+        for y in 0..(h - 1) {
+            for x in 0..w {
+                if default_borders.horizontal[y][x] {
+                    solver.add_expr(is_border.horizontal.at((y, x)));
+                }
+            }
+        }
+    }
 
-    let five = &solver.int_var_2d((h, w), 5, 5);
-    graph::graph_division_2d(&mut solver, five, &is_border);
+    solver.add_expr(
+        &is_border.horizontal
+            ^ (kind.slice((..(h - 1), ..)).ge(0)
+                & (kind.slice((..(h - 1), ..)).eq(kind.slice((1.., ..))))),
+    );
+    solver.add_expr(
+        &is_border.vertical
+            ^ (kind.slice((.., ..(w - 1))).ge(0)
+                & (kind.slice((.., ..(w - 1))).eq(kind.slice((.., 1..))))),
+    );
+
+    let sizes = clues
+        .iter()
+        .map(|row| {
+            row.iter()
+                .map(|&x| if x == Some(-1) { (1, 1) } else { (5, 5) })
+                .collect::<Vec<_>>()
+        })
+        .collect::<Vec<_>>();
+    let sizes = &solver.int_var_2d_from_ranges((h, w), &sizes);
+    graph::graph_division_2d(&mut solver, sizes, &is_border);
 
     let pento = pentominoes();
 
@@ -116,6 +158,9 @@ pub fn solve_pentominous(
         .collect::<Vec<_>>();
     for y in 0..h {
         for x in 0..w {
+            if clues[y][x] == Some(-1) {
+                continue;
+            }
             let mut conds = vec![];
             for i in 0..12 {
                 for j in 0..pento_variants[i].len() {
@@ -149,17 +194,33 @@ pub fn solve_pentominous(
     solver.irrefutable_facts().map(|f| f.get(&is_border))
 }
 
-type Problem = Vec<Vec<Option<i32>>>;
+type Problem = (
+    Vec<Vec<Option<i32>>>,
+    Option<graph::InnerGridEdges<Vec<Vec<bool>>>>,
+);
 
 fn combinator() -> impl Combinator<Problem> {
-    Grid::new(Choice::new(vec![
-        Box::new(Spaces::new(None, 'g')),
-        Box::new(Optionalize::new(MultiDigit::new(12, 1))),
-    ]))
+    Size::new(Tuple2::new(
+        ContextBasedGrid::new(Choice::new(vec![
+            Box::new(Spaces::new(None, 'g')),
+            Box::new(Dict::new(Some(-1), "c")),
+            Box::new(Optionalize::new(MultiDigit::new(12, 1))),
+        ])),
+        Choice::new(vec![
+            Box::new(Optionalize::new(Rooms)),
+            Box::new(Dict::new(None, "")),
+        ]),
+    ))
 }
 
 pub fn serialize_pentominous_problem(problem: &Problem) -> Option<String> {
-    problem_to_url(combinator(), "pentominous", problem.clone())
+    let (h, w) = util::infer_shape(&problem.0);
+    problem_to_url_with_context(
+        combinator(),
+        "pentominous",
+        problem.clone(),
+        &Context::sized(h, w),
+    )
 }
 
 pub fn deserialize_pentominous_problem(url: &str) -> Option<Problem> {
@@ -172,19 +233,22 @@ mod tests {
 
     fn problem_for_tests() -> Problem {
         // V: 7, L: 2
-        vec![
-            vec![Some(7), Some(2), None, None, None],
-            vec![None, None, None, None, None],
-            vec![None, None, None, None, None],
-            vec![None, None, None, None, None],
-            vec![None, None, None, None, None],
-        ]
+        (
+            vec![
+                vec![Some(7), Some(2), None, None, None],
+                vec![None, None, None, None, None],
+                vec![None, None, None, None, None],
+                vec![None, None, None, None, None],
+                vec![None, None, None, None, None],
+            ],
+            None,
+        )
     }
 
     #[test]
     fn test_pentominous_problem() {
-        let problem = problem_for_tests();
-        let ans = solve_pentominous(&problem);
+        let (clues, borders) = problem_for_tests();
+        let ans = solve_pentominous(&clues, &borders);
         assert!(ans.is_some());
         let ans = ans.unwrap();
         let expected = graph::BoolInnerGridEdgesIrrefutableFacts {
