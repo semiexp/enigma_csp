@@ -16,7 +16,39 @@ pub fn solve_slitherlink(
     solver.add_answer_key_bool(&is_line.horizontal);
     solver.add_answer_key_bool(&is_line.vertical);
 
-    graph::single_cycle_grid_edges(&mut solver, &is_line);
+    add_constraints(&mut solver, is_line, clues);
+
+    solver.irrefutable_facts().map(|f| f.get(is_line))
+}
+
+pub fn enumerate_answers_slitherlink(
+    clues: &[Vec<Option<i32>>],
+    num_max_answers: usize,
+) -> Vec<graph::BoolGridEdgesModel> {
+    let (h, w) = util::infer_shape(clues);
+
+    let mut solver = Solver::new();
+    let is_line = &graph::BoolGridEdges::new(&mut solver, (h, w));
+    solver.add_answer_key_bool(&is_line.horizontal);
+    solver.add_answer_key_bool(&is_line.vertical);
+
+    add_constraints(&mut solver, is_line, clues);
+
+    solver
+        .answer_iter()
+        .take(num_max_answers)
+        .map(|f| f.get_unwrap(is_line))
+        .collect()
+}
+
+fn add_constraints(
+    solver: &mut Solver,
+    is_line: &graph::BoolGridEdges,
+    clues: &[Vec<Option<i32>>],
+) {
+    let (h, w) = util::infer_shape(clues);
+
+    graph::single_cycle_grid_edges(solver, &is_line);
 
     for y in 0..h {
         for x in 0..w {
@@ -25,8 +57,6 @@ pub fn solve_slitherlink(
             }
         }
     }
-
-    solver.irrefutable_facts().map(|f| f.get(is_line))
 }
 
 pub struct SlitherlinkClueCombinator;
