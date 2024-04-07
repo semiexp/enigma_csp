@@ -63,6 +63,17 @@ pub fn solve_akichiwake(
                 }
                 continue;
             }
+            if rooms[i].len() == 1 {
+                let p = rooms[i][0];
+                if n == 0 {
+                    solver.add_expr(is_black.at(p));
+                } else if n == 1 {
+                    solver.add_expr(!is_black.at(p));
+                } else {
+                    return None;
+                }
+                continue;
+            }
             let sizes = &solver.int_var_1d(rooms[i].len(), 1, n);
             solver.add_expr(sizes.ge(n).any());
 
