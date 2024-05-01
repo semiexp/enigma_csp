@@ -3,7 +3,7 @@ use crate::graph;
 use crate::serializer::{
     problem_to_url, url_to_problem, Choice, Combinator, Dict, Grid, HexInt, Optionalize, Spaces,
 };
-use crate::solver::Solver;
+use crate::solver::{BoolVarArray2D, Solver};
 
 pub fn solve_nurikabe(clues: &[Vec<Option<i32>>]) -> Option<Vec<Vec<Option<bool>>>> {
     let (h, w) = util::infer_shape(clues);
@@ -11,6 +11,33 @@ pub fn solve_nurikabe(clues: &[Vec<Option<i32>>]) -> Option<Vec<Vec<Option<bool>
     let mut solver = Solver::new();
     let is_black = &solver.bool_var_2d((h, w));
     solver.add_answer_key_bool(is_black);
+
+    add_constraints(clues, &mut solver, is_black);
+
+    solver.irrefutable_facts().map(|f| f.get(is_black))
+}
+
+pub fn enumerate_answers_nurikabe(
+    clues: &[Vec<Option<i32>>],
+    num_max_answers: usize,
+) -> Vec<Vec<Vec<bool>>> {
+    let (h, w) = util::infer_shape(clues);
+
+    let mut solver = Solver::new();
+    let is_black = &solver.bool_var_2d((h, w));
+    solver.add_answer_key_bool(is_black);
+
+    add_constraints(clues, &mut solver, is_black);
+
+    solver
+        .answer_iter()
+        .take(num_max_answers)
+        .map(|f| f.get_unwrap(is_black))
+        .collect()
+}
+
+fn add_constraints(clues: &[Vec<Option<i32>>], solver: &mut Solver, is_black: &BoolVarArray2D) {
+    let (h, w) = util::infer_shape(clues);
 
     let mut clue_pos = vec![];
     for y in 0..h {
@@ -24,9 +51,9 @@ pub fn solve_nurikabe(clues: &[Vec<Option<i32>>]) -> Option<Vec<Vec<Option<bool>
     let group_id = solver.int_var_2d((h, w), 0, clue_pos.len() as i32);
     solver.add_expr(is_black.iff(group_id.eq(0)));
 
-    graph::active_vertices_connected_2d(&mut solver, is_black);
+    graph::active_vertices_connected_2d(solver, is_black);
     for i in 1..=clue_pos.len() {
-        graph::active_vertices_connected_2d(&mut solver, group_id.eq(i as i32));
+        graph::active_vertices_connected_2d(solver, group_id.eq(i as i32));
     }
 
     solver.add_expr(
@@ -51,8 +78,6 @@ pub fn solve_nurikabe(clues: &[Vec<Option<i32>>]) -> Option<Vec<Vec<Option<bool>
             solver.add_expr(group_id.eq((i + 1) as i32).count_true().eq(n));
         }
     }
-
-    solver.irrefutable_facts().map(|f| f.get(is_black))
 }
 
 type Problem = Vec<Vec<Option<i32>>>;

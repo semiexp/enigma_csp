@@ -164,6 +164,8 @@ fn decode_and_enumerate(
         puzzle::heyawake::enumerate_answers_heyawake(url, num_max_answers)
     } else if puzzle_kind == "slither" || puzzle_kind == "slitherlink" {
         puzzle::slitherlink::enumerate_answers_slitherlink(url, num_max_answers)
+    } else if puzzle_kind == "nurikabe" {
+        puzzle::nurikabe::enumerate_answers_nurikabe(url, num_max_answers)
     } else if puzzle_kind == "curvedata" {
         puzzle::curvedata::enumerate_answers_curvedata(url, num_max_answers)
     } else {
