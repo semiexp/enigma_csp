@@ -466,7 +466,7 @@ where
     type Output = <Value<T> as Operand>::Output;
 
     fn as_expr_array(self) -> Self::Output {
-        self.clone().as_expr_array()
+        (*self).as_expr_array()
     }
 }
 
