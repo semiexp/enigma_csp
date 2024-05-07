@@ -6,3 +6,4 @@ members = [
     "cspuz_rs_macro",
     "cspuz_solver_backend",
 ]
+resolver = "2"
