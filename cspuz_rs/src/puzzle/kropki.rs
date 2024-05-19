@@ -1,7 +1,7 @@
 use crate::graph::InnerGridEdges;
 use crate::serializer::{
-    map_2d, problem_to_url_with_context, url_to_problem, Combinator, Context, ContextBasedGrid,
-    MultiDigit, Sequencer, Size,
+    map_2d, problem_to_url_with_context, url_to_problem, Combinator, Context, MultiDigit,
+    Sequencer, Size,
 };
 use crate::solver::{IntVar, Solver};
 
@@ -97,26 +97,26 @@ impl Combinator<InnerGridEdges<Vec<Vec<KropkiClue>>>> for KropkiCombinator {
         let vertical_i32 = map_2d(&input[0].vertical, kropi_clue_to_i32);
         let horizontal_i32 = map_2d(&input[0].horizontal, kropi_clue_to_i32);
 
-        let ctx_grid = ContextBasedGrid::new(MultiDigit::new(3, 3));
+        let mut seq = vec![];
+        for y in 0..height {
+            for x in 0..(width - 1) {
+                seq.push(vertical_i32[y][x]);
+            }
+        }
+        for y in 0..(height - 1) {
+            for x in 0..width {
+                seq.push(horizontal_i32[y][x]);
+            }
+        }
+
+        let multi_digit = MultiDigit::new(3, 3);
+        let mut sequencer = Sequencer::new(&seq);
         let mut ret = vec![];
-        let (_, app) = ctx_grid.serialize(
-            &Context {
-                height: Some(height),
-                width: Some(width - 1),
-                ..*ctx
-            },
-            &vec![vertical_i32],
-        )?;
-        ret.extend(app);
-        let (_, app) = ctx_grid.serialize(
-            &Context {
-                height: Some(height - 1),
-                width: Some(width),
-                ..*ctx
-            },
-            &vec![horizontal_i32],
-        )?;
-        ret.extend(app);
+
+        while sequencer.n_read() < seq.len() {
+            let part = sequencer.serialize(ctx, &multi_digit)?;
+            ret.extend(part);
+        }
 
         Some((1, ret))
     }
@@ -129,24 +129,32 @@ impl Combinator<InnerGridEdges<Vec<Vec<KropkiClue>>>> for KropkiCombinator {
         let height = ctx.height.unwrap();
         let width = ctx.width.unwrap();
         let mut sequencer = Sequencer::new(input);
-        let ctx_grid = ContextBasedGrid::new(MultiDigit::new(3, 3));
 
-        let vertical_i32 = sequencer.deserialize_one_elem(
-            &Context {
-                height: Some(height),
-                width: Some(width - 1),
-                ..*ctx
-            },
-            &ctx_grid,
-        )?;
-        let horizontal_i32 = sequencer.deserialize_one_elem(
-            &Context {
-                height: Some(height - 1),
-                width: Some(width),
-                ..*ctx
-            },
-            &ctx_grid,
-        )?;
+        let n_items = height * (width - 1) + (height - 1) * width;
+        let mut seq = vec![];
+
+        let multi_digit = MultiDigit::new(3, 3);
+        while seq.len() < n_items {
+            let part = sequencer.deserialize(ctx, &multi_digit)?;
+            seq.extend(part);
+        }
+
+        let mut vertical_i32 = vec![];
+        for y in 0..height {
+            let mut row = vec![];
+            for x in 0..width - 1 {
+                row.push(seq[y * (width - 1) + x]);
+            }
+            vertical_i32.push(row);
+        }
+        let mut horizontal_i32 = vec![];
+        for y in 0..height - 1 {
+            let mut row = vec![];
+            for x in 0..width {
+                row.push(seq[height * (width - 1) + y * width + x]);
+            }
+            horizontal_i32.push(row);
+        }
 
         let vertical = map_2d(&vertical_i32, i32_to_kropki_clue);
         let horizontal = map_2d(&horizontal_i32, i32_to_kropki_clue);
@@ -203,26 +211,69 @@ mod tests {
         }
     }
 
+    #[rustfmt::skip]
+    fn problem_for_tests2() -> Problem {
+        InnerGridEdges {
+            horizontal: vec![
+                vec![KropkiClue::Black, KropkiClue::None, KropkiClue::White, KropkiClue::None, KropkiClue::None],
+                vec![KropkiClue::None, KropkiClue::None, KropkiClue::None, KropkiClue::White, KropkiClue::White],
+                vec![KropkiClue::None, KropkiClue::White, KropkiClue::White, KropkiClue::None, KropkiClue::None],
+                vec![KropkiClue::White, KropkiClue::None, KropkiClue::None, KropkiClue::None, KropkiClue::Black],
+            ],
+            vertical: vec![
+                vec![KropkiClue::White, KropkiClue::White, KropkiClue::White, KropkiClue::White],
+                vec![KropkiClue::None, KropkiClue::White, KropkiClue::None, KropkiClue::None],
+                vec![KropkiClue::None, KropkiClue::None, KropkiClue::White, KropkiClue::Black],
+                vec![KropkiClue::White, KropkiClue::Black, KropkiClue::None, KropkiClue::None],
+                vec![KropkiClue::None, KropkiClue::None, KropkiClue::None, KropkiClue::White],
+            ],
+        }
+    }
+
     #[test]
     fn test_kropki_problem() {
-        let problem = problem_for_tests();
-        let ans = solve_kropki(&problem);
-        assert!(ans.is_some());
-        let ans = ans.unwrap();
+        {
+            let problem = problem_for_tests();
+            let ans = solve_kropki(&problem);
+            assert!(ans.is_some());
+            let ans = ans.unwrap();
 
-        let expected = crate::puzzle::util::tests::to_option_2d([
-            [4, 2, 1, 3],
-            [1, 3, 2, 4],
-            [3, 1, 4, 2],
-            [2, 4, 3, 1],
-        ]);
-        assert_eq!(ans, expected);
+            let expected = crate::puzzle::util::tests::to_option_2d([
+                [4, 2, 1, 3],
+                [1, 3, 2, 4],
+                [3, 1, 4, 2],
+                [2, 4, 3, 1],
+            ]);
+            assert_eq!(ans, expected);
+        }
+        {
+            let problem = problem_for_tests2();
+            let ans = solve_kropki(&problem);
+            assert!(ans.is_some());
+            let ans = ans.unwrap();
+
+            let expected = crate::puzzle::util::tests::to_option_2d([
+                [1, 2, 3, 4, 5],
+                [2, 5, 4, 1, 3],
+                [5, 3, 1, 2, 4],
+                [3, 4, 2, 5, 1],
+                [4, 1, 5, 3, 2],
+            ]);
+            assert_eq!(ans, expected);
+        }
     }
 
     #[test]
     fn test_kropki_serializer() {
-        let problem = problem_for_tests();
-        let url = "https://puzz.link/p?kropki/4/4/o52l49p4";
-        util::tests::serializer_test(problem, url, serialize_problem, deserialize_problem);
+        {
+            let problem = problem_for_tests();
+            let url = "https://puzz.link/p?kropki/4/4/o52l49p4";
+            util::tests::serializer_test(problem, url, serialize_problem, deserialize_problem);
+        }
+        {
+            let problem = problem_for_tests2();
+            let url = "https://puzz.link/p?kropki/5/5/da05f05304410i";
+            util::tests::serializer_test(problem, url, serialize_problem, deserialize_problem);
+        }
     }
 }
