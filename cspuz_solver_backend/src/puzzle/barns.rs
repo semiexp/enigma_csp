@@ -1,4 +1,5 @@
 use crate::board::{Board, BoardKind, Item, ItemKind};
+use crate::uniqueness::is_unique;
 use cspuz_rs::puzzle::barns;
 
 pub fn solve_barns(url: &str) -> Result<Board, &'static str> {
@@ -7,7 +8,7 @@ pub fn solve_barns(url: &str) -> Result<Board, &'static str> {
 
     let height = icebarn.len();
     let width = icebarn[0].len();
-    let mut board = Board::new(BoardKind::Grid, height, width);
+    let mut board = Board::new(BoardKind::Grid, height, width, is_unique(&is_line));
 
     board.add_borders(&borders, "black");
     for y in 0..height {

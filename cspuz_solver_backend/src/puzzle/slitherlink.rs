@@ -1,4 +1,5 @@
 use crate::board::{Board, BoardKind, Item, ItemKind};
+use crate::uniqueness::{is_unique, Uniqueness};
 use cspuz_rs::puzzle::slitherlink;
 
 pub fn solve_slitherlink(url: &str) -> Result<Board, &'static str> {
@@ -7,7 +8,7 @@ pub fn solve_slitherlink(url: &str) -> Result<Board, &'static str> {
 
     let height = problem.len();
     let width = problem[0].len();
-    let mut board = Board::new(BoardKind::DotGrid, height, width);
+    let mut board = Board::new(BoardKind::DotGrid, height, width, is_unique(&is_line));
 
     for y in 0..height {
         for x in 0..width {
@@ -54,7 +55,7 @@ pub fn enumerate_answers_slitherlink(
 
     let height = problem.len();
     let width = problem[0].len();
-    let mut board_common = Board::new(BoardKind::DotGrid, height, width);
+    let mut board_common = Board::new(BoardKind::DotGrid, height, width, Uniqueness::NotApplicable);
 
     for y in 0..height {
         for x in 0..width {
@@ -90,7 +91,8 @@ pub fn enumerate_answers_slitherlink(
 
     let mut board_answers = vec![];
     for ans in answers {
-        let mut board_answer = Board::new(BoardKind::Empty, height, width);
+        let mut board_answer =
+            Board::new(BoardKind::Empty, height, width, Uniqueness::NotApplicable);
         // update board_answer according to ans
         for y in 0..height {
             for x in 0..=width {

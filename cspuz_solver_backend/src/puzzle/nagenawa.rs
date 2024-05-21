@@ -1,4 +1,5 @@
 use crate::board::{Board, BoardKind, Item, ItemKind};
+use crate::uniqueness::is_unique;
 use cspuz_rs::graph;
 use cspuz_rs::puzzle::nagenawa;
 
@@ -8,7 +9,7 @@ pub fn solve_nagenawa(url: &str) -> Result<Board, &'static str> {
 
     let height = is_line.horizontal.len();
     let width = is_line.horizontal[0].len() + 1;
-    let mut board = Board::new(BoardKind::Grid, height, width);
+    let mut board = Board::new(BoardKind::Grid, height, width, is_unique(&is_line));
 
     board.add_borders(&borders, "black");
     board.add_lines_irrefutable_facts(&is_line, "green", None);

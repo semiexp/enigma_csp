@@ -1,4 +1,5 @@
 use crate::board::{Board, BoardKind, Item, ItemKind};
+use crate::uniqueness::Uniqueness;
 use cspuz_rs::puzzle::sudoku;
 
 pub fn solve_sudoku(url: &str) -> Result<Board, &'static str> {
@@ -7,7 +8,16 @@ pub fn solve_sudoku(url: &str) -> Result<Board, &'static str> {
 
     let height = ans.len();
     let width = ans[0].len();
-    let mut board = Board::new(BoardKind::Grid, height, width);
+
+    let mut is_unique = Uniqueness::Unique;
+    for y in 0..height {
+        for x in 0..width {
+            if ans[y][x].iter().filter(|&&b| b).count() != 1 {
+                is_unique = Uniqueness::NonUnique;
+            }
+        }
+    }
+    let mut board = Board::new(BoardKind::Grid, height, width, is_unique);
 
     let (bh, bw) = match height {
         4 => (2, 2),

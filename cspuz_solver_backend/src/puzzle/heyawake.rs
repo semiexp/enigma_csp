@@ -1,4 +1,5 @@
 use crate::board::{Board, BoardKind, Item, ItemKind};
+use crate::uniqueness::{is_unique, Uniqueness};
 use cspuz_rs::graph;
 use cspuz_rs::puzzle::{ayeheya, heyawake};
 
@@ -24,7 +25,7 @@ pub fn solve_heyawake(url: &str, is_ayeheya: bool) -> Result<Board, &'static str
 
     let height = is_black.len();
     let width = is_black[0].len();
-    let mut board = Board::new(BoardKind::Grid, height, width);
+    let mut board = Board::new(BoardKind::Grid, height, width, is_unique(&is_black));
 
     board.add_borders(&borders, "black");
 
@@ -63,7 +64,7 @@ pub fn enumerate_answers_heyawake(
     let height = is_black_common.len();
     let width = is_black_common[0].len();
 
-    let mut board_common = Board::new(BoardKind::Grid, height, width);
+    let mut board_common = Board::new(BoardKind::Grid, height, width, Uniqueness::NotApplicable);
     board_common.add_borders(&borders, "black");
     for y in 0..height {
         for x in 0..width {
@@ -88,7 +89,8 @@ pub fn enumerate_answers_heyawake(
 
     let mut board_answers = vec![];
     for ans in answers {
-        let mut board_answer = Board::new(BoardKind::Empty, height, width);
+        let mut board_answer =
+            Board::new(BoardKind::Empty, height, width, Uniqueness::NotApplicable);
         for y in 0..height {
             for x in 0..width {
                 if is_black_common[y][x].is_none() {

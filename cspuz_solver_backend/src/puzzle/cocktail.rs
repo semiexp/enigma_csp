@@ -1,4 +1,5 @@
 use crate::board::{Board, BoardKind, Item, ItemKind};
+use crate::uniqueness::is_unique;
 use cspuz_rs::graph;
 use cspuz_rs::puzzle::cocktail;
 
@@ -8,7 +9,7 @@ pub fn solve_cocktail(url: &str) -> Result<Board, &'static str> {
 
     let height = is_black.len();
     let width = is_black[0].len();
-    let mut board = Board::new(BoardKind::Grid, height, width);
+    let mut board = Board::new(BoardKind::Grid, height, width, is_unique(&is_black));
 
     board.add_borders(&borders, "black");
 

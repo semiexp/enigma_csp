@@ -1,4 +1,5 @@
 use crate::board::{Board, BoardKind, Item, ItemKind};
+use crate::uniqueness::Uniqueness;
 use cspuz_rs::puzzle::kouchoku;
 
 pub fn solve_kouchoku(url: &str) -> Result<Board, &'static str> {
@@ -7,7 +8,16 @@ pub fn solve_kouchoku(url: &str) -> Result<Board, &'static str> {
 
     let height = problem.len();
     let width = problem[0].len();
-    let mut board = Board::new(BoardKind::Empty, height, width);
+    let mut board = Board::new(
+        BoardKind::Empty,
+        height,
+        width,
+        if undet_lines.len() == 0 {
+            Uniqueness::Unique
+        } else {
+            Uniqueness::NonUnique
+        },
+    );
     for y in 0..height {
         for x in 0..width {
             if y < height - 1 {

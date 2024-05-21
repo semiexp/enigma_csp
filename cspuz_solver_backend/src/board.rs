@@ -1,3 +1,4 @@
+use crate::uniqueness::Uniqueness;
 use cspuz_rs::graph;
 
 #[derive(PartialEq, Eq)]
@@ -206,15 +207,17 @@ pub struct Board {
     height: usize,
     width: usize,
     data: Vec<Item>,
+    uniqueness: Uniqueness,
 }
 
 impl Board {
-    pub fn new(kind: BoardKind, height: usize, width: usize) -> Board {
+    pub fn new(kind: BoardKind, height: usize, width: usize, uniqueness: Uniqueness) -> Board {
         Board {
             kind,
             height,
             width,
             data: vec![],
+            uniqueness,
         }
     }
 
@@ -312,9 +315,14 @@ impl Board {
             .map(|item| item.to_json())
             .collect::<Vec<_>>()
             .join(",");
+        let uniqueness = match self.uniqueness {
+            Uniqueness::Unique => ",\"isUnique\":true",
+            Uniqueness::NonUnique => ",\"isUnique\":false",
+            Uniqueness::NotApplicable => "",
+        };
         format!(
-            "{{\"kind\":\"{}\",\"height\":{},\"width\":{},\"defaultStyle\":\"{}\",\"data\":[{}]}}",
-            kind, height, width, default_style, data
+            "{{\"kind\":\"{}\",\"height\":{},\"width\":{},\"defaultStyle\":\"{}\",\"data\":[{}]{}}}",
+            kind, height, width, default_style, data, uniqueness
         )
     }
 }

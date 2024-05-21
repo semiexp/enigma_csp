@@ -1,4 +1,5 @@
 use crate::board::{Board, BoardKind, FireflyDir, Item, ItemKind};
+use crate::uniqueness::is_unique;
 use cspuz_rs::items::Arrow;
 use cspuz_rs::puzzle::firefly;
 
@@ -8,7 +9,7 @@ pub fn solve_firefly(url: &str) -> Result<Board, &'static str> {
 
     let height = problem.len();
     let width = problem[0].len();
-    let mut board = Board::new(BoardKind::Empty, height, width);
+    let mut board = Board::new(BoardKind::Empty, height, width, is_unique(&is_line));
 
     for y in 0..(height - 1) {
         for x in 0..width {

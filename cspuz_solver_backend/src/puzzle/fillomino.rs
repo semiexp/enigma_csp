@@ -1,4 +1,5 @@
 use crate::board::{Board, BoardKind, Item, ItemKind};
+use crate::uniqueness::is_unique;
 use cspuz_rs::puzzle::fillomino;
 
 pub fn solve_fillomino(url: &str) -> Result<Board, &'static str> {
@@ -7,7 +8,12 @@ pub fn solve_fillomino(url: &str) -> Result<Board, &'static str> {
 
     let height = num.len();
     let width = num[0].len();
-    let mut board = Board::new(BoardKind::OuterGrid, height, width);
+    let mut board = Board::new(
+        BoardKind::OuterGrid,
+        height,
+        width,
+        is_unique(&(&num, &border)),
+    );
 
     for y in 0..height {
         for x in 0..width {

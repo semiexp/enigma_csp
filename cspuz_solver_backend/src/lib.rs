@@ -2,6 +2,7 @@ extern crate cspuz_rs;
 
 pub mod board;
 mod puzzle;
+mod uniqueness;
 
 use board::Board;
 use cspuz_rs::serializer::{get_kudamono_url_info, url_to_puzzle_kind};

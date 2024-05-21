@@ -1,4 +1,5 @@
 use crate::board::{Board, BoardKind, Item, ItemKind};
+use crate::uniqueness::is_unique;
 use cspuz_rs::puzzle::guidearrow::{self, GuidearrowClue};
 
 pub fn solve_guidearrow(url: &str) -> Result<Board, &'static str> {
@@ -7,7 +8,7 @@ pub fn solve_guidearrow(url: &str) -> Result<Board, &'static str> {
 
     let height = clues.len();
     let width = clues[0].len();
-    let mut board = Board::new(BoardKind::Grid, height, width);
+    let mut board = Board::new(BoardKind::Grid, height, width, is_unique(&ans));
     board.push(Item::cell(
         ty as usize,
         tx as usize,

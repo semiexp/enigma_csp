@@ -1,4 +1,5 @@
 use crate::board::{Board, BoardKind, Item, ItemKind};
+use crate::uniqueness::{is_unique, Uniqueness};
 use cspuz_rs::puzzle::curvedata;
 
 pub fn solve_curvedata(url: &str) -> Result<Board, &'static str> {
@@ -7,7 +8,7 @@ pub fn solve_curvedata(url: &str) -> Result<Board, &'static str> {
 
     let height = piece_id.len();
     let width = piece_id[0].len();
-    let mut board = Board::new(BoardKind::Grid, height, width);
+    let mut board = Board::new(BoardKind::Grid, height, width, is_unique(&is_line));
 
     if let Some(borders) = borders {
         board.add_borders(&borders, "black");
@@ -44,7 +45,7 @@ pub fn enumerate_answers_curvedata(
 
     let height = piece_id.len();
     let width = piece_id[0].len();
-    let mut board_common = Board::new(BoardKind::Grid, height, width);
+    let mut board_common = Board::new(BoardKind::Grid, height, width, Uniqueness::NotApplicable);
 
     if let Some(borders) = borders {
         board_common.add_borders(&borders, "black");
@@ -67,7 +68,8 @@ pub fn enumerate_answers_curvedata(
 
     let mut board_answers = vec![];
     for ans in answers {
-        let mut board_answer = Board::new(BoardKind::Empty, height, width);
+        let mut board_answer =
+            Board::new(BoardKind::Empty, height, width, Uniqueness::NotApplicable);
         for y in 0..height {
             for x in 0..width {
                 if y < height - 1 && is_line_common.vertical[y][x].is_none() {

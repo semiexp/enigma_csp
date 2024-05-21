@@ -1,4 +1,5 @@
 use crate::board::{Board, BoardKind, Item, ItemKind};
+use crate::uniqueness::is_unique;
 use cspuz_rs::puzzle::crosswall;
 
 pub fn solve_crosswall(url: &str) -> Result<Board, &'static str> {
@@ -7,7 +8,7 @@ pub fn solve_crosswall(url: &str) -> Result<Board, &'static str> {
 
     let height = problem.len();
     let width = problem[0].len();
-    let mut board = Board::new(BoardKind::DotGrid, height, width);
+    let mut board = Board::new(BoardKind::DotGrid, height, width, is_unique(&is_line));
 
     for y in 0..height {
         for x in 0..width {

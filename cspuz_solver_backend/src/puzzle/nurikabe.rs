@@ -1,4 +1,5 @@
 use crate::board::{Board, BoardKind, Item, ItemKind};
+use crate::uniqueness::{is_unique, Uniqueness};
 use cspuz_rs::puzzle::nurikabe;
 
 pub fn solve_nurikabe(url: &str) -> Result<Board, &'static str> {
@@ -7,7 +8,7 @@ pub fn solve_nurikabe(url: &str) -> Result<Board, &'static str> {
 
     let height = problem.len();
     let width = problem[0].len();
-    let mut board = Board::new(BoardKind::Grid, height, width);
+    let mut board = Board::new(BoardKind::Grid, height, width, is_unique(&ans));
     for y in 0..height {
         for x in 0..width {
             if let Some(clue) = problem[y][x] {
@@ -40,7 +41,7 @@ pub fn enumerate_answers_nurikabe(
 
     let height = problem.len();
     let width = problem[0].len();
-    let mut board_common = Board::new(BoardKind::Grid, height, width);
+    let mut board_common = Board::new(BoardKind::Grid, height, width, Uniqueness::NotApplicable);
 
     for y in 0..height {
         for x in 0..width {
@@ -63,7 +64,8 @@ pub fn enumerate_answers_nurikabe(
 
     let mut boards = vec![];
     for ans in answers {
-        let mut board_answer = Board::new(BoardKind::Empty, height, width);
+        let mut board_answer =
+            Board::new(BoardKind::Empty, height, width, Uniqueness::NotApplicable);
         for y in 0..height {
             for x in 0..width {
                 if ans_common[y][x].is_some() {
