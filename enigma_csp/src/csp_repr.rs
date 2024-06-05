@@ -42,7 +42,7 @@ impl ConvertMapIndex for IntVar {
     }
 }
 
-#[derive(Clone, PartialEq, Eq, Debug)]
+#[derive(Debug)]
 pub enum Stmt {
     Expr(BoolExpr),
     AllDifferent(Vec<IntExpr>),
@@ -341,5 +341,28 @@ impl Mul<IntExpr> for IntExpr {
 
     fn mul(self, rhs: IntExpr) -> IntExpr {
         IntExpr::Mul(Box::new(self), Box::new(rhs))
+    }
+}
+
+#[cfg(test)]
+pub mod tests {
+    use super::*;
+
+    pub fn clone_stmt(stmt: &Stmt) -> Stmt {
+        let cloned = match &stmt {
+            Stmt::Expr(e) => Stmt::Expr(e.clone()),
+            Stmt::AllDifferent(exprs) => Stmt::AllDifferent(exprs.clone()),
+            Stmt::ActiveVerticesConnected(exprs, edges) => {
+                Stmt::ActiveVerticesConnected(exprs.clone(), edges.clone())
+            }
+            Stmt::Circuit(vars) => Stmt::Circuit(vars.clone()),
+            Stmt::ExtensionSupports(vars, supports) => {
+                Stmt::ExtensionSupports(vars.clone(), supports.clone())
+            }
+            Stmt::GraphDivision(sizes, edges, edges_lit) => {
+                Stmt::GraphDivision(sizes.clone(), edges.clone(), edges_lit.clone())
+            }
+        };
+        cloned
     }
 }

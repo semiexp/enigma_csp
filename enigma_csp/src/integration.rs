@@ -459,7 +459,8 @@ mod tests {
         }
 
         fn add_constraint(&mut self, stmt: Stmt) {
-            self.original_constr.push(stmt.clone());
+            let cloned = crate::csp_repr::tests::clone_stmt(&stmt);
+            self.original_constr.push(cloned);
             self.solver.add_constraint(stmt);
         }
 

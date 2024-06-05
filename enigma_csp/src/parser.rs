@@ -111,7 +111,7 @@ pub enum Var {
     Int(IntVar),
 }
 
-#[derive(PartialEq, Eq, Debug)]
+#[derive(Debug)]
 pub enum ParseResult<'a> {
     BoolVarDecl(&'a str),
     IntVarDecl(&'a str, Domain),
@@ -425,22 +425,39 @@ mod tests {
         let mut solver = IntegratedSolver::new();
 
         let result = parse(&var_map, "(bool foo)");
-        assert_eq!(result, ParseResult::BoolVarDecl("foo"));
+        match result {
+            ParseResult::BoolVarDecl(name) => {
+                assert_eq!(name, "foo");
+            }
+            _ => panic!(),
+        }
         let foo = solver.new_bool_var();
         var_map.add_bool_var("foo", foo);
 
         let result = parse(&var_map, "(bool bar)");
-        assert_eq!(result, ParseResult::BoolVarDecl("bar"));
+        match result {
+            ParseResult::BoolVarDecl(name) => {
+                assert_eq!(name, "bar");
+            }
+            _ => panic!(),
+        }
         let bar = solver.new_bool_var();
         var_map.add_bool_var("bar", bar);
 
         let result = parse(&var_map, "(|| (xor foo bar) bar)");
-        assert_eq!(
-            result,
-            ParseResult::Stmt(Stmt::Expr((foo.expr() ^ bar.expr()) | bar.expr()))
-        );
+        match result {
+            ParseResult::Stmt(Stmt::Expr(expr)) => {
+                assert_eq!(expr, (foo.expr() ^ bar.expr()) | bar.expr());
+            }
+            _ => panic!(),
+        }
 
         let result = parse(&var_map, "foo");
-        assert_eq!(result, ParseResult::Stmt(Stmt::Expr(foo.expr())));
+        match result {
+            ParseResult::Stmt(Stmt::Expr(expr)) => {
+                assert_eq!(expr, foo.expr());
+            }
+            _ => panic!(),
+        }
     }
 }
