@@ -286,6 +286,14 @@ fn normalize_stmt(env: &mut NormalizerEnv, stmt: Stmt) {
                     edge_lits_converted,
                 ));
         }
+        Stmt::CustomConstraint(inputs, constr) => {
+            let inputs_as_lit = inputs
+                .into_iter()
+                .map(|e| equivalent_bool_lit(env, e))
+                .collect::<Vec<_>>();
+            env.norm
+                .add_extra_constraint(ExtraConstraint::CustomConstraint(inputs_as_lit, constr));
+        }
     }
     if env.config.verbose {
         for i in num_constrs_before_norm..env.norm.constraints.len() {
@@ -1231,6 +1239,7 @@ mod tests {
                         }
                     }
                     Stmt::GraphDivision(_, _, _) => todo!(),
+                    Stmt::CustomConstraint(_, _) => todo!(),
                 }
             }
             true
@@ -1287,6 +1296,7 @@ mod tests {
                         }
                     }
                     ExtraConstraint::GraphDivision(_, _, _) => todo!(),
+                    ExtraConstraint::CustomConstraint(_, _) => todo!(),
                 }
             }
             true

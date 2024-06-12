@@ -3,6 +3,7 @@ use std::io::Write;
 use std::ops::{Add, BitAnd, BitOr, BitXor, Mul, Not, Sub};
 
 use crate::arithmetic::CmpOp;
+use crate::custom_constraints::PropagatorGenerator;
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug, Hash)]
 pub struct BoolVar(usize);
@@ -42,7 +43,6 @@ impl ConvertMapIndex for IntVar {
     }
 }
 
-#[derive(Debug)]
 pub enum Stmt {
     Expr(BoolExpr),
     AllDifferent(Vec<IntExpr>),
@@ -50,6 +50,31 @@ pub enum Stmt {
     Circuit(Vec<IntVar>),
     ExtensionSupports(Vec<IntVar>, Vec<Vec<Option<i32>>>),
     GraphDivision(Vec<Option<IntExpr>>, Vec<(usize, usize)>, Vec<BoolExpr>),
+    CustomConstraint(Vec<BoolExpr>, Box<dyn PropagatorGenerator>),
+}
+
+impl std::fmt::Debug for Stmt {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Stmt::Expr(e) => write!(f, "Expr({:?})", e),
+            Stmt::AllDifferent(exprs) => write!(f, "AllDifferent({:?})", exprs),
+            Stmt::ActiveVerticesConnected(exprs, edges) => {
+                write!(f, "ActiveVerticesConnected({:?}, {:?})", exprs, edges)
+            }
+            Stmt::Circuit(vars) => write!(f, "Circuit({:?})", vars),
+            Stmt::ExtensionSupports(vars, supports) => {
+                write!(f, "ExtensionSupports({:?}, {:?})", vars, supports)
+            }
+            Stmt::GraphDivision(sizes, edges, edges_lit) => {
+                write!(
+                    f,
+                    "GraphDivision({:?}, {:?}, {:?})",
+                    sizes, edges, edges_lit
+                )
+            }
+            Stmt::CustomConstraint(_, _) => write!(f, "CustomConstraint"),
+        }
+    }
 }
 
 impl Stmt {
@@ -91,6 +116,7 @@ impl Stmt {
             }
             Stmt::ExtensionSupports(_, _) => todo!(),
             Stmt::GraphDivision(_, _, _) => todo!(),
+            Stmt::CustomConstraint(_, _) => todo!(),
         }
         Ok(())
     }
@@ -361,6 +387,9 @@ pub mod tests {
             }
             Stmt::GraphDivision(sizes, edges, edges_lit) => {
                 Stmt::GraphDivision(sizes.clone(), edges.clone(), edges_lit.clone())
+            }
+            Stmt::CustomConstraint(_, _) => {
+                panic!("CustomConstraint cannot be cloned");
             }
         };
         cloned

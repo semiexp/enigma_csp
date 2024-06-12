@@ -5,6 +5,7 @@ use std::ops::Not;
 
 use super::domain::Domain;
 use crate::arithmetic::{CheckedInt, CmpOp, Range};
+use crate::custom_constraints::PropagatorGenerator;
 use crate::util::{ConvertMapIndex, UpdateStatus};
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug, Hash)]
@@ -340,6 +341,7 @@ pub enum ExtraConstraint {
     Mul(IntVar, IntVar, IntVar),
     ExtensionSupports(Vec<IntVar>, Vec<Vec<Option<CheckedInt>>>),
     GraphDivision(Vec<Option<IntVar>>, Vec<(usize, usize)>, Vec<BoolLit>),
+    CustomConstraint(Vec<BoolLit>, Box<dyn PropagatorGenerator>),
 }
 
 pub struct NormCSP {

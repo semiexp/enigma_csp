@@ -9,7 +9,7 @@ use super::norm_csp::{
     BoolLit, BoolVar, Constraint, ExtraConstraint, IntVar, IntVarRepresentation, LinearLit,
     LinearSum, NormCSP, NormCSPVars,
 };
-use super::sat::{Lit, SATModel, SAT};
+use super::sat::{Backend, Lit, SATModel, SAT};
 use crate::arithmetic::{CheckedInt, CmpOp, Range};
 use crate::util::ConvertMap;
 
@@ -615,6 +615,16 @@ pub fn encode(norm: &mut NormCSP, sat: &mut SAT, map: &mut EncodeMap, config: &C
                 env.sat
                     .add_graph_division(&domains, &dom_lits, &edges, &edge_lits);
             }
+            ExtraConstraint::CustomConstraint(lits, constr) => {
+                let lits = lits
+                    .into_iter()
+                    .map(|l| env.convert_bool_lit(l))
+                    .collect::<Vec<_>>();
+                if env.sat.get_backend() != Backend::Glucose {
+                    todo!("custom constraints are only supported with Glucose backend");
+                }
+                env.sat.add_custom_constraint(lits, constr);
+            }
         }
     }
     norm.num_encoded_vars = norm.vars.num_int_vars();
@@ -674,6 +684,7 @@ fn decide_encode_schemes(
                 ExtraConstraint::ActiveVerticesConnected(_, _) => (),
                 ExtraConstraint::ExtensionSupports(_, _) => (),
                 ExtraConstraint::GraphDivision(_, _, _) => (),
+                ExtraConstraint::CustomConstraint(_, _) => (),
             }
         }
 
@@ -728,6 +739,7 @@ fn decide_encode_schemes(
                     }
                     ExtraConstraint::ExtensionSupports(_, _) => (),
                     ExtraConstraint::GraphDivision(_, _, _) => (),
+                    ExtraConstraint::CustomConstraint(_, _) => (),
                 }
             }
 

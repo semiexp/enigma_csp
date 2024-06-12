@@ -2,6 +2,7 @@ pub mod arithmetic;
 pub mod config;
 pub mod csp;
 mod csp_repr;
+pub mod custom_constraints;
 pub mod domain;
 
 pub mod backend;

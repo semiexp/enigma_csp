@@ -579,6 +579,9 @@ mod tests {
                             return false;
                         }
                     }
+                    Stmt::CustomConstraint(_, _) => {
+                        todo!();
+                    }
                 }
             }
             true

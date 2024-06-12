@@ -362,6 +362,8 @@ extern "C" {
     fn Glucose_SolverValue(solver: *mut Opaque, lit: Lit) -> i32;
     fn Glucose_SolverAddWatch(solver: *mut Opaque, lit: Lit, wrapper_object: *mut c_void);
     fn Glucose_SolverEnqueue(solver: *mut Opaque, lit: Lit, wrapper_object: *mut c_void) -> i32;
+
+    fn Glucose_IsCurrentLevel(solver: *mut Opaque, lit: Lit) -> i32;
 }
 
 #[derive(Clone, Copy)]
@@ -389,6 +391,10 @@ impl SolverManipulator {
     pub unsafe fn enqueue(&mut self, lit: Lit) -> bool {
         assert!(self.wrapper_object.is_some());
         Glucose_SolverEnqueue(self.ptr, lit, self.wrapper_object.unwrap()) != 0
+    }
+
+    pub unsafe fn is_current_level(&self, lit: Lit) -> bool {
+        Glucose_IsCurrentLevel(self.ptr, lit) != 0
     }
 }
 

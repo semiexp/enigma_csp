@@ -6,6 +6,8 @@ use crate::backend::cadical;
 use crate::backend::external;
 use crate::backend::glucose;
 
+use crate::custom_constraints::PropagatorGenerator;
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Var(pub(crate) i32);
 
@@ -102,6 +104,14 @@ impl SAT {
             Backend::CaDiCaL => SAT::new_cadical(),
             #[cfg(not(feature = "backend-cadical"))]
             Backend::CaDiCaL => panic!("CaDiCaL backend is not enabled"),
+        }
+    }
+
+    pub fn get_backend(&self) -> Backend {
+        match self {
+            SAT::Glucose(_) => Backend::Glucose,
+            SAT::External(_) => Backend::External,
+            SAT::CaDiCaL(_) => Backend::CaDiCaL,
         }
     }
 
@@ -292,6 +302,20 @@ impl SAT {
             SAT::External(_) => panic!("add_graph_division is not supported in external backend"),
             #[cfg(feature = "backend-cadical")]
             SAT::CaDiCaL(_) => todo!(),
+        }
+    }
+
+    pub fn add_custom_constraint(
+        &mut self,
+        inputs: Vec<Lit>,
+        constr: Box<dyn PropagatorGenerator>,
+    ) -> bool {
+        match self {
+            SAT::Glucose(solver) => {
+                let propagator = constr.generate(inputs);
+                solver.add_custom_constraint(propagator)
+            }
+            _ => todo!("add_custom_constraint is supported only in Glucose backend"),
         }
     }
 
