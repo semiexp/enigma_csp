@@ -110,7 +110,9 @@ impl SAT {
     pub fn get_backend(&self) -> Backend {
         match self {
             SAT::Glucose(_) => Backend::Glucose,
+            #[cfg(feature = "backend-external")]
             SAT::External(_) => Backend::External,
+            #[cfg(feature = "backend-cadical")]
             SAT::CaDiCaL(_) => Backend::CaDiCaL,
         }
     }

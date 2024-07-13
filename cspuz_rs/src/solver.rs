@@ -6,6 +6,7 @@ pub use enigma_csp::csp::BoolVar as CSPBoolVar;
 pub use enigma_csp::csp::IntExpr as CSPIntExpr;
 pub use enigma_csp::csp::IntVar as CSPIntVar;
 use enigma_csp::csp::{Assignment, Stmt};
+use enigma_csp::custom_constraints::PropagatorGenerator;
 use enigma_csp::domain::Domain;
 use enigma_csp::integration::IntegratedSolver;
 use enigma_csp::integration::Model as IntegratedModel;
@@ -1198,6 +1199,17 @@ impl<'a> Solver<'a> {
             .collect();
         self.solver
             .add_constraint(Stmt::GraphDivision(sizes, edges.to_owned(), edge_values));
+    }
+
+    pub fn add_custom_constraint<T>(
+        &mut self,
+        constraint: Box<dyn PropagatorGenerator>,
+        vars: T,
+    ) where
+        T: IntoIterator,
+        <T as IntoIterator>::Item: Operand<Output = Array0DImpl<CSPBoolExpr>>, {
+        let vars = vars.into_iter().map(|x| x.as_expr_array().data).collect();
+        self.solver.add_constraint(Stmt::CustomConstraint(vars, constraint));
     }
 
     pub fn set_perf_stats<'b: 'a>(&mut self, perf_stats: &'b PerfStats) {
