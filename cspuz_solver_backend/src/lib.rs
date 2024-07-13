@@ -122,6 +122,8 @@ fn solve_puzz_link(puzzle_kind: String, url: &str) -> Result<Board, &'static str
         puzzle::polyominous::solve_pentominous(url)
     } else if puzzle_kind == "akichi" {
         puzzle::akichiwake::solve_akichiwake(url)
+    } else if puzzle_kind == "chainedb" {
+        puzzle::chainedb::solve_chainedb(url)
     } else {
         Err("unknown puzzle type")
     }

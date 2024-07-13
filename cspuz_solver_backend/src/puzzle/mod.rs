@@ -6,6 +6,7 @@ pub mod araf;
 pub mod barns;
 pub mod castle_wall;
 pub mod cave;
+pub mod chainedb;
 pub mod chocobanana;
 pub mod cocktail;
 pub mod compass;
