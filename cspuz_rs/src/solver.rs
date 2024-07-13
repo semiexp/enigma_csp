@@ -1201,15 +1201,14 @@ impl<'a> Solver<'a> {
             .add_constraint(Stmt::GraphDivision(sizes, edges.to_owned(), edge_values));
     }
 
-    pub fn add_custom_constraint<T>(
-        &mut self,
-        constraint: Box<dyn PropagatorGenerator>,
-        vars: T,
-    ) where
+    pub fn add_custom_constraint<T>(&mut self, constraint: Box<dyn PropagatorGenerator>, vars: T)
+    where
         T: IntoIterator,
-        <T as IntoIterator>::Item: Operand<Output = Array0DImpl<CSPBoolExpr>>, {
+        <T as IntoIterator>::Item: Operand<Output = Array0DImpl<CSPBoolExpr>>,
+    {
         let vars = vars.into_iter().map(|x| x.as_expr_array().data).collect();
-        self.solver.add_constraint(Stmt::CustomConstraint(vars, constraint));
+        self.solver
+            .add_constraint(Stmt::CustomConstraint(vars, constraint));
     }
 
     pub fn set_perf_stats<'b: 'a>(&mut self, perf_stats: &'b PerfStats) {
