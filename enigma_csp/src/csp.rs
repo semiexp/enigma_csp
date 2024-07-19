@@ -427,7 +427,7 @@ impl CSP {
                 }
                 Stmt::CustomConstraint(exprs, _) => {
                     exprs.iter_mut().for_each(|e| vars.constant_folding_bool(e));
-                },
+                }
             }
         }
     }

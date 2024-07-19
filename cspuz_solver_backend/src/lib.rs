@@ -124,6 +124,8 @@ fn solve_puzz_link(puzzle_kind: String, url: &str) -> Result<Board, &'static str
         puzzle::akichiwake::solve_akichiwake(url)
     } else if puzzle_kind == "chainedb" {
         puzzle::chainedb::solve_chainedb(url)
+    } else if puzzle_kind == "evolmino" {
+        puzzle::evolmino::solve_evolmino(url)
     } else {
         Err("unknown puzzle type")
     }
