@@ -838,31 +838,6 @@ impl SimpleCustomConstraint for EvolminoConstraint {
     }
 
     fn find_inconsistency(&mut self) -> Option<Vec<(usize, bool)>> {
-        let res = self.find_inconsistency_sub();
-        /*
-        if let Some(r) = &res {
-            let mut vis = vec![vec!['.'; self.board.width]; self.board.height];
-            for &(idx, val) in r {
-                let y = idx / self.board.width;
-                let x = idx % self.board.width;
-                vis[y][x] = if val { '#' } else { '_' };
-            }
-            eprintln!("=== reason ===");
-            for y in 0..self.board.height {
-                for x in 0..self.board.width {
-                    eprint!("{} ", vis[y][x]);
-                }
-                eprintln!();
-            }
-            eprintln!();
-        }
-        */
-        res
-    }
-}
-
-impl EvolminoConstraint {
-    fn find_inconsistency_sub(&mut self) -> Option<Vec<(usize, bool)>> {
         let height = self.board.height;
         let width = self.board.width;
 
