@@ -745,6 +745,13 @@ impl BoardManager {
             foreach_neighbor(y, x, height, width, |y2, x2| {
                 if self.cells[y2][x2] == BoardCell::Empty {
                     ret.push((self.cell_id(y2, x2), false));
+                } else if self.cells[y2][x2] == BoardCell::Undecided {
+                    foreach_neighbor(y2, x2, height, width, |y3, x3| {
+                        let i = info.cell_info[y3][x3];
+                        if i.0 == DetailedCellKind::ArrowBlock && i.1 != block_id {
+                            disturbing_blocks.push(i.1);
+                        }
+                    })
                 }
             })
         }
@@ -776,6 +783,13 @@ impl BoardManager {
                     if i.0 == DetailedCellKind::ArrowBlockNeighbor && i.1 != block_id {
                         disturbing_blocks.push(i.1);
                     }
+
+                    foreach_neighbor(y2, x2, height, width, |y3, x3| {
+                        let i = info.cell_info[y3][x3];
+                        if i.0 == DetailedCellKind::ArrowBlock && i.1 != block_id {
+                            disturbing_blocks.push(i.1);
+                        }
+                    })
                 });
             }
         }
