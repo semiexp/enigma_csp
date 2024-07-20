@@ -7,6 +7,8 @@ pub fn infer_shape<T>(array: &[Vec<T>]) -> (usize, usize) {
 
 #[cfg(test)]
 pub mod tests {
+    use enigma_csp::custom_constraints::SimpleCustomConstraint;
+
     pub fn to_option_2d<X, Y, T>(array: X) -> Vec<Vec<Option<T>>>
     where
         X: IntoIterator<Item = Y>,
@@ -59,5 +61,61 @@ pub mod tests {
         assert!(reserialized.is_some());
         let reserialized = reserialized.unwrap();
         assert_eq!(reserialized, url);
+    }
+
+    pub struct ReasonVerifier<T: SimpleCustomConstraint> {
+        constraint: T,
+        cloned_constraint: T,
+    }
+
+    impl<T: SimpleCustomConstraint> ReasonVerifier<T> {
+        pub fn new(constraint: T, cloned_constraint: T) -> ReasonVerifier<T> {
+            ReasonVerifier {
+                constraint,
+                cloned_constraint,
+            }
+        }
+    }
+
+    impl<T: SimpleCustomConstraint> SimpleCustomConstraint for ReasonVerifier<T> {
+        fn initialize_sat(&mut self, num_inputs: usize) {
+            self.constraint.initialize_sat(num_inputs);
+            self.cloned_constraint.initialize_sat(num_inputs);
+        }
+
+        fn notify(&mut self, index: usize, value: bool) {
+            self.constraint.notify(index, value);
+        }
+
+        fn undo(&mut self) {
+            self.constraint.undo();
+        }
+
+        fn find_inconsistency(&mut self) -> Option<Vec<(usize, bool)>> {
+            let reason = self.constraint.find_inconsistency();
+
+            if let Some(reason) = &reason {
+                let mut reason = reason.clone();
+                reason.sort();
+                reason.dedup();
+                for &(idx, value) in &reason {
+                    self.cloned_constraint.notify(idx, value);
+                }
+
+                let cloned_reason = self.cloned_constraint.find_inconsistency();
+                assert!(cloned_reason.is_some());
+
+                // TODO: check if `cloned_reason` is a subset of `reason`
+                for item in &cloned_reason.unwrap() {
+                    assert!(reason.binary_search(item).is_ok());
+                }
+
+                for _ in 0..reason.len() {
+                    self.cloned_constraint.undo();
+                }
+            }
+
+            reason
+        }
     }
 }

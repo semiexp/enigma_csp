@@ -51,12 +51,35 @@ pub fn solve_evolmino(problem: &Problem) -> Option<Vec<Vec<Option<bool>>>> {
     }
 
     let problem = ProblemWithArrowId::new(problem)?;
-    let constraint = EvolminoConstraint {
-        board: BoardManager::new(problem.clone()),
-        problem,
-    };
 
-    solver.add_custom_constraint(Box::new(constraint), is_square);
+    #[cfg(not(test))]
+    {
+        let constraint = EvolminoConstraint {
+            board: BoardManager::new(problem.clone()),
+            problem,
+        };
+        solver.add_custom_constraint(Box::new(constraint), is_square);
+    }
+
+    #[cfg(test)]
+    {
+        let constraint = EvolminoConstraint {
+            board: BoardManager::new(problem.clone()),
+            problem: problem.clone(),
+        };
+        let cloned_constraint = EvolminoConstraint {
+            board: BoardManager::new(problem.clone()),
+            problem,
+        };
+
+        solver.add_custom_constraint(
+            Box::new(util::tests::ReasonVerifier::new(
+                constraint,
+                cloned_constraint,
+            )),
+            is_square,
+        );
+    }
 
     solver.irrefutable_facts().map(|f| f.get(is_square))
 }
@@ -1173,5 +1196,22 @@ mod tests {
         let problem = problem_for_tests();
         let url = "https://puzz.link/p?evolmino/6/7/i6900910k00005zz1p0008222o";
         util::tests::serializer_test(problem, url, serialize_problem, deserialize_problem);
+    }
+
+    #[test]
+    #[ignore]
+    fn test_evolmino_problems() {
+        let urls = [
+            "https://puzz.link/p?evolmino/8/8/0000io6000800022ii0060zzdsozzh",
+            "https://puzz.link/p?evolmino/8/8/00600090ii60000900200iza0m77q10zz07u",
+            "https://puzz.link/p?evolmino/9/9/i00000000q008i02o00000000000t0h0000uxp82000010mu968688k",
+            "https://puzz.link/p?evolmino/10/10/o2o82o22q0020000000000000000000000wzzn999nzj09000z6999br",
+        ];
+
+        for url in urls {
+            let problem = deserialize_problem(url).unwrap();
+            let ans = solve_evolmino(&problem);
+            assert!(ans.is_some());
+        }
     }
 }
