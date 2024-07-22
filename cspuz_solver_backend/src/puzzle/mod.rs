@@ -15,6 +15,7 @@ pub mod creek;
 pub mod cross_border_parity_loop;
 pub mod crosswall;
 pub mod curvedata;
+pub mod dbchoco;
 pub mod evolmino;
 pub mod fillomino;
 pub mod firefly;
