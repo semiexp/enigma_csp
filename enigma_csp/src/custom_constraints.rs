@@ -54,6 +54,10 @@ pub trait SimpleCustomConstraint {
     fn notify(&mut self, index: usize, value: bool);
     fn find_inconsistency(&mut self) -> Option<Vec<(usize, bool)>>;
     fn undo(&mut self);
+
+    fn lazy_propagation(&self) -> bool {
+        false
+    }
 }
 
 impl<T: SimpleCustomConstraint> PropagatorGenerator for T {
@@ -109,12 +113,16 @@ unsafe impl<T: SimpleCustomConstraint> CustomPropagator for CustomConstraintWrap
         self.constraint.find_inconsistency().is_none()
     }
 
-    fn propagate(&mut self, _solver: SolverManipulator, p: Lit) -> bool {
+    fn propagate(&mut self, _solver: SolverManipulator, p: Lit, num_pending_propations: i32) -> bool {
         let mut idx = self.all_lits.partition_point(|(lit, _, _)| *lit < p);
         while idx < self.all_lits.len() && self.all_lits[idx].0 == p {
             let (_, i, value) = self.all_lits[idx];
             self.constraint.notify(i, value);
             idx += 1;
+        }
+
+        if self.constraint.lazy_propagation() && num_pending_propations > 0 {
+            return true;
         }
 
         if let Some(inconsistency) = self.constraint.find_inconsistency() {

@@ -400,7 +400,7 @@ impl SolverManipulator {
 
 pub unsafe trait CustomPropagator {
     fn initialize(&mut self, solver: SolverManipulator) -> bool;
-    fn propagate(&mut self, solver: SolverManipulator, p: Lit) -> bool;
+    fn propagate(&mut self, solver: SolverManipulator, p: Lit, num_pending_propagations: i32) -> bool;
     fn calc_reason(
         &mut self,
         solver: SolverManipulator,
@@ -435,6 +435,7 @@ extern "C" fn Glucose_CallCustomPropagatorPropagate(
     wrapper_object: *mut c_void,
     trait_object: *mut c_void,
     p: Lit,
+    num_pending_propagations: i32,
 ) -> i32 {
     let trait_object =
         unsafe { std::mem::transmute::<_, &mut Box<dyn CustomPropagator>>(trait_object) };
@@ -444,6 +445,7 @@ extern "C" fn Glucose_CallCustomPropagatorPropagate(
             wrapper_object: Some(wrapper_object),
         },
         p,
+        num_pending_propagations,
     );
     if res {
         1
@@ -579,7 +581,7 @@ unsafe impl CustomPropagator for OrderEncodingLinear {
         for lit in unique_watchers {
             let val = unsafe { solver.value(lit) };
             if val == Some(true) {
-                if !self.propagate(solver, lit) {
+                if !self.propagate(solver, lit, 0) {
                     return false;
                 }
             }
@@ -592,7 +594,7 @@ unsafe impl CustomPropagator for OrderEncodingLinear {
         true
     }
 
-    fn propagate(&mut self, mut solver: SolverManipulator, p: Lit) -> bool {
+    fn propagate(&mut self, mut solver: SolverManipulator, p: Lit, _num_pending_propagations: i32) -> bool {
         self.active_lits.push(p);
         self.undo_list.push(None);
 
@@ -748,7 +750,7 @@ mod tests {
                 // TODO: this `clone` is just for silencing the borrow checker
                 if let Some(v) = unsafe { solver.value(var.as_lit(false)) } {
                     let lit_sign = var.as_lit(!v);
-                    if !self.propagate(solver, lit_sign) {
+                    if !self.propagate(solver, lit_sign, 0) {
                         return false;
                     }
                 }
@@ -756,7 +758,7 @@ mod tests {
             true
         }
 
-        fn propagate(&mut self, mut solver: SolverManipulator, p: Lit) -> bool {
+        fn propagate(&mut self, mut solver: SolverManipulator, p: Lit, _num_pending_propagations: i32) -> bool {
             let s = !p.is_negated();
             let v = p.var();
 

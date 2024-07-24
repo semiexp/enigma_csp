@@ -625,6 +625,10 @@ struct DoublechocoConstraint {
 }
 
 impl SimpleCustomConstraint for DoublechocoConstraint {
+    fn lazy_propagation(&self) -> bool {
+        true
+    }
+
     fn initialize_sat(&mut self, num_inputs: usize) {
         assert_eq!(
             num_inputs,

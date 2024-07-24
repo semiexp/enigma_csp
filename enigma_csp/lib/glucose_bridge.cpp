@@ -14,7 +14,7 @@ bool RustExtraConstraint::initialize(Solver& solver) {
 
 bool RustExtraConstraint::propagate(Solver& solver, Lit p) {
     solver.registerUndo(var(p), this);
-    return Glucose_CallCustomPropagatorPropagate(&solver, this, trait_object_, p.x) != 0;
+    return Glucose_CallCustomPropagatorPropagate(&solver, this, trait_object_, p.x, num_pending_propagation()) != 0;
 }
 
 void RustExtraConstraint::calcReason(Solver& solver, Lit p, Lit extra, vec<Lit>& out_reason) {

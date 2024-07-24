@@ -838,6 +838,10 @@ struct EvolminoConstraint {
 }
 
 impl SimpleCustomConstraint for EvolminoConstraint {
+    fn lazy_propagation(&self) -> bool {
+        true
+    }
+
     fn initialize_sat(&mut self, num_inputs: usize) {
         assert_eq!(num_inputs, self.board.height * self.board.width);
     }
