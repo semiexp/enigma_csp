@@ -400,7 +400,12 @@ impl SolverManipulator {
 
 pub unsafe trait CustomPropagator {
     fn initialize(&mut self, solver: SolverManipulator) -> bool;
-    fn propagate(&mut self, solver: SolverManipulator, p: Lit, num_pending_propagations: i32) -> bool;
+    fn propagate(
+        &mut self,
+        solver: SolverManipulator,
+        p: Lit,
+        num_pending_propagations: i32,
+    ) -> bool;
     fn calc_reason(
         &mut self,
         solver: SolverManipulator,
@@ -594,7 +599,12 @@ unsafe impl CustomPropagator for OrderEncodingLinear {
         true
     }
 
-    fn propagate(&mut self, mut solver: SolverManipulator, p: Lit, _num_pending_propagations: i32) -> bool {
+    fn propagate(
+        &mut self,
+        mut solver: SolverManipulator,
+        p: Lit,
+        _num_pending_propagations: i32,
+    ) -> bool {
         self.active_lits.push(p);
         self.undo_list.push(None);
 
@@ -758,7 +768,12 @@ mod tests {
             true
         }
 
-        fn propagate(&mut self, mut solver: SolverManipulator, p: Lit, _num_pending_propagations: i32) -> bool {
+        fn propagate(
+            &mut self,
+            mut solver: SolverManipulator,
+            p: Lit,
+            _num_pending_propagations: i32,
+        ) -> bool {
             let s = !p.is_negated();
             let v = p.var();
 

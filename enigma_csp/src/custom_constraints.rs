@@ -113,7 +113,12 @@ unsafe impl<T: SimpleCustomConstraint> CustomPropagator for CustomConstraintWrap
         self.constraint.find_inconsistency().is_none()
     }
 
-    fn propagate(&mut self, _solver: SolverManipulator, p: Lit, num_pending_propations: i32) -> bool {
+    fn propagate(
+        &mut self,
+        _solver: SolverManipulator,
+        p: Lit,
+        num_pending_propations: i32,
+    ) -> bool {
         let mut idx = self.all_lits.partition_point(|(lit, _, _)| *lit < p);
         while idx < self.all_lits.len() && self.all_lits[idx].0 == p {
             let (_, i, value) = self.all_lits[idx];
