@@ -1,4 +1,4 @@
-use std::ops::Index;
+use std::ops::{Index, IndexMut};
 
 use super::util;
 use crate::graph;
@@ -31,19 +31,23 @@ pub fn solve_doublechoco(
         .chain(is_border.horizontal.clone().into_iter())
         .collect::<Vec<_>>();
 
+    let cell_num = Grid::from_vecs(
+        &(num
+            .iter()
+            .map(|row| {
+                row.iter()
+                    .map(|&n| n.map(|x| x as usize))
+                    .collect::<Vec<_>>()
+            })
+            .collect::<Vec<_>>()),
+    );
+
     #[cfg(not(test))]
     {
         let constraint = DoublechocoConstraint {
             board: BoardManager::new(color),
-            cell_color: color.to_vec(),
-            cell_num: num
-                .iter()
-                .map(|row| {
-                    row.iter()
-                        .map(|&n| n.map(|x| x as usize))
-                        .collect::<Vec<_>>()
-                })
-                .collect(),
+            cell_color: Grid::from_vecs(color),
+            cell_num,
         };
 
         solver.add_custom_constraint(Box::new(constraint), edges_flat);
@@ -53,27 +57,13 @@ pub fn solve_doublechoco(
     {
         let constraint = DoublechocoConstraint {
             board: BoardManager::new(color),
-            cell_color: color.to_vec(),
-            cell_num: num
-                .iter()
-                .map(|row| {
-                    row.iter()
-                        .map(|&n| n.map(|x| x as usize))
-                        .collect::<Vec<_>>()
-                })
-                .collect(),
+            cell_color: Grid::from_vecs(color),
+            cell_num: cell_num.clone(),
         };
         let cloned_constraint = DoublechocoConstraint {
             board: BoardManager::new(color),
-            cell_color: color.to_vec(),
-            cell_num: num
-                .iter()
-                .map(|row| {
-                    row.iter()
-                        .map(|&n| n.map(|x| x as usize))
-                        .collect::<Vec<_>>()
-                })
-                .collect(),
+            cell_color: Grid::from_vecs(color),
+            cell_num,
         };
 
         solver.add_custom_constraint(
@@ -121,33 +111,93 @@ enum Border {
     Connected,
 }
 
+#[derive(Clone)]
+struct Grid<T: Clone> {
+    data: Vec<T>,
+    height: usize,
+    width: usize,
+}
+
+impl<T: Clone> Grid<T> {
+    pub fn new(height: usize, width: usize, default: T) -> Grid<T> {
+        Grid {
+            data: vec![default; height * width],
+            height,
+            width,
+        }
+    }
+
+    pub fn from_vecs(vecs: &[Vec<T>]) -> Grid<T> {
+        let height = vecs.len();
+        assert!(height > 0);
+        let width = vecs[0].len();
+        let mut buf = vec![];
+        for i in 0..height {
+            assert_eq!(vecs[i].len(), width);
+            buf.extend_from_slice(&vecs[i]);
+        }
+
+        Grid {
+            data: buf,
+            height,
+            width,
+        }
+    }
+
+    pub fn height(&self) -> usize {
+        self.height
+    }
+
+    pub fn width(&self) -> usize {
+        self.width
+    }
+}
+
+impl<T: Clone> Index<(usize, usize)> for Grid<T> {
+    type Output = T;
+
+    fn index(&self, index: (usize, usize)) -> &Self::Output {
+        let (y, x) = index;
+        assert!(y < self.height && x < self.width);
+        unsafe { self.data.get_unchecked(y * self.width + x) }
+    }
+}
+
+impl<T: Clone> IndexMut<(usize, usize)> for Grid<T> {
+    fn index_mut(&mut self, index: (usize, usize)) -> &mut Self::Output {
+        let (y, x) = index;
+        assert!(y < self.height && x < self.width);
+        unsafe { self.data.get_unchecked_mut(y * self.width + x) }
+    }
+}
+
 // TODO: remove duplicated codes (`evolmino.rs` has the same code)
 
 const NO_GROUP: usize = !0;
 
 struct GroupInfo {
-    group_id: Vec<Vec<usize>>,
+    group_id: Grid<usize>,
     groups_flat: Vec<(usize, usize)>,
     groups_offset: Vec<usize>,
 }
 
 impl GroupInfo {
-    fn new(group_id: Vec<Vec<usize>>) -> GroupInfo {
-        let height = group_id.len();
-        let width = group_id[0].len();
+    fn new(group_id: Grid<usize>) -> GroupInfo {
+        let height = group_id.height();
+        let width = group_id.width();
 
         let mut group_size = vec![];
         for y in 0..height {
             for x in 0..width {
-                if group_id[y][x] == NO_GROUP {
+                if group_id[(y, x)] == NO_GROUP {
                     continue;
                 }
 
-                while group_size.len() <= group_id[y][x] {
+                while group_size.len() <= group_id[(y, x)] {
                     group_size.push(0);
                 }
 
-                group_size[group_id[y][x]] += 1;
+                group_size[group_id[(y, x)]] += 1;
             }
         }
 
@@ -161,7 +211,7 @@ impl GroupInfo {
 
         for y in 0..height {
             for x in 0..width {
-                let id = group_id[y][x];
+                let id = group_id[(y, x)];
                 if id == NO_GROUP {
                     continue;
                 }
@@ -318,14 +368,14 @@ struct BoardInfo {
 struct BoardManager {
     height: usize,
     width: usize,
-    cell_color: Vec<Vec<i32>>,
+    cell_color: Grid<i32>,
     decision_stack: Vec<usize>,
 
     // borders between horizontally adjacent cells
-    horizontal_borders: Vec<Vec<Border>>,
+    horizontal_borders: Grid<Border>,
 
     // borders between vertically adjacent cells
-    vertical_borders: Vec<Vec<Border>>,
+    vertical_borders: Grid<Border>,
 }
 
 impl BoardManager {
@@ -336,10 +386,10 @@ impl BoardManager {
         BoardManager {
             height,
             width,
-            cell_color: cell_color.to_vec(),
+            cell_color: Grid::from_vecs(cell_color),
             decision_stack: vec![],
-            horizontal_borders: vec![vec![Border::Undecided; width - 1]; height],
-            vertical_borders: vec![vec![Border::Undecided; width]; height - 1],
+            horizontal_borders: Grid::new(height, width - 1, Border::Undecided),
+            vertical_borders: Grid::new(height - 1, width, Border::Undecided),
         }
     }
 
@@ -368,15 +418,15 @@ impl BoardManager {
         let (is_vertical, y, x) = self.idx_to_border(idx);
 
         if is_vertical {
-            assert_eq!(self.vertical_borders[y][x], Border::Undecided);
-            self.vertical_borders[y][x] = if value {
+            assert_eq!(self.vertical_borders[(y, x)], Border::Undecided);
+            self.vertical_borders[(y, x)] = if value {
                 Border::Wall
             } else {
                 Border::Connected
             };
         } else {
-            assert_eq!(self.horizontal_borders[y][x], Border::Undecided);
-            self.horizontal_borders[y][x] = if value {
+            assert_eq!(self.horizontal_borders[(y, x)], Border::Undecided);
+            self.horizontal_borders[(y, x)] = if value {
                 Border::Wall
             } else {
                 Border::Connected
@@ -392,11 +442,11 @@ impl BoardManager {
         let (is_vertical, y, x) = self.idx_to_border(top);
 
         if is_vertical {
-            assert_ne!(self.vertical_borders[y][x], Border::Undecided);
-            self.vertical_borders[y][x] = Border::Undecided;
+            assert_ne!(self.vertical_borders[(y, x)], Border::Undecided);
+            self.vertical_borders[(y, x)] = Border::Undecided;
         } else {
-            assert_ne!(self.horizontal_borders[y][x], Border::Undecided);
-            self.horizontal_borders[y][x] = Border::Undecided;
+            assert_ne!(self.horizontal_borders[(y, x)], Border::Undecided);
+            self.horizontal_borders[(y, x)] = Border::Undecided;
         }
     }
 
@@ -405,14 +455,14 @@ impl BoardManager {
 
         for &(y, x) in &info.units[unit_id] {
             if y < self.height - 1
-                && info.units.group_id[y + 1][x] == unit_id
-                && self.vertical_borders[y][x] == Border::Connected
+                && info.units.group_id[(y + 1, x)] == unit_id
+                && self.vertical_borders[(y, x)] == Border::Connected
             {
                 ret.push((self.vertical_idx(y, x), false));
             }
             if x < self.width - 1
-                && info.units.group_id[y][x + 1] == unit_id
-                && self.horizontal_borders[y][x] == Border::Connected
+                && info.units.group_id[(y, x + 1)] == unit_id
+                && self.horizontal_borders[(y, x)] == Border::Connected
             {
                 ret.push((self.horizontal_idx(y, x), false));
             }
@@ -426,14 +476,14 @@ impl BoardManager {
 
         for &(y, x) in &info.blocks[block_id] {
             if y < self.height - 1
-                && info.blocks.group_id[y + 1][x] == block_id
-                && self.vertical_borders[y][x] == Border::Connected
+                && info.blocks.group_id[(y + 1, x)] == block_id
+                && self.vertical_borders[(y, x)] == Border::Connected
             {
                 ret.push((self.vertical_idx(y, x), false));
             }
             if x < self.width - 1
-                && info.blocks.group_id[y][x + 1] == block_id
-                && self.horizontal_borders[y][x] == Border::Connected
+                && info.blocks.group_id[(y, x + 1)] == block_id
+                && self.horizontal_borders[(y, x)] == Border::Connected
             {
                 ret.push((self.horizontal_idx(y, x), false));
             }
@@ -451,30 +501,30 @@ impl BoardManager {
 
         for &(y, x) in &info.potential_units[unit_id] {
             if y > 0
-                && info.potential_units.group_id[y - 1][x] != unit_id
-                && self.cell_color[y][x] == self.cell_color[y - 1][x]
-                && self.vertical_borders[y - 1][x] == Border::Wall
+                && info.potential_units.group_id[(y - 1, x)] != unit_id
+                && self.cell_color[(y, x)] == self.cell_color[(y - 1, x)]
+                && self.vertical_borders[(y - 1, x)] == Border::Wall
             {
                 ret.push((self.vertical_idx(y - 1, x), true));
             }
             if y < self.height - 1
-                && info.potential_units.group_id[y + 1][x] != unit_id
-                && self.cell_color[y][x] == self.cell_color[y + 1][x]
-                && self.vertical_borders[y][x] == Border::Wall
+                && info.potential_units.group_id[(y + 1, x)] != unit_id
+                && self.cell_color[(y, x)] == self.cell_color[(y + 1, x)]
+                && self.vertical_borders[(y, x)] == Border::Wall
             {
                 ret.push((self.vertical_idx(y, x), true));
             }
             if x > 0
-                && info.potential_units.group_id[y][x - 1] != unit_id
-                && self.cell_color[y][x] == self.cell_color[y][x - 1]
-                && self.horizontal_borders[y][x - 1] == Border::Wall
+                && info.potential_units.group_id[(y, x - 1)] != unit_id
+                && self.cell_color[(y, x)] == self.cell_color[(y, x - 1)]
+                && self.horizontal_borders[(y, x - 1)] == Border::Wall
             {
                 ret.push((self.horizontal_idx(y, x - 1), true));
             }
             if x < self.width - 1
-                && info.potential_units.group_id[y][x + 1] != unit_id
-                && self.cell_color[y][x] == self.cell_color[y][x + 1]
-                && self.horizontal_borders[y][x] == Border::Wall
+                && info.potential_units.group_id[(y, x + 1)] != unit_id
+                && self.cell_color[(y, x)] == self.cell_color[(y, x + 1)]
+                && self.horizontal_borders[(y, x)] == Border::Wall
             {
                 ret.push((self.horizontal_idx(y, x), true));
             }
@@ -490,8 +540,8 @@ impl BoardManager {
         y2: usize,
         x2: usize,
     ) -> Vec<(usize, bool)> {
-        let mut bfs: Vec<Vec<Option<(usize, usize)>>> = vec![vec![None; self.width]; self.height];
-        bfs[y1][x1] = Some((y1, x1));
+        let mut bfs: Grid<Option<(usize, usize)>> = Grid::new(self.height, self.width, None);
+        bfs[(y1, x1)] = Some((y1, x1));
 
         let mut qu = std::collections::VecDeque::<(usize, usize)>::new();
         qu.push_back((y1, x1));
@@ -501,43 +551,43 @@ impl BoardManager {
             }
 
             if y > 0
-                && self.vertical_borders[y - 1][x] == Border::Connected
-                && bfs[y - 1][x].is_none()
+                && self.vertical_borders[(y - 1, x)] == Border::Connected
+                && bfs[(y - 1, x)].is_none()
             {
-                bfs[y - 1][x] = Some((y, x));
+                bfs[(y - 1, x)] = Some((y, x));
                 qu.push_back((y - 1, x));
             }
             if y < self.height - 1
-                && self.vertical_borders[y][x] == Border::Connected
-                && bfs[y + 1][x].is_none()
+                && self.vertical_borders[(y, x)] == Border::Connected
+                && bfs[(y + 1, x)].is_none()
             {
-                bfs[y + 1][x] = Some((y, x));
+                bfs[(y + 1, x)] = Some((y, x));
                 qu.push_back((y + 1, x));
             }
             if x > 0
-                && self.horizontal_borders[y][x - 1] == Border::Connected
-                && bfs[y][x - 1].is_none()
+                && self.horizontal_borders[(y, x - 1)] == Border::Connected
+                && bfs[(y, x - 1)].is_none()
             {
-                bfs[y][x - 1] = Some((y, x));
+                bfs[(y, x - 1)] = Some((y, x));
                 qu.push_back((y, x - 1));
             }
             if x < self.width - 1
-                && self.horizontal_borders[y][x] == Border::Connected
-                && bfs[y][x + 1].is_none()
+                && self.horizontal_borders[(y, x)] == Border::Connected
+                && bfs[(y, x + 1)].is_none()
             {
-                bfs[y][x + 1] = Some((y, x));
+                bfs[(y, x + 1)] = Some((y, x));
                 qu.push_back((y, x + 1));
             }
         }
 
-        assert!(bfs[y2][x2].is_some());
+        assert!(bfs[(y2, x2)].is_some());
 
         let mut ret = vec![];
         let mut y = y2;
         let mut x = x2;
 
         while !(y == y1 && x == x1) {
-            let (yf, xf) = bfs[y][x].unwrap();
+            let (yf, xf) = bfs[(y, x)].unwrap();
 
             if y == yf {
                 ret.push((self.horizontal_idx(y, x.min(xf)), false));
@@ -565,48 +615,48 @@ impl BoardManager {
         ignore_color: bool,
         is_potential: bool,
     ) -> GroupInfo {
-        let mut group_id = vec![vec![NO_GROUP; self.width]; self.height];
+        let mut group_id = Grid::new(self.height, self.width, NO_GROUP);
         let mut stack = vec![];
         let mut last_id = 0;
 
         for y in 0..self.height {
             for x in 0..self.width {
-                if group_id[y][x] != NO_GROUP {
+                if group_id[(y, x)] != NO_GROUP {
                     continue;
                 }
 
                 assert!(stack.is_empty());
 
-                group_id[y][x] = last_id;
+                group_id[(y, x)] = last_id;
                 stack.push((y, x));
 
                 while let Some((y, x)) = stack.pop() {
                     let mut traverse = |y2: usize, x2: usize, border: Border| {
-                        if !ignore_color && self.cell_color[y][x] != self.cell_color[y2][x2] {
+                        if !ignore_color && self.cell_color[(y, x)] != self.cell_color[(y2, x2)] {
                             return;
                         }
 
                         if border == Border::Connected
                             || (is_potential && border == Border::Undecided)
                         {
-                            if group_id[y2][x2] == NO_GROUP {
-                                group_id[y2][x2] = last_id;
+                            if group_id[(y2, x2)] == NO_GROUP {
+                                group_id[(y2, x2)] = last_id;
                                 stack.push((y2, x2));
                             }
                         }
                     };
 
                     if y > 0 {
-                        traverse(y - 1, x, self.vertical_borders[y - 1][x]);
+                        traverse(y - 1, x, self.vertical_borders[(y - 1, x)]);
                     }
                     if y < self.height - 1 {
-                        traverse(y + 1, x, self.vertical_borders[y][x]);
+                        traverse(y + 1, x, self.vertical_borders[(y, x)]);
                     }
                     if x > 0 {
-                        traverse(y, x - 1, self.horizontal_borders[y][x - 1]);
+                        traverse(y, x - 1, self.horizontal_borders[(y, x - 1)]);
                     }
                     if x < self.width - 1 {
-                        traverse(y, x + 1, self.horizontal_borders[y][x]);
+                        traverse(y, x + 1, self.horizontal_borders[(y, x)]);
                     }
                 }
 
@@ -620,8 +670,8 @@ impl BoardManager {
 
 struct DoublechocoConstraint {
     board: BoardManager,
-    cell_color: Vec<Vec<i32>>,
-    cell_num: Vec<Vec<Option<usize>>>,
+    cell_color: Grid<i32>,
+    cell_num: Grid<Option<usize>>,
 }
 
 impl SimpleCustomConstraint for DoublechocoConstraint {
@@ -657,8 +707,8 @@ impl SimpleCustomConstraint for DoublechocoConstraint {
             let mut potential_unit_id = [NO_GROUP, NO_GROUP];
 
             for &(y, x) in &info.blocks[i] {
-                let c = self.cell_color[y][x] as usize;
-                let pb_id = info.potential_units.group_id[y][x];
+                let c = self.cell_color[(y, x)] as usize;
+                let pb_id = info.potential_units.group_id[(y, x)];
 
                 if potential_unit_id[c] == NO_GROUP {
                     potential_unit_id[c] = pb_id;
@@ -670,7 +720,7 @@ impl SimpleCustomConstraint for DoublechocoConstraint {
                 }
 
                 size_by_color[c] += 1;
-                let n = self.cell_num[y][x];
+                let n = self.cell_num[(y, x)];
                 if let Some(n) = n {
                     has_num[c] = true;
                     if let Some(num) = num {
@@ -743,16 +793,16 @@ impl SimpleCustomConstraint for DoublechocoConstraint {
             for x in 0..width {
                 // Extra walls between cells in the same block
                 if y < height - 1
-                    && info.blocks.group_id[y][x] == info.blocks.group_id[y + 1][x]
-                    && self.board.vertical_borders[y][x] == Border::Wall
+                    && info.blocks.group_id[(y, x)] == info.blocks.group_id[(y + 1, x)]
+                    && self.board.vertical_borders[(y, x)] == Border::Wall
                 {
                     let mut ret = self.board.reason_for_path(y, x, y + 1, x);
                     ret.push((self.board.vertical_idx(y, x), true));
                     return Some(ret);
                 }
                 if x < width - 1
-                    && info.blocks.group_id[y][x] == info.blocks.group_id[y][x + 1]
-                    && self.board.horizontal_borders[y][x] == Border::Wall
+                    && info.blocks.group_id[(y, x)] == info.blocks.group_id[(y, x + 1)]
+                    && self.board.horizontal_borders[(y, x)] == Border::Wall
                 {
                     let mut ret = self.board.reason_for_path(y, x, y, x + 1);
                     ret.push((self.board.horizontal_idx(y, x), true));
@@ -765,21 +815,21 @@ impl SimpleCustomConstraint for DoublechocoConstraint {
         for y in 0..height {
             for x in 0..width {
                 if y < height - 1
-                    && self.cell_color[y][x] != self.cell_color[y + 1][x]
-                    && self.board.vertical_borders[y][x] != Border::Wall
+                    && self.cell_color[(y, x)] != self.cell_color[(y + 1, x)]
+                    && self.board.vertical_borders[(y, x)] != Border::Wall
                 {
-                    let i = info.potential_units.group_id[y][x];
-                    let j = info.potential_units.group_id[y + 1][x];
+                    let i = info.potential_units.group_id[(y, x)];
+                    let j = info.potential_units.group_id[(y + 1, x)];
                     adjacent_potential_units_flat.push((i, j));
                     adjacent_potential_units_flat.push((j, i));
                 }
 
                 if x < width - 1
-                    && self.cell_color[y][x] != self.cell_color[y][x + 1]
-                    && self.board.horizontal_borders[y][x] != Border::Wall
+                    && self.cell_color[(y, x)] != self.cell_color[(y, x + 1)]
+                    && self.board.horizontal_borders[(y, x)] != Border::Wall
                 {
-                    let i = info.potential_units.group_id[y][x];
-                    let j = info.potential_units.group_id[y][x + 1];
+                    let i = info.potential_units.group_id[(y, x)];
+                    let j = info.potential_units.group_id[(y, x + 1)];
                     adjacent_potential_units_flat.push((i, j));
                     adjacent_potential_units_flat.push((j, i));
                 }
@@ -803,10 +853,10 @@ impl SimpleCustomConstraint for DoublechocoConstraint {
             for &(y, x) in &info.units[i] {
                 cells.push((y as i32, x as i32));
 
-                if y < height - 1 && info.units.group_id[y + 1][x] == i {
+                if y < height - 1 && info.units.group_id[(y + 1, x)] == i {
                     connections.push((y as i32 * 2 + 1, x as i32 * 2));
                 }
-                if x < width - 1 && info.units.group_id[y][x + 1] == i {
+                if x < width - 1 && info.units.group_id[(y, x + 1)] == i {
                     connections.push((y as i32 * 2, x as i32 * 2 + 1));
                 }
             }
@@ -816,7 +866,7 @@ impl SimpleCustomConstraint for DoublechocoConstraint {
             assert!(shape.is_invariant_met());
 
             let one_cell = info.units[i][0];
-            let potential_unit_id = info.potential_units.group_id[one_cell.0][one_cell.1];
+            let potential_unit_id = info.potential_units.group_id[one_cell];
             let mut origins = vec![];
             for &g in &adjacent_potential_units[potential_unit_id] {
                 for &p in &info.potential_units[g] {
@@ -848,21 +898,21 @@ impl SimpleCustomConstraint for DoublechocoConstraint {
                         }
                         let py = py as usize;
                         let px = px as usize;
-                        if self.cell_color[py >> 1][px >> 1]
-                            != self.cell_color[(py + 1) >> 1][(px + 1) >> 1]
+                        if self.cell_color[(py >> 1, px >> 1)]
+                            != self.cell_color[((py + 1) >> 1, (px + 1) >> 1)]
                         {
                             is_invalid = true;
                             blocker_cand = None;
                             break;
                         }
                         if (py & 1) == 1 {
-                            if self.board.vertical_borders[py >> 1][px >> 1] == Border::Wall {
+                            if self.board.vertical_borders[(py >> 1, px >> 1)] == Border::Wall {
                                 is_invalid = true;
                                 blocker_cand =
                                     Some((self.board.vertical_idx(py >> 1, px >> 1), true));
                             }
                         } else {
-                            if self.board.horizontal_borders[py >> 1][px >> 1] == Border::Wall {
+                            if self.board.horizontal_borders[(py >> 1, px >> 1)] == Border::Wall {
                                 is_invalid = true;
                                 blocker_cand =
                                     Some((self.board.horizontal_idx(py >> 1, px >> 1), true));
@@ -891,48 +941,48 @@ impl SimpleCustomConstraint for DoublechocoConstraint {
 
                 for &(y, x) in &info.potential_units[potential_unit_id] {
                     if y > 0
-                        && self.board.vertical_borders[y - 1][x] == Border::Wall
-                        && self.cell_color[y][x] != self.cell_color[y - 1][x]
+                        && self.board.vertical_borders[(y - 1, x)] == Border::Wall
+                        && self.cell_color[(y, x)] != self.cell_color[(y - 1, x)]
                         && adjacent_potential_units_flat
                             .binary_search(&(
                                 potential_unit_id,
-                                info.potential_units.group_id[y - 1][x],
+                                info.potential_units.group_id[(y - 1, x)],
                             ))
                             .is_err()
                     {
                         reason.push((self.board.vertical_idx(y - 1, x), true));
                     }
                     if y < height - 1
-                        && self.board.vertical_borders[y][x] == Border::Wall
-                        && self.cell_color[y][x] != self.cell_color[y + 1][x]
+                        && self.board.vertical_borders[(y, x)] == Border::Wall
+                        && self.cell_color[(y, x)] != self.cell_color[(y + 1, x)]
                         && adjacent_potential_units_flat
                             .binary_search(&(
                                 potential_unit_id,
-                                info.potential_units.group_id[y + 1][x],
+                                info.potential_units.group_id[(y + 1, x)],
                             ))
                             .is_err()
                     {
                         reason.push((self.board.vertical_idx(y, x), true));
                     }
                     if x > 0
-                        && self.board.horizontal_borders[y][x - 1] == Border::Wall
-                        && self.cell_color[y][x] != self.cell_color[y][x - 1]
+                        && self.board.horizontal_borders[(y, x - 1)] == Border::Wall
+                        && self.cell_color[(y, x)] != self.cell_color[(y, x - 1)]
                         && adjacent_potential_units_flat
                             .binary_search(&(
                                 potential_unit_id,
-                                info.potential_units.group_id[y][x - 1],
+                                info.potential_units.group_id[(y, x - 1)],
                             ))
                             .is_err()
                     {
                         reason.push((self.board.horizontal_idx(y, x - 1), true));
                     }
                     if x < width - 1
-                        && self.board.horizontal_borders[y][x] == Border::Wall
-                        && self.cell_color[y][x] != self.cell_color[y][x + 1]
+                        && self.board.horizontal_borders[(y, x)] == Border::Wall
+                        && self.cell_color[(y, x)] != self.cell_color[(y, x + 1)]
                         && adjacent_potential_units_flat
                             .binary_search(&(
                                 potential_unit_id,
-                                info.potential_units.group_id[y][x + 1],
+                                info.potential_units.group_id[(y, x + 1)],
                             ))
                             .is_err()
                     {
