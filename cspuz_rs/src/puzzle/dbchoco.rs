@@ -844,6 +844,8 @@ impl SimpleCustomConstraint for DoublechocoConstraint {
             adjacent_potential_units[i].push(j);
         }
 
+        let mut origins = vec![];
+
         for i in 0..info.units.num_groups() {
             let mut cells = vec![];
             let mut connections = vec![];
@@ -867,7 +869,8 @@ impl SimpleCustomConstraint for DoublechocoConstraint {
 
             let one_cell = info.units[i][0];
             let potential_unit_id = info.potential_units.group_id[one_cell];
-            let mut origins = vec![];
+            origins.clear();
+
             for &g in &adjacent_potential_units[potential_unit_id] {
                 for &p in &info.potential_units[g] {
                     origins.push(p);
