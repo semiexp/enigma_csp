@@ -339,6 +339,10 @@ impl Shape {
 }
 
 fn enumerate_transforms(shape: &Shape) -> Vec<Shape> {
+    if shape.cells.len() == 1 {
+        return vec![shape.clone()];
+    }
+
     let mut ret = vec![];
     ret.push(shape.clone());
     for i in 0..3 {
