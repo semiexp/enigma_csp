@@ -848,8 +848,6 @@ impl SimpleCustomConstraint for DoublechocoConstraint {
             adjacent_potential_units[i].push(j);
         }
 
-        let mut origins = vec![];
-
         for i in 0..info.units.num_groups() {
             let mut cells = vec![];
             let mut connections = vec![];
@@ -873,65 +871,61 @@ impl SimpleCustomConstraint for DoublechocoConstraint {
 
             let one_cell = info.units[i][0];
             let potential_unit_id = info.potential_units.group_id[one_cell];
-            origins.clear();
-
-            for &g in &adjacent_potential_units[potential_unit_id] {
-                for &p in &info.potential_units[g] {
-                    origins.push(p);
-                }
-            }
 
             let transforms = enumerate_transforms(&shape);
             let mut found = false;
             let mut blockers = vec![];
 
             'outer: for tr in &transforms {
-                for &(oy, ox) in &origins {
-                    let mut is_invalid = false;
-                    let mut blocker_cand = None;
+                for &g in &adjacent_potential_units[potential_unit_id] {
+                    for &(oy, ox) in &info.potential_units[g] {
+                        let mut is_invalid = false;
+                        let mut blocker_cand = None;
 
-                    for &(dy, dx) in &tr.connections {
-                        let py = oy as i32 * 2 + dy;
-                        let px = ox as i32 * 2 + dx;
+                        for &(dy, dx) in &tr.connections {
+                            let py = oy as i32 * 2 + dy;
+                            let px = ox as i32 * 2 + dx;
 
-                        if !(0 <= py
-                            && py <= (height - 1) as i32 * 2
-                            && 0 <= px
-                            && px <= (width - 1) as i32 * 2)
-                        {
-                            is_invalid = true;
-                            blocker_cand = None;
-                            break;
-                        }
-                        let py = py as usize;
-                        let px = px as usize;
-                        if self.cell_color[(py >> 1, px >> 1)]
-                            != self.cell_color[((py + 1) >> 1, (px + 1) >> 1)]
-                        {
-                            is_invalid = true;
-                            blocker_cand = None;
-                            break;
-                        }
-                        if (py & 1) == 1 {
-                            if self.board.vertical_borders[(py >> 1, px >> 1)] == Border::Wall {
+                            if !(0 <= py
+                                && py <= (height - 1) as i32 * 2
+                                && 0 <= px
+                                && px <= (width - 1) as i32 * 2)
+                            {
                                 is_invalid = true;
-                                blocker_cand =
-                                    Some((self.board.vertical_idx(py >> 1, px >> 1), true));
+                                blocker_cand = None;
+                                break;
                             }
-                        } else {
-                            if self.board.horizontal_borders[(py >> 1, px >> 1)] == Border::Wall {
+                            let py = py as usize;
+                            let px = px as usize;
+                            if self.cell_color[(py >> 1, px >> 1)]
+                                != self.cell_color[((py + 1) >> 1, (px + 1) >> 1)]
+                            {
                                 is_invalid = true;
-                                blocker_cand =
-                                    Some((self.board.horizontal_idx(py >> 1, px >> 1), true));
+                                blocker_cand = None;
+                                break;
+                            }
+                            if (py & 1) == 1 {
+                                if self.board.vertical_borders[(py >> 1, px >> 1)] == Border::Wall {
+                                    is_invalid = true;
+                                    blocker_cand =
+                                        Some((self.board.vertical_idx(py >> 1, px >> 1), true));
+                                }
+                            } else {
+                                if self.board.horizontal_borders[(py >> 1, px >> 1)] == Border::Wall
+                                {
+                                    is_invalid = true;
+                                    blocker_cand =
+                                        Some((self.board.horizontal_idx(py >> 1, px >> 1), true));
+                                }
                             }
                         }
-                    }
 
-                    if !is_invalid {
-                        found = true;
-                        break 'outer;
+                        if !is_invalid {
+                            found = true;
+                            break 'outer;
+                        }
+                        blockers.extend(blocker_cand);
                     }
-                    blockers.extend(blocker_cand);
                 }
             }
 
