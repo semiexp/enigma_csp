@@ -320,6 +320,26 @@ impl Shape {
         ret
     }
 
+    fn rotate180(&self) -> Shape {
+        let mut new_cells = self
+            .cells
+            .iter()
+            .map(|&(y, x)| (-y, -x))
+            .collect::<Vec<_>>();
+        let new_connections = self
+            .connections
+            .iter()
+            .map(|&(y, x)| (-y, -x))
+            .collect::<Vec<_>>();
+        new_cells.reverse();
+
+        let mut ret = Shape {
+            cells: new_cells,
+            connections: new_connections,
+        };
+        ret.normalize();
+        ret
+    }
     fn flip_y(&self) -> Shape {
         let mut new_cells = self.cells.iter().map(|&(y, x)| (-y, x)).collect::<Vec<_>>();
         let new_connections = self
@@ -345,15 +365,36 @@ fn enumerate_transforms(shape: &Shape) -> Vec<Shape> {
 
     let mut ret = vec![];
     ret.push(shape.clone());
-    for i in 0..3 {
-        ret.push(ret[i].rotate90());
-    }
-    for i in 0..4 {
-        ret.push(ret[i].flip_y());
+
+    {
+        let rot180 = shape.rotate180();
+        if shape != &rot180 {
+            ret.push(rot180);
+        }
     }
 
-    ret.sort();
-    ret.dedup();
+    {
+        let rot90 = shape.rotate90();
+        if shape != &rot90 {
+            if ret.len() == 1 {
+                ret.push(rot90);
+            } else {
+                ret.push(rot90.rotate180());
+                ret.push(rot90);
+            }
+        }
+    }
+
+    {
+        let flip = shape.flip_y();
+        if !ret.iter().any(|s| s == &flip) {
+            let n = ret.len();
+            ret.push(flip);
+            for i in 1..n {
+                ret.push(ret[i].flip_y());
+            }
+        }
+    }
 
     ret
 }
@@ -1002,53 +1043,95 @@ impl SimpleCustomConstraint for DoublechocoConstraint {
 mod tests {
     use super::*;
 
+    fn enumerate_transforms_naive(shape: &Shape) -> Vec<Shape> {
+        let mut ret = vec![];
+        ret.push(shape.clone());
+        for i in 0..3 {
+            ret.push(ret[i].rotate90());
+        }
+        for i in 0..4 {
+            ret.push(ret[i].flip_y());
+        }
+
+        ret.sort();
+        ret.dedup();
+
+        ret
+    }
+
+    fn run_compare_enumerate_transforms(shape: &Shape) {
+        let expected = enumerate_transforms_naive(shape);
+
+        let mut actual = enumerate_transforms(shape);
+        actual.sort();
+
+        assert_eq!(actual, expected);
+    }
+
     #[test]
     fn test_enumerate_transforms() {
-        // TODO: add more shapes for testing
-        {
-            let shape = Shape {
-                cells: vec![(0, 0)],
-                connections: vec![],
-            };
+        run_compare_enumerate_transforms(&Shape {
+            cells: vec![(0, 0)],
+            connections: vec![],
+        });
 
-            assert_eq!(enumerate_transforms(&shape), vec![shape]);
-        }
+        run_compare_enumerate_transforms(&Shape {
+            cells: vec![(0, 0), (0, 1)],
+            connections: vec![(0, 1)],
+        });
 
-        {
-            let shape = Shape {
-                cells: vec![(0, 0), (0, 1)],
-                connections: vec![(0, 1)],
-            };
+        run_compare_enumerate_transforms(&Shape {
+            cells: vec![(0, 0), (0, 1), (1, 0)],
+            connections: vec![(0, 1), (1, 0)],
+        });
 
-            assert_eq!(
-                enumerate_transforms(&shape),
-                vec![
-                    shape,
-                    Shape {
-                        cells: vec![(0, 0), (1, 0)],
-                        connections: vec![(1, 0)],
-                    },
-                ]
-            );
-        }
+        run_compare_enumerate_transforms(&Shape {
+            cells: vec![(0, 0), (0, 1), (1, 1)],
+            connections: vec![(0, 1), (1, 2)],
+        });
 
-        {
-            let shape = Shape {
-                cells: vec![(0, 0), (0, 1), (1, 0)],
-                connections: vec![(0, 1), (1, 0)],
-            };
+        run_compare_enumerate_transforms(&Shape {
+            cells: vec![(0, 0), (0, 1), (0, 2), (1, 1)],
+            connections: vec![(0, 1), (0, 3), (1, 2)],
+        });
 
-            assert_eq!(enumerate_transforms(&shape).len(), 4);
-        }
+        run_compare_enumerate_transforms(&Shape {
+            cells: vec![(0, 0), (1, 0), (1, 1), (2, 0)],
+            connections: vec![(1, 0), (2, 1), (3, 0)],
+        });
 
-        {
-            let shape = Shape {
-                cells: vec![(0, 0), (0, 1), (0, 2), (1, 0)],
-                connections: vec![(0, 1), (0, 3), (1, 0)],
-            };
+        run_compare_enumerate_transforms(&Shape {
+            cells: vec![(0, 0), (0, 1), (1, 1), (1, 2)],
+            connections: vec![(0, 1), (1, 2), (2, 3)],
+        });
 
-            assert_eq!(enumerate_transforms(&shape).len(), 8);
-        }
+        run_compare_enumerate_transforms(&Shape {
+            cells: vec![
+                (0, 0),
+                (1, -2),
+                (1, -1),
+                (1, 0),
+                (2, -1),
+                (2, 0),
+                (2, 1),
+                (3, -1),
+            ],
+            connections: vec![
+                (1, 0),
+                (2, -3),
+                (2, -1),
+                (3, -2),
+                (3, 0),
+                (4, -1),
+                (4, 1),
+                (5, -2),
+            ],
+        });
+
+        run_compare_enumerate_transforms(&Shape {
+            cells: vec![(0, 0), (0, 1), (0, 2), (1, 0)],
+            connections: vec![(0, 1), (0, 3), (1, 0)],
+        });
     }
 
     fn problem_for_tests() -> Problem {
