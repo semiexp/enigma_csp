@@ -16,6 +16,7 @@ pub struct DoublechocoSolverConfig {
     consider_known_companion_unit_only: bool,
     prune_with_known_blockers: bool,
     use_earliest_blocker: bool,
+    sort_units_by_size: bool,
 }
 
 impl DoublechocoSolverConfig {
@@ -25,6 +26,7 @@ impl DoublechocoSolverConfig {
             consider_known_companion_unit_only: true,
             prune_with_known_blockers: true,
             use_earliest_blocker: true,
+            sort_units_by_size: true,
         }
     }
 }
@@ -995,7 +997,16 @@ impl SimpleCustomConstraint for DoublechocoConstraint {
             adjacent_potential_units[i].push(j);
         }
 
-        for i in 0..info.units.num_groups() {
+        let units;
+        if self.config.sort_units_by_size {
+            let mut units_vec = (0..info.units.num_groups()).collect::<Vec<_>>();
+            units_vec.sort_by_key(|&i| info.units[i].len());
+            units = units_vec;
+        } else {
+            units = (0..info.units.num_groups()).collect::<Vec<_>>();
+        }
+
+        for i in units {
             let mut cells = vec![];
             let mut connections = vec![];
 
