@@ -17,6 +17,7 @@ pub struct DoublechocoSolverConfig {
     prune_with_known_blockers: bool,
     use_earliest_blocker: bool,
     sort_units_by_size: bool,
+    use_walls_in_connections: bool,
 }
 
 impl DoublechocoSolverConfig {
@@ -27,6 +28,7 @@ impl DoublechocoSolverConfig {
             prune_with_known_blockers: true,
             use_earliest_blocker: true,
             sort_units_by_size: true,
+            use_walls_in_connections: true,
         }
     }
 }
@@ -300,7 +302,7 @@ struct Shape {
 
     // If two adjacent cells (y, x) and (y', x') are in `cells`, (y + y', x + x') must be in `connections`.
     // `connections` need not be necessarily sorted
-    connections: Vec<(i32, i32)>,
+    connections: Vec<(i32, i32, bool)>,
 }
 
 impl std::cmp::PartialEq for Shape {
@@ -345,7 +347,7 @@ impl Shape {
             *y -= min_y;
             *x -= min_x;
         }
-        for (y, x) in &mut self.connections {
+        for (y, x, _) in &mut self.connections {
             *y -= min_y * 2;
             *x -= min_x * 2;
         }
@@ -356,7 +358,7 @@ impl Shape {
         let new_connections = self
             .connections
             .iter()
-            .map(|&(y, x)| (x, -y))
+            .map(|&(y, x, k)| (x, -y, k))
             .collect::<Vec<_>>();
         new_cells.sort();
 
@@ -377,7 +379,7 @@ impl Shape {
         let new_connections = self
             .connections
             .iter()
-            .map(|&(y, x)| (-y, -x))
+            .map(|&(y, x, k)| (-y, -x, k))
             .collect::<Vec<_>>();
         new_cells.reverse();
 
@@ -393,7 +395,7 @@ impl Shape {
         let new_connections = self
             .connections
             .iter()
-            .map(|&(y, x)| (-y, x))
+            .map(|&(y, x, k)| (-y, x, k))
             .collect::<Vec<_>>();
         new_cells.sort();
 
@@ -406,7 +408,20 @@ impl Shape {
     }
 }
 
-fn enumerate_transforms(shape: &Shape) -> Vec<Shape> {
+fn enumerate_transforms(shape: &Shape, no_prune: bool) -> Vec<Shape> {
+    if no_prune {
+        let mut ret = vec![];
+        ret.push(shape.clone());
+        for i in 0..3 {
+            ret.push(ret[i].rotate90());
+        }
+        for i in 0..4 {
+            ret.push(ret[i].flip_y());
+        }
+
+        return ret;
+    }
+
     if shape.cells.len() == 1 {
         return vec![shape.clone()];
     }
@@ -1010,16 +1025,57 @@ impl SimpleCustomConstraint for DoublechocoConstraint {
             let mut cells = vec![];
             let mut connections = vec![];
 
+            let use_walls_in_connections =
+                self.config.use_walls_in_connections && info.units[i].len() >= 3;
+
             // Note: by construction, info.units[i] is sorted
 
             for &(y, x) in &info.units[i] {
                 cells.push((y as i32, x as i32));
 
                 if y < height - 1 && info.units.group_id[(y + 1, x)] == i {
-                    connections.push((y as i32 * 2 + 1, x as i32 * 2));
+                    connections.push((y as i32 * 2 + 1, x as i32 * 2, false));
                 }
                 if x < width - 1 && info.units.group_id[(y, x + 1)] == i {
-                    connections.push((y as i32 * 2, x as i32 * 2 + 1));
+                    connections.push((y as i32 * 2, x as i32 * 2 + 1, false));
+                }
+
+                // Why the following is necessary?
+                // `info.potential_units.group_id[(y, x)] != info.potential_units.group_id[(y + 1, x)])`
+                // Walls within a potential unit will not be included in the reason.
+                if use_walls_in_connections {
+                    if y == height - 1
+                        || (self.board.vertical_borders[(y, x)] == Border::Wall
+                            && info.potential_units.group_id[(y, x)]
+                                != info.potential_units.group_id[(y + 1, x)])
+                        || self.cell_color[(y, x)] != self.cell_color[(y + 1, x)]
+                    {
+                        connections.push((y as i32 * 2 + 1, x as i32 * 2, true));
+                    }
+                    if x == width - 1
+                        || (self.board.horizontal_borders[(y, x)] == Border::Wall
+                            && info.potential_units.group_id[(y, x)]
+                                != info.potential_units.group_id[(y, x + 1)])
+                        || self.cell_color[(y, x)] != self.cell_color[(y, x + 1)]
+                    {
+                        connections.push((y as i32 * 2, x as i32 * 2 + 1, true));
+                    }
+                    if y == 0
+                        || (self.board.vertical_borders[(y - 1, x)] == Border::Wall
+                            && info.potential_units.group_id[(y, x)]
+                                != info.potential_units.group_id[(y - 1, x)])
+                        || self.cell_color[(y, x)] != self.cell_color[(y - 1, x)]
+                    {
+                        connections.push((y as i32 * 2 - 1, x as i32 * 2, true));
+                    }
+                    if x == 0
+                        || (self.board.horizontal_borders[(y, x - 1)] == Border::Wall
+                            && info.potential_units.group_id[(y, x)]
+                                != info.potential_units.group_id[(y, x - 1)])
+                        || self.cell_color[(y, x)] != self.cell_color[(y, x - 1)]
+                    {
+                        connections.push((y as i32 * 2, x as i32 * 2 - 1, true));
+                    }
                 }
             }
 
@@ -1084,7 +1140,7 @@ impl SimpleCustomConstraint for DoublechocoConstraint {
             let one_cell = info.units[i][0];
             let potential_unit_id = info.potential_units.group_id[one_cell];
 
-            let transforms = enumerate_transforms(&shape);
+            let transforms = enumerate_transforms(&shape, use_walls_in_connections);
             let mut found = false;
             let mut blockers = vec![];
 
@@ -1101,30 +1157,56 @@ impl SimpleCustomConstraint for DoublechocoConstraint {
                         let mut blocker_cand = None;
                         let mut earliest_timing = std::usize::MAX;
 
-                        for &(dy, dx) in &tr.connections {
+                        for &(dy, dx, kind) in &tr.connections {
                             let py = oy as i32 * 2 + dy;
                             let px = ox as i32 * 2 + dx;
 
-                            if !(0 <= py
-                                && py <= (height - 1) as i32 * 2
-                                && 0 <= px
-                                && px <= (width - 1) as i32 * 2)
-                            {
-                                is_invalid = true;
-                                blocker_cand = None;
-                                break;
+                            if kind {
+                                if !(0 <= py
+                                    && py <= (height - 1) as i32 * 2
+                                    && 0 <= px
+                                    && px <= (width - 1) as i32 * 2)
+                                {
+                                    continue;
+                                }
+                            } else {
+                                if !(0 <= py
+                                    && py <= (height - 1) as i32 * 2
+                                    && 0 <= px
+                                    && px <= (width - 1) as i32 * 2)
+                                {
+                                    is_invalid = true;
+                                    blocker_cand = None;
+                                    break;
+                                }
                             }
+
                             let py = py as usize;
                             let px = px as usize;
-                            if self.cell_color[(py >> 1, px >> 1)]
-                                != self.cell_color[((py + 1) >> 1, (px + 1) >> 1)]
-                            {
-                                is_invalid = true;
-                                blocker_cand = None;
-                                break;
+
+                            if kind {
+                                if self.cell_color[(py >> 1, px >> 1)]
+                                    != self.cell_color[((py + 1) >> 1, (px + 1) >> 1)]
+                                {
+                                    continue;
+                                }
+                            } else {
+                                if self.cell_color[(py >> 1, px >> 1)]
+                                    != self.cell_color[((py + 1) >> 1, (px + 1) >> 1)]
+                                {
+                                    is_invalid = true;
+                                    blocker_cand = None;
+                                    break;
+                                }
                             }
+
+                            let undesired = if kind {
+                                Border::Connected
+                            } else {
+                                Border::Wall
+                            };
                             if (py & 1) == 1 {
-                                if self.board.vertical_borders[(py >> 1, px >> 1)] == Border::Wall {
+                                if self.board.vertical_borders[(py >> 1, px >> 1)] == undesired {
                                     let by = py >> 1;
                                     let bx = px >> 1;
 
@@ -1132,7 +1214,7 @@ impl SimpleCustomConstraint for DoublechocoConstraint {
 
                                     if self.config.prune_with_known_blockers
                                         && blockers
-                                            .contains(&(self.board.vertical_idx(by, bx), true))
+                                            .contains(&(self.board.vertical_idx(by, bx), !kind))
                                     {
                                         blocker_cand = None;
                                         break;
@@ -1146,12 +1228,11 @@ impl SimpleCustomConstraint for DoublechocoConstraint {
                                                 self.board.vertical_borders_timing[(by, bx)];
                                         }
                                         blocker_cand =
-                                            Some((self.board.vertical_idx(by, bx), true));
+                                            Some((self.board.vertical_idx(by, bx), !kind));
                                     }
                                 }
                             } else {
-                                if self.board.horizontal_borders[(py >> 1, px >> 1)] == Border::Wall
-                                {
+                                if self.board.horizontal_borders[(py >> 1, px >> 1)] == undesired {
                                     let by = py >> 1;
                                     let bx = px >> 1;
 
@@ -1159,7 +1240,7 @@ impl SimpleCustomConstraint for DoublechocoConstraint {
 
                                     if self.config.prune_with_known_blockers
                                         && blockers
-                                            .contains(&(self.board.horizontal_idx(by, bx), true))
+                                            .contains(&(self.board.horizontal_idx(by, bx), !kind))
                                     {
                                         blocker_cand = None;
                                         break;
@@ -1172,10 +1253,8 @@ impl SimpleCustomConstraint for DoublechocoConstraint {
                                             earliest_timing =
                                                 self.board.horizontal_borders_timing[(by, bx)];
                                         }
-                                        blocker_cand = Some((
-                                            self.board.horizontal_idx(py >> 1, px >> 1),
-                                            true,
-                                        ));
+                                        blocker_cand =
+                                            Some((self.board.horizontal_idx(by, bx), !kind));
                                     }
                                 }
                             }
@@ -1292,7 +1371,7 @@ mod tests {
     fn run_compare_enumerate_transforms(shape: &Shape) {
         let expected = enumerate_transforms_naive(shape);
 
-        let mut actual = enumerate_transforms(shape);
+        let mut actual = enumerate_transforms(shape, false);
         actual.sort();
 
         assert_eq!(actual, expected);
@@ -1307,32 +1386,32 @@ mod tests {
 
         run_compare_enumerate_transforms(&Shape {
             cells: vec![(0, 0), (0, 1)],
-            connections: vec![(0, 1)],
+            connections: vec![(0, 1, false)],
         });
 
         run_compare_enumerate_transforms(&Shape {
             cells: vec![(0, 0), (0, 1), (1, 0)],
-            connections: vec![(0, 1), (1, 0)],
+            connections: vec![(0, 1, false), (1, 0, false)],
         });
 
         run_compare_enumerate_transforms(&Shape {
             cells: vec![(0, 0), (0, 1), (1, 1)],
-            connections: vec![(0, 1), (1, 2)],
+            connections: vec![(0, 1, false), (1, 2, false)],
         });
 
         run_compare_enumerate_transforms(&Shape {
             cells: vec![(0, 0), (0, 1), (0, 2), (1, 1)],
-            connections: vec![(0, 1), (0, 3), (1, 2)],
+            connections: vec![(0, 1, false), (0, 3, false), (1, 2, false)],
         });
 
         run_compare_enumerate_transforms(&Shape {
             cells: vec![(0, 0), (1, 0), (1, 1), (2, 0)],
-            connections: vec![(1, 0), (2, 1), (3, 0)],
+            connections: vec![(1, 0, false), (2, 1, false), (3, 0, false)],
         });
 
         run_compare_enumerate_transforms(&Shape {
             cells: vec![(0, 0), (0, 1), (1, 1), (1, 2)],
-            connections: vec![(0, 1), (1, 2), (2, 3)],
+            connections: vec![(0, 1, false), (1, 2, false), (2, 3, false)],
         });
 
         run_compare_enumerate_transforms(&Shape {
@@ -1347,20 +1426,20 @@ mod tests {
                 (3, -1),
             ],
             connections: vec![
-                (1, 0),
-                (2, -3),
-                (2, -1),
-                (3, -2),
-                (3, 0),
-                (4, -1),
-                (4, 1),
-                (5, -2),
+                (1, 0, false),
+                (2, -3, false),
+                (2, -1, false),
+                (3, -2, false),
+                (3, 0, false),
+                (4, -1, false),
+                (4, 1, false),
+                (5, -2, false),
             ],
         });
 
         run_compare_enumerate_transforms(&Shape {
             cells: vec![(0, 0), (0, 1), (0, 2), (1, 0)],
-            connections: vec![(0, 1), (0, 3), (1, 0)],
+            connections: vec![(0, 1, false), (0, 3, false), (1, 0, false)],
         });
     }
 
