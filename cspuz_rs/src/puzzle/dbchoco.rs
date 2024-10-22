@@ -6,13 +6,40 @@ use crate::serializer::{
     problem_to_url_with_context, url_to_problem, Choice, Combinator, Context, ContextBasedGrid,
     HexInt, MultiDigit, Optionalize, Size, Spaces, Tuple2,
 };
-use crate::solver::Solver;
+use crate::solver::{count_true, Solver};
 
 use enigma_csp::custom_constraints::SimpleCustomConstraint;
+
+#[derive(Clone, Copy, Debug)]
+pub struct DoublechocoSolverConfig {
+    disallow_trivial_extra_walls: bool,
+    consider_known_companion_unit_only: bool,
+    prune_with_known_blockers: bool,
+    use_earliest_blocker: bool,
+}
+
+impl DoublechocoSolverConfig {
+    pub fn new() -> DoublechocoSolverConfig {
+        DoublechocoSolverConfig {
+            disallow_trivial_extra_walls: true,
+            consider_known_companion_unit_only: true,
+            prune_with_known_blockers: true,
+            use_earliest_blocker: true,
+        }
+    }
+}
 
 pub fn solve_doublechoco(
     color: &[Vec<i32>],
     num: &[Vec<Option<i32>>],
+) -> Option<graph::BoolInnerGridEdgesIrrefutableFacts> {
+    solve_doublechoco_with_config(color, num, DoublechocoSolverConfig::new())
+}
+
+pub fn solve_doublechoco_with_config(
+    color: &[Vec<i32>],
+    num: &[Vec<Option<i32>>],
+    config: DoublechocoSolverConfig,
 ) -> Option<graph::BoolInnerGridEdgesIrrefutableFacts> {
     let (h, w) = util::infer_shape(color);
     assert_eq!(util::infer_shape(num), (h, w));
@@ -21,6 +48,22 @@ pub fn solve_doublechoco(
     let is_border = graph::BoolInnerGridEdges::new(&mut solver, (h, w));
     solver.add_answer_key_bool(&is_border.horizontal);
     solver.add_answer_key_bool(&is_border.vertical);
+
+    if config.disallow_trivial_extra_walls {
+        for y in 0..(h - 1) {
+            for x in 0..(w - 1) {
+                solver.add_expr(
+                    count_true([
+                        is_border.horizontal.at((y, x)),
+                        is_border.horizontal.at((y, x + 1)),
+                        is_border.vertical.at((y, x)),
+                        is_border.vertical.at((y + 1, x)),
+                    ])
+                    .ne(1),
+                );
+            }
+        }
+    }
 
     color.to_vec();
 
@@ -48,6 +91,7 @@ pub fn solve_doublechoco(
             board: BoardManager::new(color),
             cell_color: Grid::from_vecs(color),
             cell_num,
+            config,
         };
 
         solver.add_custom_constraint(Box::new(constraint), edges_flat);
@@ -59,11 +103,13 @@ pub fn solve_doublechoco(
             board: BoardManager::new(color),
             cell_color: Grid::from_vecs(color),
             cell_num: cell_num.clone(),
+            config,
         };
         let cloned_constraint = DoublechocoConstraint {
             board: BoardManager::new(color),
             cell_color: Grid::from_vecs(color),
             cell_num,
+            config,
         };
 
         solver.add_custom_constraint(
@@ -418,9 +464,11 @@ struct BoardManager {
 
     // borders between horizontally adjacent cells
     horizontal_borders: Grid<Border>,
+    horizontal_borders_timing: Grid<usize>,
 
     // borders between vertically adjacent cells
     vertical_borders: Grid<Border>,
+    vertical_borders_timing: Grid<usize>,
 }
 
 impl BoardManager {
@@ -435,6 +483,8 @@ impl BoardManager {
             decision_stack: vec![],
             horizontal_borders: Grid::new(height, width - 1, Border::Undecided),
             vertical_borders: Grid::new(height - 1, width, Border::Undecided),
+            horizontal_borders_timing: Grid::new(height, width - 1, 0),
+            vertical_borders_timing: Grid::new(height - 1, width, 0),
         }
     }
 
@@ -469,6 +519,7 @@ impl BoardManager {
             } else {
                 Border::Connected
             };
+            self.vertical_borders_timing[(y, x)] = self.decision_stack.len();
         } else {
             assert_eq!(self.horizontal_borders[(y, x)], Border::Undecided);
             self.horizontal_borders[(y, x)] = if value {
@@ -476,6 +527,7 @@ impl BoardManager {
             } else {
                 Border::Connected
             };
+            self.horizontal_borders_timing[(y, x)] = self.decision_stack.len();
         }
 
         self.decision_stack.push(idx);
@@ -711,12 +763,66 @@ impl BoardManager {
 
         GroupInfo::new(group_id)
     }
+
+    #[allow(unused)]
+    pub fn dump(&self) {
+        let height = self.height;
+        let width = self.width;
+
+        for y in 0..=(height * 2) {
+            for x in 0..=(width * 2) {
+                if (y & 1) == 0 && (x & 1) == 0 {
+                    print!("+");
+                } else if (y & 1) == 0 {
+                    let edge_kind = if y > 0 && y < height * 2 {
+                        self.vertical_borders[(((y - 1) >> 1) as usize, (x >> 1) as usize)]
+                    } else {
+                        Border::Wall
+                    };
+                    print!(
+                        "{}",
+                        match edge_kind {
+                            Border::Wall => "---",
+                            Border::Connected => "   ",
+                            Border::Undecided => " ? ",
+                        }
+                    );
+                } else if (x & 1) == 0 {
+                    let edge_kind = if x > 0 && x < width * 2 {
+                        self.horizontal_borders[((y >> 1) as usize, ((x - 1) >> 1) as usize)]
+                    } else {
+                        Border::Wall
+                    };
+                    print!(
+                        "{}",
+                        match edge_kind {
+                            Border::Wall => "|",
+                            Border::Connected => " ",
+                            Border::Undecided => "?",
+                        }
+                    );
+                } else {
+                    let y = y >> 1;
+                    let x = x >> 1;
+
+                    if self.cell_color[(y, x)] == 0 {
+                        print!("   ");
+                    } else {
+                        print!("###");
+                    }
+                }
+            }
+            println!();
+        }
+        println!();
+    }
 }
 
 struct DoublechocoConstraint {
     board: BoardManager,
     cell_color: Grid<i32>,
     cell_num: Grid<Option<usize>>,
+    config: DoublechocoSolverConfig,
 }
 
 impl SimpleCustomConstraint for DoublechocoConstraint {
@@ -906,6 +1012,60 @@ impl SimpleCustomConstraint for DoublechocoConstraint {
                 }
             }
 
+            let mut another_potential_unit = None;
+            let mut another_unit_connector = None;
+            let mut another_unit_connector_timing = std::usize::MAX;
+            if self.config.consider_known_companion_unit_only {
+                for &(y, x) in &info.units[i] {
+                    if y < height - 1
+                        && self.cell_color[(y, x)] != self.cell_color[(y + 1, x)]
+                        && self.board.vertical_borders[(y, x)] == Border::Connected
+                        && another_unit_connector_timing
+                            > self.board.vertical_borders_timing[(y, x)]
+                    {
+                        another_potential_unit = Some(info.potential_units.group_id[(y + 1, x)]);
+                        another_unit_connector = Some(self.board.vertical_idx(y, x));
+                        another_unit_connector_timing = self.board.vertical_borders_timing[(y, x)];
+                    }
+
+                    if y > 0
+                        && self.cell_color[(y, x)] != self.cell_color[(y - 1, x)]
+                        && self.board.vertical_borders[(y - 1, x)] == Border::Connected
+                        && another_unit_connector_timing
+                            > self.board.vertical_borders_timing[(y - 1, x)]
+                    {
+                        another_potential_unit = Some(info.potential_units.group_id[(y - 1, x)]);
+                        another_unit_connector = Some(self.board.vertical_idx(y - 1, x));
+                        another_unit_connector_timing =
+                            self.board.vertical_borders_timing[(y - 1, x)];
+                    }
+
+                    if x < width - 1
+                        && self.cell_color[(y, x)] != self.cell_color[(y, x + 1)]
+                        && self.board.horizontal_borders[(y, x)] == Border::Connected
+                        && another_unit_connector_timing
+                            > self.board.horizontal_borders_timing[(y, x)]
+                    {
+                        another_potential_unit = Some(info.potential_units.group_id[(y, x + 1)]);
+                        another_unit_connector = Some(self.board.horizontal_idx(y, x));
+                        another_unit_connector_timing =
+                            self.board.horizontal_borders_timing[(y, x)];
+                    }
+
+                    if x > 0
+                        && self.cell_color[(y, x)] != self.cell_color[(y, x - 1)]
+                        && self.board.horizontal_borders[(y, x - 1)] == Border::Connected
+                        && another_unit_connector_timing
+                            > self.board.horizontal_borders_timing[(y, x - 1)]
+                    {
+                        another_potential_unit = Some(info.potential_units.group_id[(y, x - 1)]);
+                        another_unit_connector = Some(self.board.horizontal_idx(y, x - 1));
+                        another_unit_connector_timing =
+                            self.board.horizontal_borders_timing[(y, x - 1)];
+                    }
+                }
+            }
+
             let mut shape = Shape { cells, connections };
             shape.normalize();
             assert!(shape.is_invariant_met());
@@ -919,9 +1079,16 @@ impl SimpleCustomConstraint for DoublechocoConstraint {
 
             'outer: for tr in &transforms {
                 for &g in &adjacent_potential_units[potential_unit_id] {
+                    if let Some(another_potential_unit) = another_potential_unit {
+                        if g != another_potential_unit {
+                            continue;
+                        }
+                    }
+
                     for &(oy, ox) in &info.potential_units[g] {
                         let mut is_invalid = false;
                         let mut blocker_cand = None;
+                        let mut earliest_timing = std::usize::MAX;
 
                         for &(dy, dx) in &tr.connections {
                             let py = oy as i32 * 2 + dy;
@@ -947,16 +1114,58 @@ impl SimpleCustomConstraint for DoublechocoConstraint {
                             }
                             if (py & 1) == 1 {
                                 if self.board.vertical_borders[(py >> 1, px >> 1)] == Border::Wall {
+                                    let by = py >> 1;
+                                    let bx = px >> 1;
+
                                     is_invalid = true;
-                                    blocker_cand =
-                                        Some((self.board.vertical_idx(py >> 1, px >> 1), true));
+
+                                    if self.config.prune_with_known_blockers
+                                        && blockers
+                                            .contains(&(self.board.vertical_idx(by, bx), true))
+                                    {
+                                        blocker_cand = None;
+                                        break;
+                                    }
+
+                                    if self.board.vertical_borders_timing[(by, bx)]
+                                        < earliest_timing
+                                    {
+                                        if self.config.use_earliest_blocker {
+                                            earliest_timing =
+                                                self.board.vertical_borders_timing[(by, bx)];
+                                        }
+                                        blocker_cand =
+                                            Some((self.board.vertical_idx(by, bx), true));
+                                    }
                                 }
                             } else {
                                 if self.board.horizontal_borders[(py >> 1, px >> 1)] == Border::Wall
                                 {
+                                    let by = py >> 1;
+                                    let bx = px >> 1;
+
                                     is_invalid = true;
-                                    blocker_cand =
-                                        Some((self.board.horizontal_idx(py >> 1, px >> 1), true));
+
+                                    if self.config.prune_with_known_blockers
+                                        && blockers
+                                            .contains(&(self.board.horizontal_idx(by, bx), true))
+                                    {
+                                        blocker_cand = None;
+                                        break;
+                                    }
+
+                                    if self.board.horizontal_borders_timing[(by, bx)]
+                                        < earliest_timing
+                                    {
+                                        if self.config.use_earliest_blocker {
+                                            earliest_timing =
+                                                self.board.horizontal_borders_timing[(by, bx)];
+                                        }
+                                        blocker_cand = Some((
+                                            self.board.horizontal_idx(py >> 1, px >> 1),
+                                            true,
+                                        ));
+                                    }
                                 }
                             }
                         }
@@ -978,7 +1187,17 @@ impl SimpleCustomConstraint for DoublechocoConstraint {
                         .reason_for_potential_unit_boundary(&info, potential_unit_id),
                 );
                 for &g in &adjacent_potential_units[potential_unit_id] {
+                    if let Some(another_potential_unit) = another_potential_unit {
+                        if g != another_potential_unit {
+                            continue;
+                        }
+                    }
                     reason.extend(self.board.reason_for_potential_unit_boundary(&info, g));
+                }
+                if adjacent_potential_units.len() > 1 {
+                    if let Some(another_unit_connector) = another_unit_connector {
+                        reason.push((another_unit_connector, false));
+                    }
                 }
 
                 for &(y, x) in &info.potential_units[potential_unit_id] {
