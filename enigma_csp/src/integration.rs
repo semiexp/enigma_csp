@@ -102,6 +102,10 @@ impl<'a> IntegratedSolver<'a> {
         self.csp.new_int_var(domain)
     }
 
+    pub fn add_prenormalize_var(&mut self, var: BoolVar) {
+        self.csp.add_prenormalize_var(var);
+    }
+
     pub fn new_int_var_from_list(&mut self, domain_list: Vec<i32>) -> IntVar {
         let domain_list = domain_list
             .into_iter()

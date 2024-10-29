@@ -335,6 +335,7 @@ pub struct CSP {
     pub(super) vars: CSPVars,
     pub(super) constraints: Vec<Stmt>,
     inconsistent: bool,
+    pub(super) prenormalize_vars: Vec<BoolVar>,
 }
 
 impl CSP {
@@ -346,6 +347,7 @@ impl CSP {
             },
             constraints: vec![],
             inconsistent: false,
+            prenormalize_vars: vec![],
         }
     }
 
@@ -359,6 +361,10 @@ impl CSP {
         let id = self.vars.int_var.len();
         self.vars.int_var.push(IntVarData::new(domain));
         IntVar::new(id)
+    }
+
+    pub fn add_prenormalize_var(&mut self, var: BoolVar) {
+        self.prenormalize_vars.push(var);
     }
 
     pub fn new_int_var_from_list(&mut self, domain_list: Vec<CheckedInt>) -> IntVar {

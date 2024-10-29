@@ -151,6 +151,11 @@ pub fn normalize(csp: &mut CSP, norm: &mut NormCSP, map: &mut NormalizeMap, conf
         }
     }
 
+    for &var in &csp.prenormalize_vars {
+        let var = env.convert_bool_var(var).var;
+        env.norm.add_prenormalize_var(var);
+    }
+
     let mut stmts = vec![];
     std::mem::swap(&mut stmts, &mut csp.constraints);
 

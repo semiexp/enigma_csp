@@ -507,6 +507,10 @@ pub fn encode(norm: &mut NormCSP, sat: &mut SAT, map: &mut EncodeMap, config: &C
         config,
     };
 
+    for &var in &norm.prenormalize_vars {
+        env.convert_bool_lit(BoolLit::new(var, false));
+    }
+
     for constr in constrs {
         encode_constraint(&mut env, constr);
     }

@@ -350,6 +350,7 @@ pub struct NormCSP {
     pub(super) extra_constraints: Vec<ExtraConstraint>,
     pub(super) num_encoded_vars: usize,
     inconsistent: bool,
+    pub(super) prenormalize_vars: Vec<BoolVar>,
 }
 
 impl NormCSP {
@@ -363,6 +364,7 @@ impl NormCSP {
             extra_constraints: vec![],
             num_encoded_vars: 0,
             inconsistent: false,
+            prenormalize_vars: vec![],
         }
     }
 
@@ -374,6 +376,10 @@ impl NormCSP {
 
     pub fn new_int_var(&mut self, domain: super::domain::Domain) -> IntVar {
         self.vars.new_int_var(IntVarRepresentation::Domain(domain))
+    }
+
+    pub fn add_prenormalize_var(&mut self, var: BoolVar) {
+        self.prenormalize_vars.push(var);
     }
 
     pub fn new_binary_int_var(

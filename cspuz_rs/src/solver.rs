@@ -1087,6 +1087,10 @@ impl<'a> Solver<'a> {
         })
     }
 
+    pub fn add_prenormalize_var(&mut self, var: BoolVar) {
+        self.solver.add_prenormalize_var(var.0.data);
+    }
+
     pub fn bool_var_1d(&mut self, len: usize) -> BoolVarArray1D {
         Value(Array1DImpl {
             data: (0..len).map(|_| self.solver.new_bool_var()).collect(),
