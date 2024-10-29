@@ -152,6 +152,18 @@ unsafe impl<T: SimpleCustomConstraint> CustomPropagator for CustomConstraintWrap
             lits.sort();
             lits.dedup();
 
+            // TODO: it is unclear whether we need to keep the original order
+            /*
+            let mut lits_dedup = vec![];
+            let mut lits_set = std::collections::HashSet::new();
+            for lit in lits {
+                if lits_set.insert(lit.0) {
+                    lits_dedup.push(lit);
+                }
+            }
+            lits = lits_dedup;
+            */
+
             let mut has_current_level: bool = false;
             for &lit in &lits {
                 if unsafe { _solver.is_current_level(lit) } {
