@@ -8,7 +8,7 @@ use crate::backend::glucose;
 
 use crate::custom_constraints::PropagatorGenerator;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct Var(pub(crate) i32);
 
 impl Var {
@@ -18,7 +18,7 @@ impl Var {
 }
 
 #[repr(C)]
-#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Lit(pub(crate) i32);
 
 impl Lit {

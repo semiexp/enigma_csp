@@ -155,6 +155,21 @@ impl Encoding {
             panic!();
         }
     }
+
+    #[allow(unused)]
+    fn repr_literals(&self) -> Vec<Lit> {
+        let mut ret = vec![];
+        if let Some(order_encoding) = &self.order_encoding {
+            ret.extend_from_slice(&order_encoding.lits);
+        }
+        if let Some(direct_encoding) = &self.direct_encoding {
+            ret.extend_from_slice(&direct_encoding.lits);
+        }
+        if let Some(log_encoding) = &self.log_encoding {
+            ret.extend_from_slice(&log_encoding.lits);
+        }
+        ret
+    }
 }
 
 #[cfg(feature = "sat-analyzer")]
@@ -848,11 +863,11 @@ fn encode_constraint(env: &mut EncoderEnv, constr: Constraint) {
             EncoderKind::MixedGe => {
                 if linear_lit.op == CmpOp::Ne {
                     // `ne` is decomposed to a disjunction of 2 linear literals and handled separately
-                    simplified_linears.push(decompose_linear_lit(
+                    simplified_linears.extend(decompose_linear_lit(
                         env,
                         &LinearLit::new(linear_lit.sum.clone() * (-1) + (-1), CmpOp::Ge),
                     ));
-                    simplified_linears.push(decompose_linear_lit(
+                    simplified_linears.extend(decompose_linear_lit(
                         env,
                         &LinearLit::new(linear_lit.sum.clone() + (-1), CmpOp::Ge),
                     ));
@@ -868,13 +883,20 @@ fn encode_constraint(env: &mut EncoderEnv, constr: Constraint) {
                         CmpOp::Gt => vec![linear_lit.sum + (-1)],
                     };
                     let mut decomposed = vec![];
+                    let mut is_unsat = false;
                     for sum in simplified_sums {
-                        decomposed.append(&mut decompose_linear_lit(
-                            env,
-                            &LinearLit::new(sum, CmpOp::Ge),
-                        ));
+                        let lits = decompose_linear_lit(env, &LinearLit::new(sum, CmpOp::Ge));
+
+                        if let Some(lits) = lits {
+                            decomposed.extend(lits);
+                        } else {
+                            is_unsat = true;
+                            break;
+                        }
                     }
-                    simplified_linears.push(decomposed);
+                    if !is_unsat {
+                        simplified_linears.push(decomposed);
+                    }
                 }
             }
             EncoderKind::DirectSimple => {
@@ -882,7 +904,7 @@ fn encode_constraint(env: &mut EncoderEnv, constr: Constraint) {
             }
             EncoderKind::DirectEqNe => {
                 assert!(linear_lit.op == CmpOp::Eq || linear_lit.op == CmpOp::Ne);
-                simplified_linears.push(decompose_linear_lit(env, &linear_lit));
+                simplified_linears.extend(decompose_linear_lit(env, &linear_lit));
             }
             EncoderKind::Log => {
                 #[cfg(feature = "csp-extra-constraints")]
@@ -1237,7 +1259,14 @@ enum LinearInfo<'a> {
     Direct(LinearInfoForDirectEncoding<'a>),
 }
 
-fn decompose_linear_lit(env: &mut EncoderEnv, lit: &LinearLit) -> Vec<LinearLit> {
+/// Given a LinearLit `lit`, compute a set of LinearLit's whose conjunction is equivalent to `lit`.
+/// If `None` is returned, it means that `lit` is not satisfiable.
+///
+/// This function may introduce auxiliary variables. These variables are added to `env`,
+/// but any encoded clauses are not directly added to `env`.
+/// It is ensured that just calling this function does not affect the satisfiability of the current SAT instance,
+/// unless the returned literals are encoded and added to the SAT.
+fn decompose_linear_lit(env: &mut EncoderEnv, lit: &LinearLit) -> Option<Vec<LinearLit>> {
     assert!(lit.op == CmpOp::Ge || lit.op == CmpOp::Eq || lit.op == CmpOp::Ne);
     let op_for_aux_lits = if lit.op == CmpOp::Ge {
         CmpOp::Ge
@@ -1280,8 +1309,16 @@ fn decompose_linear_lit(env: &mut EncoderEnv, lit: &LinearLit) -> Vec<LinearLit>
                 rem_sum.add_coef(var, coef);
             }
             let rem_dom = env.norm_vars.get_domain_linear_sum(&rem_sum);
-            aux_dom.refine_upper_bound(-(lit.sum.constant + rem_dom.lower_bound_checked()));
-            aux_dom.refine_lower_bound(-(lit.sum.constant + rem_dom.upper_bound_checked()));
+            if lit.op == CmpOp::Eq {
+                aux_dom.refine_upper_bound(-(lit.sum.constant + rem_dom.lower_bound_checked()));
+            }
+            if lit.op == CmpOp::Eq || lit.op == CmpOp::Ge {
+                aux_dom.refine_lower_bound(-(lit.sum.constant + rem_dom.upper_bound_checked()));
+            }
+
+            if aux_dom.is_empty() {
+                return None;
+            }
 
             let aux_var = env
                 .norm_vars
@@ -1314,7 +1351,7 @@ fn decompose_linear_lit(env: &mut EncoderEnv, lit: &LinearLit) -> Vec<LinearLit>
         sum.add_coef(var, coef);
     }
     ret.push(LinearLit::new(sum, lit.op));
-    ret
+    Some(ret)
 }
 
 #[cfg(feature = "csp-extra-constraints")]

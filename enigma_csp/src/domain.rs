@@ -21,6 +21,13 @@ impl Domain {
         Domain::range(1, 0)
     }
 
+    pub fn is_empty(&self) -> bool {
+        match self {
+            Domain::Range(low, high) => low > high,
+            Domain::Enumerative(cands) => cands.is_empty(),
+        }
+    }
+
     pub(crate) fn range_from_checked(low: CheckedInt, high: CheckedInt) -> Domain {
         Domain::Range(low, high)
     }
