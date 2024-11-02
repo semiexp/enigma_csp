@@ -2708,10 +2708,7 @@ mod tests {
         ) -> Vec<Vec<CheckedInt>> {
             let domains = int_vars
                 .iter()
-                .map(|&v| match self.norm_vars.int_var(v) {
-                    IntVarRepresentation::Domain(domain) => domain.enumerate(),
-                    IntVarRepresentation::Binary(_, t, f) => vec![*t, *f],
-                })
+                .map(|&v| self.norm_vars.int_var(v).enumerate())
                 .collect::<Vec<_>>();
 
             let all_assignments = crate::test_util::product_multi(&domains);
@@ -2926,6 +2923,91 @@ mod tests {
                 }
 
                 tester.run_check(&lits);
+            }
+        }
+    }
+
+    #[test]
+    fn test_decompose_linear_lit() {
+        for c in [-1, -3, 5] {
+            for op in [CmpOp::Eq, CmpOp::Ne, CmpOp::Ge] {
+                let mut tester = EncoderTester::new();
+
+                let mut terms = vec![];
+                for _ in 0..12 {
+                    let var = tester.add_int_var(Domain::range(0, 1), false);
+                    terms.push((var, 1));
+                }
+
+                let lit = LinearLit::new(linear_sum(&terms, c), op);
+                let decomposed = decompose_linear_lit(&mut tester.env(), &lit);
+
+                let lit_vars = lit.sum.iter().map(|(v, _)| *v).collect::<Vec<_>>();
+                let lit_domains = lit_vars
+                    .iter()
+                    .map(|&v| tester.norm_vars.int_var(v).enumerate())
+                    .collect::<Vec<_>>();
+
+                let mut other_vars = vec![];
+                if let Some(decomposed) = &decomposed {
+                    for lit in decomposed {
+                        let vars = lit
+                            .sum
+                            .iter()
+                            .map(|(v, _)| *v)
+                            .filter(|&v| !lit_vars.contains(&v))
+                            .collect::<Vec<_>>();
+                        other_vars.extend(vars);
+                    }
+                }
+
+                let is_unsat = is_unsatisfiable_linear(&tester.env(), &lit);
+                if !is_unsat {
+                    assert!(other_vars.len() > 0);
+                }
+
+                let other_vars_domains = other_vars
+                    .iter()
+                    .map(|&v| tester.norm_vars.int_var(v).enumerate())
+                    .collect::<Vec<_>>();
+
+                let assignments = crate::test_util::product_multi(&lit_domains);
+                let other_assignments = crate::test_util::product_multi(&other_vars_domains);
+
+                let is_satisfiable =
+                    |lit: &LinearLit,
+                     assignment: &[CheckedInt],
+                     other_assignment: &[CheckedInt]| {
+                        let mut value = lit.sum.constant;
+                        for (&var, &coef) in lit.sum.iter() {
+                            if let Some(idx) = lit_vars.iter().position(|&v| v == var) {
+                                value += assignment[idx] * coef;
+                            } else {
+                                value += other_assignment
+                                    [other_vars.iter().position(|&v| v == var).unwrap()]
+                                    * coef;
+                            }
+                        }
+                        lit.op.compare(value, CheckedInt::new(0))
+                    };
+
+                for a in &assignments {
+                    let is_sat = is_satisfiable(&lit, a, &[]);
+
+                    if decomposed.is_none() {
+                        assert!(!is_sat);
+                        continue;
+                    }
+
+                    let decomposed = decomposed.as_ref().unwrap();
+                    let mut is_sat_decomposed_any = false;
+                    for b in &other_assignments {
+                        is_sat_decomposed_any |=
+                            decomposed.iter().all(|lit| is_satisfiable(lit, a, b));
+                    }
+
+                    assert_eq!(is_sat, is_sat_decomposed_any);
+                }
             }
         }
     }
