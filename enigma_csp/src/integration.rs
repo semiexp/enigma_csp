@@ -1455,6 +1455,52 @@ mod tests {
         tester.check();
     }
 
+    #[test]
+    fn test_integration_many_terms() {
+        for c in [-3, 0, 3, 12, 13] {
+            let mut config = Config::default();
+            config.native_linear_encoding_terms = 0;
+            config.domain_product_threshold = 2;
+            let mut tester = IntegrationTester::with_config(config);
+
+            let mut vars = vec![];
+            for _ in 0..12 {
+                vars.push(tester.new_int_var(Domain::range(0, 1)));
+            }
+
+            let mut expr = IntExpr::Const(0);
+            for v in &vars {
+                expr = expr + v.expr();
+            }
+
+            tester.add_expr(expr.ge(IntExpr::Const(c)));
+            tester.check();
+        }
+    }
+
+    #[test]
+    fn test_integration_many_terms_not_equal() {
+        for c in [-1, 0, 1, 13, 14] {
+            let mut config = Config::default();
+            config.native_linear_encoding_terms = 0;
+            config.domain_product_threshold = 10;
+            let mut tester = IntegrationTester::with_config(config);
+
+            let mut vars = vec![];
+            for _ in 0..13 {
+                vars.push(tester.new_int_var(Domain::range(0, 1)));
+            }
+
+            let mut expr = IntExpr::Const(0);
+            for v in &vars {
+                expr = expr + v.expr();
+            }
+
+            tester.add_expr(expr.ne(IntExpr::Const(c)));
+            tester.check();
+        }
+    }
+
     #[cfg(feature = "csp-extra-constraints")]
     #[test]
     fn test_integration_exhaustive_circuit1() {

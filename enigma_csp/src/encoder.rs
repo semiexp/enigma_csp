@@ -2667,13 +2667,20 @@ mod tests {
             v
         }
 
-        fn enumerate_valid_assignments_by_sat(&mut self) -> Vec<Vec<CheckedInt>> {
+        fn enumerate_valid_assignments_by_sat(
+            &mut self,
+            int_vars: &[IntVar],
+        ) -> Vec<Vec<CheckedInt>> {
+            let mut sat_vars_set = std::collections::HashSet::new();
+            for var in int_vars {
+                for lit in self.map.int_map[*var].as_ref().unwrap().repr_literals() {
+                    sat_vars_set.insert(lit.var());
+                }
+            }
+            let sat_vars = sat_vars_set.into_iter().collect::<Vec<_>>();
+
             let sat = &mut self.sat;
             let map = &self.map;
-            let norm_vars = &self.norm_vars;
-
-            let int_vars = norm_vars.int_vars_iter().collect::<Vec<_>>();
-            let sat_vars = sat.all_vars();
 
             let mut ret = vec![];
             while let Some(model) = sat.solve() {
@@ -2697,8 +2704,8 @@ mod tests {
             &self,
             lits: &[LinearLit],
             mul: &[(IntVar, IntVar, IntVar)],
+            int_vars: &[IntVar],
         ) -> Vec<Vec<CheckedInt>> {
-            let int_vars = self.norm_vars.int_vars_iter().collect::<Vec<_>>();
             let domains = int_vars
                 .iter()
                 .map(|&v| match self.norm_vars.int_var(v) {
@@ -2736,20 +2743,29 @@ mod tests {
             valid_assignments
         }
 
-        fn run_check(mut self, lits: &[LinearLit]) {
-            let mut result_by_literals = self.enumerate_valid_assignments_by_literals(lits, &[]);
-            result_by_literals.sort();
-            let mut result_by_sat = self.enumerate_valid_assignments_by_sat();
-            result_by_sat.sort();
-
-            assert_eq!(result_by_literals, result_by_sat);
+        fn run_check(self, lits: &[LinearLit]) {
+            self.run_check_with_mul(lits, &[]);
         }
 
         #[allow(unused)]
         fn run_check_with_mul(mut self, lits: &[LinearLit], mul: &[(IntVar, IntVar, IntVar)]) {
-            let mut result_by_literals = self.enumerate_valid_assignments_by_literals(lits, mul);
+            let mut related_vars_set = std::collections::HashSet::new();
+            for lit in lits {
+                for (v, _) in lit.sum.iter() {
+                    related_vars_set.insert(*v);
+                }
+            }
+            for (x, y, m) in mul {
+                related_vars_set.insert(*x);
+                related_vars_set.insert(*y);
+                related_vars_set.insert(*m);
+            }
+            let related_vars = related_vars_set.into_iter().collect::<Vec<_>>();
+
+            let mut result_by_literals =
+                self.enumerate_valid_assignments_by_literals(lits, mul, &related_vars);
             result_by_literals.sort();
-            let mut result_by_sat = self.enumerate_valid_assignments_by_sat();
+            let mut result_by_sat = self.enumerate_valid_assignments_by_sat(&related_vars);
             result_by_sat.sort();
 
             assert_eq!(result_by_literals, result_by_sat);
@@ -2877,6 +2893,41 @@ mod tests {
         encode_linear_ge_order_encoding_native(&mut tester.env(), &lits[0].sum);
 
         tester.run_check(&lits);
+    }
+
+    #[test]
+    fn test_encode_large_literals() {
+        for c in [-1, -3, 5] {
+            for op in [CmpOp::Eq, CmpOp::Ne, CmpOp::Ge] {
+                let mut tester = EncoderTester::new();
+
+                let mut terms = vec![];
+                for _ in 0..12 {
+                    let var = tester.add_int_var(Domain::range(0, 1), false);
+                    terms.push((var, 1));
+                }
+
+                let lits = vec![LinearLit::new(linear_sum(&terms, c), op)];
+                let env = &mut tester.env();
+                let is_unsat = is_unsatisfiable_linear(env, &lits[0]);
+
+                encode_constraint(
+                    env,
+                    Constraint {
+                        bool_lit: vec![],
+                        linear_lit: lits.clone(),
+                    },
+                );
+
+                // If the literal is unsatisfiable, the encoding does not take place
+                if !is_unsat {
+                    // Ensure that auxiliary variables are created, or this test is meaningless
+                    assert!(tester.norm_vars.int_vars_iter().count() > terms.len());
+                }
+
+                tester.run_check(&lits);
+            }
+        }
     }
 
     #[cfg(feature = "csp-extra-constraints")]
