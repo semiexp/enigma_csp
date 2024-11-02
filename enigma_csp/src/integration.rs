@@ -852,6 +852,32 @@ mod tests {
     }
 
     #[test]
+    fn test_integration_solve_twice_propagation() {
+        let mut solver = IntegratedSolver::new();
+
+        let x = solver.new_bool_var();
+        let y = solver.new_bool_var();
+        solver.add_expr(x.expr() | y.expr());
+
+        {
+            let model = solver.solve();
+            assert!(model.is_some());
+        }
+
+        solver.add_expr(!x.expr());
+        {
+            let model = solver.solve();
+            assert!(model.is_some());
+        }
+
+        solver.add_expr(!y.expr());
+        {
+            let model = solver.solve();
+            assert!(model.is_none());
+        }
+    }
+
+    #[test]
     fn test_integration_bool_lit_after_decomposition() {
         let mut config = Config::default();
         config.domain_product_threshold = 1;
