@@ -54,6 +54,7 @@ pub mod slashpack;
 pub mod slitherlink;
 pub mod soulmates;
 pub mod square_jam;
+pub mod statue_park;
 pub mod stostone;
 pub mod sudoku;
 pub mod tapa;

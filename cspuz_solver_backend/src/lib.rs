@@ -128,6 +128,8 @@ fn solve_puzz_link(puzzle_kind: String, url: &str) -> Result<Board, &'static str
         puzzle::evolmino::solve_evolmino(url)
     } else if puzzle_kind == "dbchoco" {
         puzzle::dbchoco::solve_doublechoco(url)
+    } else if puzzle_kind == "statuepark" {
+        puzzle::statue_park::solve_statue_park(url)
     } else {
         Err("unknown puzzle type")
     }
