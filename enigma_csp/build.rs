@@ -54,7 +54,6 @@ fn build_glucose() {
             .file("lib/glucose_bridge.cpp")
             .files(&build_target)
             .include("lib/glucose")
-            .flag("-std=c++17")
             .flag(puzzle_solver_minimal_flag)
             .warnings(false)
             .compile("calc");
@@ -80,7 +79,6 @@ fn build_cadical() {
         .file("lib/cadical_bridge.cpp")
         .files(&build_target)
         .include("lib/cadical/src")
-        .flag("-std=c++17")
         .flag("-DVERSION=\"1.5.3\"") // TODO
         .flag("-DNBUILD")
         .warnings(false)
