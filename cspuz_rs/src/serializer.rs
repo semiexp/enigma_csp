@@ -1450,8 +1450,19 @@ pub struct KudamonoURLInfo<'a> {
     pub encoding_v2: bool,
 }
 
+pub fn get_kudamono_url_body(url: &str) -> Option<&str> {
+    if !url.contains("pedros.works/paper-puzzle-player?")
+        && !url.contains("pedros.works/paper-puzzle-player.html?")
+    {
+        None
+    } else {
+        let i = url.find("?")? + 1;
+        return url.get(i..);
+    }
+}
+
 pub fn get_kudamono_url_info_detailed<'a>(url: &'a str) -> Option<BTreeMap<String, &'a str>> {
-    let body = url.strip_prefix("https://pedros.works/paper-puzzle-player?")?;
+    let body = get_kudamono_url_body(url)?;
     let mut idx = 0;
 
     let mut ret = BTreeMap::new();
@@ -2133,27 +2144,26 @@ mod tests {
 
     #[test]
     fn test_kudamono_url_info() {
-        {
-            let url =
-                "https://pedros.works/paper-puzzle-player?W=13&H=12&L=x3x37x19x18x12&G=tricklayer";
-            let info = get_kudamono_url_info(url);
-            assert!(info.is_some());
-            let info = info.unwrap();
-            assert_eq!(info.height, 13);
-            assert_eq!(info.width, 14);
-            assert_eq!(info.encoding_v2, false);
-        }
-        {
-            let url =
-                "https://pedros.works/paper-puzzle-player?W=14x13&L=x11x23x110x16x18&G=tricklayer";
-            let info = get_kudamono_url_info(url);
-            assert!(info.is_some());
-            let info = info.unwrap();
-            assert_eq!(info.height, 13);
-            assert_eq!(info.width, 14);
-            assert_eq!(info.puzzle_kind, "tricklayer");
-            assert_eq!(info.content, "x11x23x110x16x18");
-            assert_eq!(info.encoding_v2, true);
-        }
+        let url =
+            "https://pedros.works/paper-puzzle-player?W=13&H=12&L=x3x37x19x18x12&G=tricklayer";
+        let info = get_kudamono_url_info(url);
+        assert!(info.is_some());
+        let info = info.unwrap();
+        assert_eq!(info.height, 13);
+        assert_eq!(info.width, 14);
+        assert_eq!(info.puzzle_kind, "tricklayer");
+        assert_eq!(info.content, "x3x37x19x18x12");
+        assert_eq!(info.encoding_v2, false);
+
+        let url =
+            "file:///C://somefolder/pedros.works/paper-puzzle-player.html?W=4&H=4&L=x5&G=anygenre";
+        let info = get_kudamono_url_info(url);
+        assert!(info.is_some());
+        let info = info.unwrap();
+        assert_eq!(info.height, 5);
+        assert_eq!(info.width, 5);
+        assert_eq!(info.puzzle_kind, "anygenre");
+        assert_eq!(info.encoding_v2, true);
+        assert_eq!(info.content, "x5");
     }
 }
