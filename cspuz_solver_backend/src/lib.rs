@@ -130,6 +130,8 @@ fn solve_puzz_link(puzzle_kind: String, url: &str) -> Result<Board, &'static str
         puzzle::dbchoco::solve_doublechoco(url)
     } else if puzzle_kind == "statuepark" {
         puzzle::statue_park::solve_statue_park(url)
+    } else if puzzle_kind == "kakuro" {
+        puzzle::kakuro::solve_kakuro(url)
     } else {
         Err("unknown puzzle type")
     }

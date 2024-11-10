@@ -29,6 +29,7 @@ pub mod herugolf;
 pub mod heyawake;
 pub mod icewalk;
 pub mod inverse_litso;
+pub mod kakuro;
 pub mod kouchoku;
 pub mod kropki;
 pub mod kurotto;

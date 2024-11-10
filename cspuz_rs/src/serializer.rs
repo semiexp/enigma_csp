@@ -842,6 +842,45 @@ where
     }
 }
 
+pub struct UnlimitedSeq<S> {
+    base_serializer: S,
+}
+
+impl<S> UnlimitedSeq<S> {
+    pub fn new(base_serializer: S) -> UnlimitedSeq<S> {
+        UnlimitedSeq { base_serializer }
+    }
+}
+
+impl<S, T> Combinator<Vec<T>> for UnlimitedSeq<S>
+where
+    S: Combinator<T>,
+{
+    fn serialize(&self, ctx: &Context, input: &[Vec<T>]) -> Option<(usize, Vec<u8>)> {
+        if input.len() == 0 {
+            return None;
+        }
+
+        let mut sequencer = Sequencer::new(&input[0]);
+        let mut ret = vec![];
+        while let Some(part) = sequencer.serialize(ctx, &self.base_serializer) {
+            ret.extend(part);
+        }
+
+        Some((1, ret))
+    }
+
+    fn deserialize(&self, ctx: &Context, input: &[u8]) -> Option<(usize, Vec<Vec<T>>)> {
+        let mut sequencer = Sequencer::new(input);
+        let mut ret = vec![];
+        while let Some(part) = sequencer.deserialize(ctx, &self.base_serializer) {
+            ret.extend(part);
+        }
+
+        Some((sequencer.n_read(), vec![ret]))
+    }
+}
+
 pub struct ContextBasedGrid<S> {
     base_serializer: S,
 }
@@ -1917,6 +1956,34 @@ mod tests {
         assert_eq!(
             combinator.deserialize(ctx, "12-2a5".as_bytes()),
             Some((5, vec![vec![1, 2, 42]]))
+        );
+    }
+
+    #[test]
+    fn test_unlimited_seq() {
+        let ctx = &Context::new();
+        let combinator = UnlimitedSeq::new(HexInt);
+
+        assert_eq!(
+            combinator.serialize(ctx, &[vec![]]),
+            Some((1, Vec::from("")))
+        );
+        assert_eq!(
+            combinator.serialize(ctx, &[vec![1, 2, 42, 8]]),
+            Some((1, Vec::from("12-2a8")))
+        );
+
+        assert_eq!(
+            combinator.deserialize(ctx, "".as_bytes()),
+            Some((0, vec![vec![]]))
+        );
+        assert_eq!(
+            combinator.deserialize(ctx, "12-2a8".as_bytes()),
+            Some((6, vec![vec![1, 2, 42, 8]]))
+        );
+        assert_eq!(
+            combinator.deserialize(ctx, "12-2a8/abc".as_bytes()),
+            Some((6, vec![vec![1, 2, 42, 8]]))
         );
     }
 
