@@ -9,6 +9,8 @@ pub fn solve_doppelblock(
     clues_left: &[Option<i32>],
     cells: &Option<Vec<Vec<Option<i32>>>>,
 ) -> Option<Vec<Vec<Option<i32>>>> {
+    // Some(-1) means that the cell is not a black cell
+
     let size = clues_left.len();
     if size != clues_up.len() {
         return None;
@@ -16,7 +18,11 @@ pub fn solve_doppelblock(
 
     let mut solver = Solver::new();
     let numbers = &solver.int_var_2d((size, size), 0, (size - 2) as i32);
+    let has_number = &solver.bool_var_2d((size, size));
     solver.add_answer_key_int(numbers);
+    solver.add_answer_key_bool(has_number);
+
+    solver.add_expr(numbers.ne(0).iff(has_number));
 
     if let Some(cells) = cells.as_ref() {
         for i in 0..size {
@@ -51,7 +57,24 @@ pub fn solve_doppelblock(
         add_constraints(numbers.slice_fixed_x((.., i)), clues_up[i]);
     }
 
-    solver.irrefutable_facts().map(|f| f.get(numbers))
+    solver.irrefutable_facts().map(|f| {
+        let numbers = f.get(numbers);
+        let has_number = f.get(has_number);
+
+        let mut ret = vec![];
+        for y in 0..size {
+            let mut row = vec![];
+            for x in 0..size {
+                if let Some(n) = numbers[y][x] {
+                    row.push(Some(n));
+                } else {
+                    row.push(if has_number[y][x] == Some(true) { Some(-1) } else { None });
+                }
+            }
+            ret.push(row);
+        }
+        ret
+    })
 }
 
 pub type Problem = (

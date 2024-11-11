@@ -64,6 +64,8 @@ pub fn solve_doppelblock(url: &str) -> Result<Board, &'static str> {
             if let Some(n) = answer[y][x] {
                 if n == 0 {
                     board.push(Item::cell(y + 1, x + 1, "green", ItemKind::Block));
+                } else if n == -1 {
+                    board.push(Item::cell(y + 1, x + 1, "green", ItemKind::Circle));
                 } else {
                     board.push(Item::cell(y + 1, x + 1, "green", ItemKind::Num(n)));
                 }
