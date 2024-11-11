@@ -8,7 +8,7 @@ pub fn solve_kakuro(url: &str) -> Result<Board, &'static str> {
 
     let height = answer.len();
     let width = answer[0].len();
-    let mut board = Board::new(BoardKind::OuterGrid, height, width, is_unique(&answer));
+    let mut board = Board::new(BoardKind::Grid, height, width, is_unique(&answer));
 
     for y in 0..height {
         for x in 0..width {
