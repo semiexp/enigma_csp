@@ -1,5 +1,5 @@
 use crate::board::{Board, BoardKind, Item, ItemKind};
-use crate::uniqueness::is_unique;
+use crate::uniqueness::Uniqueness;
 use cspuz_rs::puzzle::doppelblock;
 
 pub fn solve_doppelblock(url: &str) -> Result<Board, &'static str> {
@@ -10,7 +10,16 @@ pub fn solve_doppelblock(url: &str) -> Result<Board, &'static str> {
 
     let height = clues_left.len();
     let width = clues_up.len();
-    let mut board = Board::new(BoardKind::Empty, height + 1, width + 1, is_unique(&answer));
+
+    let mut is_unique = Uniqueness::Unique;
+    for y in 0..height {
+        for x in 0..width {
+            if answer[y][x].is_none() || answer[y][x] == Some(-1) {
+                is_unique = Uniqueness::NonUnique;
+            }
+        }
+    }
+    let mut board = Board::new(BoardKind::Empty, height + 1, width + 1, is_unique);
 
     for y in 0..height {
         if let Some(n) = clues_left[y] {

@@ -68,7 +68,11 @@ pub fn solve_doppelblock(
                 if let Some(n) = numbers[y][x] {
                     row.push(Some(n));
                 } else {
-                    row.push(if has_number[y][x] == Some(true) { Some(-1) } else { None });
+                    row.push(if has_number[y][x] == Some(true) {
+                        Some(-1)
+                    } else {
+                        None
+                    });
                 }
             }
             ret.push(row);
