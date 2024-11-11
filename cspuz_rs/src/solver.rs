@@ -162,6 +162,13 @@ impl<T: Clone> Value<Array1DImpl<T>> {
             data: self.0.data.clone(),
         })
     }
+
+    pub fn slice<I: RangeBounds<usize>>(&self, idx: I) -> Value<Array1DImpl<T>> {
+        let (start, end) = resolve_range(self.len(), &idx);
+        Value(Array1DImpl {
+            data: self.0.data[start..end].to_vec(),
+        })
+    }
 }
 
 impl<T> Value<Array2DImpl<T>> {

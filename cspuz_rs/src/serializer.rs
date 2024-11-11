@@ -104,6 +104,10 @@ impl<'a, T> Sequencer<'a, T> {
         self.n_read
     }
 
+    pub fn n_remaining(&self) -> usize {
+        self.input.len() - self.n_read
+    }
+
     pub fn serialize<C: Combinator<T>>(&mut self, ctx: &Context, combinator: C) -> Option<Vec<u8>> {
         if let Some((n, res)) = combinator.serialize(ctx, &self.input[self.n_read..]) {
             self.n_read += n;
