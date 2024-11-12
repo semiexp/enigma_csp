@@ -6,7 +6,7 @@ use crate::serializer::{
     from_base36, problem_to_url_with_context, to_base36, url_to_problem, Combinator, Context,
     ContextBasedGrid, Map, MultiDigit, Size, Tuple3,
 };
-use crate::solver::{any, count_true, Solver};
+use crate::solver::{any, Solver};
 
 use enigma_csp::custom_constraints::SimpleCustomConstraint;
 
@@ -42,12 +42,64 @@ pub fn solve_evolmino(problem: &Problem) -> Option<Vec<Vec<Option<bool>>>> {
             }
         }
     }
-    for arrow in &problem.arrows {
-        // both of adjacent cells in an arrow cannot be squares
-        for i in 1..arrow.len() {
-            solver.add_expr(!(is_square.at(arrow[i - 1]) & is_square.at(arrow[i])));
-        }
 
+    let mut has_arrow = vec![vec![false; w]; h];
+    for arrow in &problem.arrows {
+        for &(y, x) in arrow {
+            has_arrow[y][x] = true;
+        }
+    }
+
+    // if two cells are on (possibly different) arrows, they cannot be both squares
+    for y in 0..h {
+        for x in 0..w {
+            if y < h - 1 && has_arrow[y][x] && has_arrow[y + 1][x] {
+                solver.add_expr(!(is_square.at((y, x)) & is_square.at((y + 1, x))));
+            }
+            if x < w - 1 && has_arrow[y][x] && has_arrow[y][x + 1] {
+                solver.add_expr(!(is_square.at((y, x)) & is_square.at((y, x + 1))));
+            }
+        }
+    }
+
+    for y in 0..h {
+        for x in 0..w {
+            if has_arrow[y][x] {
+                continue;
+            }
+
+            let mut neighbors = vec![];
+            if y > 0 {
+                neighbors.push((y - 1, x));
+            }
+            if x > 0 {
+                neighbors.push((y, x - 1));
+            }
+            if y < h - 1 {
+                neighbors.push((y + 1, x));
+            }
+            if x < w - 1 {
+                neighbors.push((y, x + 1));
+            }
+
+            for i in 1..neighbors.len() {
+                for j in 0..i {
+                    let (iy, ix) = neighbors[i];
+                    let (jy, jx) = neighbors[j];
+
+                    if has_arrow[iy][ix] && has_arrow[jy][jx] {
+                        solver.add_expr(
+                            !(is_square.at((iy, ix))
+                                & is_square.at((y, x))
+                                & is_square.at((jy, jx))),
+                        );
+                    }
+                }
+            }
+        }
+    }
+
+    for arrow in &problem.arrows {
         let mut cells = vec![];
         for &p in arrow {
             cells.push(is_square.at(p));
