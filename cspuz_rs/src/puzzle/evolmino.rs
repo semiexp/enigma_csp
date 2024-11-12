@@ -6,7 +6,7 @@ use crate::serializer::{
     from_base36, problem_to_url_with_context, to_base36, url_to_problem, Combinator, Context,
     ContextBasedGrid, Map, MultiDigit, Size, Tuple3,
 };
-use crate::solver::{count_true, Solver};
+use crate::solver::{any, count_true, Solver};
 
 use enigma_csp::custom_constraints::SimpleCustomConstraint;
 
@@ -43,11 +43,25 @@ pub fn solve_evolmino(problem: &Problem) -> Option<Vec<Vec<Option<bool>>>> {
         }
     }
     for arrow in &problem.arrows {
+        // both of adjacent cells in an arrow cannot be squares
+        for i in 1..arrow.len() {
+            solver.add_expr(!(is_square.at(arrow[i - 1]) & is_square.at(arrow[i])));
+        }
+
         let mut cells = vec![];
         for &p in arrow {
             cells.push(is_square.at(p));
         }
-        solver.add_expr(count_true(cells).ge(2));
+        // solver.add_expr(count_true(cells).ge(2));
+        for i in 0..cells.len() {
+            let mut c = vec![];
+            for j in 0..cells.len() {
+                if i != j {
+                    c.push(cells[j].clone());
+                }
+            }
+            solver.add_expr(any(c));
+        }
     }
 
     let problem = ProblemWithArrowId::new(problem)?;
