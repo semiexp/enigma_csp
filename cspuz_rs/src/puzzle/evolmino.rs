@@ -1,6 +1,6 @@
 use std::ops::Index;
 
-use super::util;
+use super::util::{self, Grid};
 use crate::graph;
 use crate::serializer::{
     from_base36, problem_to_url_with_context, to_base36, url_to_problem, Combinator, Context,
@@ -408,8 +408,8 @@ const INVALID_GROUP: usize = !1;
 
 #[derive(Clone)]
 struct ProblemWithArrowId {
-    cells: Vec<Vec<ProblemCell>>,
-    arrow_id: Vec<Vec<usize>>,
+    cells: Grid<ProblemCell>,
+    arrow_id: Grid<usize>,
     arrows: Vec<Vec<(usize, usize)>>,
 }
 
@@ -417,19 +417,19 @@ impl ProblemWithArrowId {
     fn new(problem: &Problem) -> Option<ProblemWithArrowId> {
         let height = problem.cells.len();
         let width = problem.cells[0].len();
-        let mut arrow_id = vec![vec![NO_GROUP; width]; height];
+        let mut arrow_id = Grid::new(height, width, NO_GROUP);
 
         for (i, arrow) in problem.arrows.iter().enumerate() {
             for &(y, x) in arrow {
-                if arrow_id[y][x] != NO_GROUP {
+                if arrow_id[(y, x)] != NO_GROUP {
                     return None;
                 }
-                arrow_id[y][x] = i;
+                arrow_id[(y, x)] = i;
             }
         }
 
         Some(ProblemWithArrowId {
-            cells: problem.cells.clone(),
+            cells: Grid::from_vecs(&problem.cells),
             arrow_id,
             arrows: problem.arrows.clone(),
         })
@@ -442,22 +442,22 @@ struct GroupInfo {
 }
 
 impl GroupInfo {
-    fn new(group_id: Vec<Vec<usize>>) -> GroupInfo {
-        let height = group_id.len();
-        let width = group_id[0].len();
+    fn new(group_id: Grid<usize>) -> GroupInfo {
+        let height = group_id.height();
+        let width = group_id.width();
 
         let mut group_size = vec![];
         for y in 0..height {
             for x in 0..width {
-                if group_id[y][x] == NO_GROUP {
+                if group_id[(y, x)] == NO_GROUP {
                     continue;
                 }
 
-                while group_size.len() <= group_id[y][x] {
+                while group_size.len() <= group_id[(y, x)] {
                     group_size.push(0);
                 }
 
-                group_size[group_id[y][x]] += 1;
+                group_size[group_id[(y, x)]] += 1;
             }
         }
 
@@ -471,7 +471,7 @@ impl GroupInfo {
 
         for y in 0..height {
             for x in 0..width {
-                let id = group_id[y][x];
+                let id = group_id[(y, x)];
                 if id == NO_GROUP {
                     continue;
                 }
@@ -531,7 +531,7 @@ enum DetailedCellKind {
 
 #[derive(Debug)]
 struct BoardInfoDetailed {
-    cell_info: Vec<Vec<(DetailedCellKind, usize)>>,
+    cell_info: Grid<(DetailedCellKind, usize)>,
     arrow_blocks: Vec<Vec<(usize, usize)>>,
     arrow_block_neighbors: Vec<Vec<(usize, usize)>>,
     floatings: Vec<Vec<(usize, usize)>>,
@@ -541,34 +541,34 @@ struct BoardManager {
     height: usize,
     width: usize,
     problem: ProblemWithArrowId,
-    cells: Vec<Vec<BoardCell>>,
+    cells: Grid<BoardCell>,
     decision_stack: Vec<(usize, usize)>,
 }
 
 impl BoardManager {
     pub fn new(problem: ProblemWithArrowId) -> BoardManager {
-        let height = problem.cells.len();
-        let width = problem.cells[0].len();
+        let height = problem.cells.height();
+        let width = problem.cells.width();
         BoardManager {
             height,
             width,
             problem,
-            cells: vec![vec![BoardCell::Undecided; width]; height],
+            cells: Grid::new(height, width, BoardCell::Undecided),
             decision_stack: vec![],
         }
     }
 
     pub fn decide(&mut self, y: usize, x: usize, cell: BoardCell) {
-        assert!(self.cells[y][x] == BoardCell::Undecided);
-        self.cells[y][x] = cell;
+        assert!(self.cells[(y, x)] == BoardCell::Undecided);
+        self.cells[(y, x)] = cell;
         self.decision_stack.push((y, x));
     }
 
     pub fn undo(&mut self) {
         assert!(!self.decision_stack.is_empty());
         let (y, x) = self.decision_stack.pop().unwrap();
-        assert!(self.cells[y][x] != BoardCell::Undecided);
-        self.cells[y][x] = BoardCell::Undecided;
+        assert!(self.cells[(y, x)] != BoardCell::Undecided);
+        self.cells[(y, x)] = BoardCell::Undecided;
     }
 
     #[allow(unused)]
@@ -577,7 +577,7 @@ impl BoardManager {
             for x in 0..self.width {
                 eprint!(
                     "{} ",
-                    match self.cells[y][x] {
+                    match self.cells[(y, x)] {
                         BoardCell::Undecided => '.',
                         BoardCell::Square => '#',
                         BoardCell::Empty => '_',
@@ -597,19 +597,19 @@ impl BoardManager {
     }
 
     fn compute_connected_components(&self, is_potential: bool) -> GroupInfo {
-        let mut group_id = vec![vec![NO_GROUP; self.width]; self.height];
+        let mut group_id = Grid::new(self.height, self.width, NO_GROUP);
         let mut id_last = 0;
 
         let mut stack = vec![];
 
         let is_check_cell = |y: usize, x: usize| {
-            !(self.cells[y][x] == BoardCell::Empty
-                || (!is_potential && self.cells[y][x] == BoardCell::Undecided))
+            !(self.cells[(y, x)] == BoardCell::Empty
+                || (!is_potential && self.cells[(y, x)] == BoardCell::Undecided))
         };
 
         for y in 0..self.height {
             for x in 0..self.width {
-                if group_id[y][x] != NO_GROUP {
+                if group_id[(y, x)] != NO_GROUP {
                     continue;
                 }
 
@@ -621,10 +621,10 @@ impl BoardManager {
                 stack.push((y, x));
 
                 while let Some((y, x)) = stack.pop() {
-                    group_id[y][x] = id_last;
+                    group_id[(y, x)] = id_last;
 
                     foreach_neighbor(y, x, self.height, self.width, |y2, x2| {
-                        if group_id[y2][x2] == NO_GROUP && is_check_cell(y2, x2) {
+                        if group_id[(y2, x2)] == NO_GROUP && is_check_cell(y2, x2) {
                             stack.push((y2, x2));
                         }
                     });
@@ -638,13 +638,16 @@ impl BoardManager {
     }
 
     pub fn compute_board_info_detailed(&self, info: &BoardInfoSimple) -> BoardInfoDetailed {
-        let mut cell_info =
-            vec![vec![(DetailedCellKind::Empty, INVALID_GROUP); self.width]; self.height];
+        let mut cell_info = Grid::new(
+            self.height,
+            self.width,
+            (DetailedCellKind::Empty, INVALID_GROUP),
+        );
 
         for y in 0..self.height {
             for x in 0..self.width {
-                if self.cells[y][x] == BoardCell::Empty {
-                    cell_info[y][x] = (DetailedCellKind::Empty, NO_GROUP);
+                if self.cells[(y, x)] == BoardCell::Empty {
+                    cell_info[(y, x)] = (DetailedCellKind::Empty, NO_GROUP);
                 }
             }
         }
@@ -653,7 +656,7 @@ impl BoardManager {
         for i in 0..info.blocks.num_groups() {
             let mut has_arrow = false;
             for &(y, x) in &info.blocks[i] {
-                if self.problem.arrow_id[y][x] != NO_GROUP {
+                if self.problem.arrow_id[(y, x)] != NO_GROUP {
                     assert!(!has_arrow);
                     has_arrow = true;
                 }
@@ -661,7 +664,7 @@ impl BoardManager {
             if has_arrow {
                 let mut group = vec![];
                 for &(y, x) in &info.blocks[i] {
-                    cell_info[y][x] = (DetailedCellKind::ArrowBlock, arrow_blocks.len());
+                    cell_info[(y, x)] = (DetailedCellKind::ArrowBlock, arrow_blocks.len());
                     group.push((y, x));
                 }
                 arrow_blocks.push(group);
@@ -671,13 +674,13 @@ impl BoardManager {
         let mut arrow_block_neighbors = vec![vec![]; arrow_blocks.len()];
         for y in 0..self.height {
             for x in 0..self.width {
-                if self.cells[y][x] != BoardCell::Undecided {
+                if self.cells[(y, x)] != BoardCell::Undecided {
                     continue;
                 }
 
                 let mut neighbor_block_id = NO_GROUP;
                 foreach_neighbor(y, x, self.height, self.width, |ny, nx| {
-                    let info = cell_info[ny][nx];
+                    let info = cell_info[(ny, nx)];
                     if info.0 == DetailedCellKind::ArrowBlock {
                         if neighbor_block_id == NO_GROUP {
                             neighbor_block_id = info.1;
@@ -688,10 +691,10 @@ impl BoardManager {
                 });
 
                 if neighbor_block_id != NO_GROUP && neighbor_block_id != INVALID_GROUP {
-                    cell_info[y][x] = (DetailedCellKind::ArrowBlockNeighbor, neighbor_block_id);
+                    cell_info[(y, x)] = (DetailedCellKind::ArrowBlockNeighbor, neighbor_block_id);
                     arrow_block_neighbors[neighbor_block_id].push((y, x));
                 } else if neighbor_block_id == INVALID_GROUP {
-                    cell_info[y][x] = (DetailedCellKind::Empty, NO_GROUP);
+                    cell_info[(y, x)] = (DetailedCellKind::Empty, NO_GROUP);
                 }
             }
         }
@@ -700,7 +703,7 @@ impl BoardManager {
         let mut floatings = vec![];
         for y in 0..self.height {
             for x in 0..self.width {
-                if cell_info[y][x].1 != INVALID_GROUP {
+                if cell_info[(y, x)].1 != INVALID_GROUP {
                     continue;
                 }
 
@@ -712,11 +715,11 @@ impl BoardManager {
                     self.width,
                     &mut visited,
                     &mut group,
-                    |y, x| cell_info[y][x].1 == INVALID_GROUP,
+                    |y, x| cell_info[(y, x)].1 == INVALID_GROUP,
                 );
 
                 for &(ny, nx) in &group {
-                    cell_info[ny][nx] = (DetailedCellKind::Floating, floatings.len());
+                    cell_info[(ny, nx)] = (DetailedCellKind::Floating, floatings.len());
                 }
                 floatings.push(group);
             }
@@ -735,12 +738,12 @@ impl BoardManager {
     }
 
     fn reason_for_path(&self, ya: usize, xa: usize, yb: usize, xb: usize) -> Vec<(usize, bool)> {
-        assert_eq!(self.cells[ya][xa], BoardCell::Square);
-        assert_eq!(self.cells[yb][xb], BoardCell::Square);
+        assert_eq!(self.cells[(ya, xa)], BoardCell::Square);
+        assert_eq!(self.cells[(yb, xb)], BoardCell::Square);
 
-        let mut bfs: Vec<Vec<Option<(usize, usize)>>> = vec![vec![None; self.width]; self.height];
+        let mut bfs: Grid<Option<(usize, usize)>> = Grid::new(self.height, self.width, None);
         let mut qu = std::collections::VecDeque::<(usize, usize)>::new();
-        bfs[ya][xa] = Some((!0, !0));
+        bfs[(ya, xa)] = Some((!0, !0));
         qu.push_back((ya, xa));
 
         while let Some((y, x)) = qu.pop_front() {
@@ -749,15 +752,15 @@ impl BoardManager {
             }
 
             foreach_neighbor(y, x, self.height, self.width, |y2, x2| {
-                if self.cells[y2][x2] != BoardCell::Square || bfs[y2][x2].is_some() {
+                if self.cells[(y2, x2)] != BoardCell::Square || bfs[(y2, x2)].is_some() {
                     return;
                 }
-                bfs[y2][x2] = Some((y, x));
+                bfs[(y2, x2)] = Some((y, x));
                 qu.push_back((y2, x2));
             });
         }
 
-        assert!(bfs[yb][xb].is_some());
+        assert!(bfs[(yb, xb)].is_some());
         let mut ret = vec![];
 
         let mut y = yb;
@@ -768,7 +771,7 @@ impl BoardManager {
             if y == ya && x == xa {
                 break;
             }
-            (y, x) = bfs[y][x].unwrap();
+            (y, x) = bfs[(y, x)].unwrap();
         }
 
         ret
@@ -782,7 +785,7 @@ impl BoardManager {
         let mut ret = vec![];
         for &(y, x) in &info.potential_blocks[group_id] {
             foreach_neighbor(y, x, self.height, self.width, |y2, x2| {
-                if self.cells[y2][x2] == BoardCell::Empty {
+                if self.cells[(y2, x2)] == BoardCell::Empty {
                     ret.push((self.cell_id(y2, x2), false));
                 }
             });
@@ -817,11 +820,11 @@ impl BoardManager {
         let mut disturbing_blocks = vec![];
         for &(y, x) in &info.arrow_blocks[block_id] {
             foreach_neighbor(y, x, height, width, |y2, x2| {
-                if self.cells[y2][x2] == BoardCell::Empty {
+                if self.cells[(y2, x2)] == BoardCell::Empty {
                     ret.push((self.cell_id(y2, x2), false));
                 } else {
                     foreach_neighbor(y2, x2, height, width, |y3, x3| {
-                        let i = info.cell_info[y3][x3];
+                        let i = info.cell_info[(y3, x3)];
                         if i.0 == DetailedCellKind::ArrowBlock && i.1 != block_id {
                             disturbing_blocks.push(i.1);
                         }
@@ -832,11 +835,11 @@ impl BoardManager {
 
         for &(y, x) in &info.arrow_block_neighbors[block_id] {
             foreach_neighbor(y, x, height, width, |y2, x2| {
-                if self.cells[y2][x2] == BoardCell::Empty {
+                if self.cells[(y2, x2)] == BoardCell::Empty {
                     ret.push((self.cell_id(y2, x2), false));
-                } else if self.cells[y2][x2] == BoardCell::Undecided {
+                } else if self.cells[(y2, x2)] == BoardCell::Undecided {
                     foreach_neighbor(y2, x2, height, width, |y3, x3| {
-                        let i = info.cell_info[y3][x3];
+                        let i = info.cell_info[(y3, x3)];
                         if i.0 == DetailedCellKind::ArrowBlock && i.1 != block_id {
                             disturbing_blocks.push(i.1);
                         }
@@ -848,7 +851,7 @@ impl BoardManager {
         let mut adjacent_floatings = vec![];
         for &(y, x) in &info.arrow_block_neighbors[block_id] {
             foreach_neighbor(y, x, height, width, |y2, x2| {
-                let i = info.cell_info[y2][x2];
+                let i = info.cell_info[(y2, x2)];
                 if i.0 == DetailedCellKind::Floating {
                     adjacent_floatings.push(i.1);
                 } else if i.0 == DetailedCellKind::ArrowBlockNeighbor && i.1 != block_id {
@@ -863,18 +866,18 @@ impl BoardManager {
         for f in adjacent_floatings {
             for &(y, x) in &info.floatings[f] {
                 foreach_neighbor(y, x, height, width, |y2, x2| {
-                    if self.cells[y2][x2] == BoardCell::Empty {
+                    if self.cells[(y2, x2)] == BoardCell::Empty {
                         ret.push((self.cell_id(y2, x2), false));
                         return;
                     }
 
-                    let i = info.cell_info[y2][x2];
+                    let i = info.cell_info[(y2, x2)];
                     if i.0 == DetailedCellKind::ArrowBlockNeighbor && i.1 != block_id {
                         disturbing_blocks.push(i.1);
                     }
 
                     foreach_neighbor(y2, x2, height, width, |y3, x3| {
-                        let i = info.cell_info[y3][x3];
+                        let i = info.cell_info[(y3, x3)];
                         if i.0 == DetailedCellKind::ArrowBlock && i.1 != block_id {
                             disturbing_blocks.push(i.1);
                         }
@@ -942,10 +945,10 @@ impl SimpleCustomConstraint for EvolminoConstraint {
             let mut has_arrow = false;
 
             for &(y, x) in &board_info_simple.potential_blocks[i] {
-                if self.problem.arrow_id[y][x] != NO_GROUP {
+                if self.problem.arrow_id[(y, x)] != NO_GROUP {
                     has_arrow = true;
                 }
-                if self.board.cells[y][x] == BoardCell::Square {
+                if self.board.cells[(y, x)] == BoardCell::Square {
                     square_cell = Some((y, x));
                 }
             }
@@ -964,7 +967,7 @@ impl SimpleCustomConstraint for EvolminoConstraint {
         for i in 0..board_info_simple.blocks.num_groups() {
             let mut arrow_cell = None;
             for &(y, x) in &board_info_simple.blocks[i] {
-                if self.problem.arrow_id[y][x] != NO_GROUP {
+                if self.problem.arrow_id[(y, x)] != NO_GROUP {
                     if let Some((ay, ax)) = arrow_cell {
                         assert_ne!((y, x), (ay, ax));
                         return Some(self.board.reason_for_path(y, x, ay, ax));
@@ -985,20 +988,20 @@ impl SimpleCustomConstraint for EvolminoConstraint {
 
             for j in 0..arrow.len() {
                 let (y, x) = arrow[j];
-                if self.board.cells[y][x] != BoardCell::Square {
+                if self.board.cells[(y, x)] != BoardCell::Square {
                     continue;
                 }
 
                 assert_eq!(
-                    board_info_detail.cell_info[y][x].0,
+                    board_info_detail.cell_info[(y, x)].0,
                     DetailedCellKind::ArrowBlock
                 );
-                let block_id = board_info_detail.cell_info[y][x].1;
+                let block_id = board_info_detail.cell_info[(y, x)].1;
 
                 let mut allowed_floatings = vec![false; board_info_detail.floatings.len()];
                 for &(y, x) in &board_info_detail.arrow_block_neighbors[block_id] {
                     foreach_neighbor(y, x, height, width, |y2, x2| {
-                        let f = board_info_detail.cell_info[y2][x2];
+                        let f = board_info_detail.cell_info[(y2, x2)];
                         if f.0 == DetailedCellKind::Floating {
                             allowed_floatings[f.1] = true;
                         }
@@ -1027,7 +1030,7 @@ impl SimpleCustomConstraint for EvolminoConstraint {
 
                                 let y2 = y2 as usize;
                                 let x2 = x2 as usize;
-                                let d = board_info_detail.cell_info[y2][x2];
+                                let d = board_info_detail.cell_info[(y2, x2)];
                                 if !((d.0 == DetailedCellKind::Floating && allowed_floatings[d.1])
                                     || (d.0 != DetailedCellKind::Floating && d.1 == block_id))
                                 {
@@ -1070,7 +1073,7 @@ impl SimpleCustomConstraint for EvolminoConstraint {
             let mut neighbor_floatings = vec![];
             for &(y, x) in &board_info_detail.arrow_block_neighbors[i] {
                 foreach_neighbor(y, x, height, width, |y2, x2| {
-                    let f = board_info_detail.cell_info[y2][x2];
+                    let f = board_info_detail.cell_info[(y2, x2)];
                     if f.0 == DetailedCellKind::Floating {
                         neighbor_floatings.push(f.1);
                     }
@@ -1093,26 +1096,24 @@ impl SimpleCustomConstraint for EvolminoConstraint {
 
             for j in 0..arrow.len() {
                 let (y, x) = arrow[j];
-                if self.board.cells[y][x] != BoardCell::Square {
+                if self.board.cells[(y, x)] != BoardCell::Square {
                     continue;
                 }
                 assert_eq!(
-                    board_info_detail.cell_info[y][x].0,
+                    board_info_detail.cell_info[(y, x)].0,
                     DetailedCellKind::ArrowBlock
                 );
 
                 if let Some(last_block_idx) = last_block_idx {
-                    let last_block_id = board_info_detail.cell_info[arrow[last_block_idx].0]
-                        [arrow[last_block_idx].1]
-                        .1;
-                    let cur_block_id = board_info_detail.cell_info[y][x].1;
+                    let last_block_id = board_info_detail.cell_info[arrow[last_block_idx]].1;
+                    let cur_block_id = board_info_detail.cell_info[(y, x)].1;
                     assert_ne!(last_block_id, cur_block_id);
 
                     let mut gap_ub = 1;
                     {
                         let mut k = last_block_idx + 2;
                         while k < j - 1 {
-                            let c = self.board.cells[arrow[k].0][arrow[k].1];
+                            let c = self.board.cells[arrow[k]];
                             assert_ne!(c, BoardCell::Square);
                             if c == BoardCell::Undecided {
                                 gap_ub += 1;
@@ -1153,7 +1154,7 @@ impl SimpleCustomConstraint for EvolminoConstraint {
                         ));
                         for k in last_block_idx + 2..j - 1 {
                             let (y, x) = arrow[k];
-                            if self.board.cells[y][x] == BoardCell::Empty {
+                            if self.board.cells[(y, x)] == BoardCell::Empty {
                                 ret.push((self.board.cell_id(y, x), false));
                             }
                         }

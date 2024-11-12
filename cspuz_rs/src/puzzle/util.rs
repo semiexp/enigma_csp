@@ -7,7 +7,7 @@ pub fn infer_shape<T>(array: &[Vec<T>]) -> (usize, usize) {
     (height, width)
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Grid<T: Clone> {
     data: Vec<T>,
     height: usize,
