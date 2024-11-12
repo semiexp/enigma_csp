@@ -1,6 +1,6 @@
-use std::ops::{Index, IndexMut};
+use std::ops::Index;
 
-use super::util;
+use super::util::{self, Grid};
 use crate::graph;
 use crate::serializer::{
     problem_to_url_with_context, url_to_problem, Choice, Combinator, Context, ContextBasedGrid,
@@ -109,66 +109,6 @@ enum Border {
     Undecided,
     Wall,
     Connected,
-}
-
-#[derive(Clone)]
-struct Grid<T: Clone> {
-    data: Vec<T>,
-    height: usize,
-    width: usize,
-}
-
-impl<T: Clone> Grid<T> {
-    pub fn new(height: usize, width: usize, default: T) -> Grid<T> {
-        Grid {
-            data: vec![default; height * width],
-            height,
-            width,
-        }
-    }
-
-    pub fn from_vecs(vecs: &[Vec<T>]) -> Grid<T> {
-        let height = vecs.len();
-        assert!(height > 0);
-        let width = vecs[0].len();
-        let mut buf = vec![];
-        for i in 0..height {
-            assert_eq!(vecs[i].len(), width);
-            buf.extend_from_slice(&vecs[i]);
-        }
-
-        Grid {
-            data: buf,
-            height,
-            width,
-        }
-    }
-
-    pub fn height(&self) -> usize {
-        self.height
-    }
-
-    pub fn width(&self) -> usize {
-        self.width
-    }
-}
-
-impl<T: Clone> Index<(usize, usize)> for Grid<T> {
-    type Output = T;
-
-    fn index(&self, index: (usize, usize)) -> &Self::Output {
-        let (y, x) = index;
-        assert!(y < self.height && x < self.width);
-        unsafe { self.data.get_unchecked(y * self.width + x) }
-    }
-}
-
-impl<T: Clone> IndexMut<(usize, usize)> for Grid<T> {
-    fn index_mut(&mut self, index: (usize, usize)) -> &mut Self::Output {
-        let (y, x) = index;
-        assert!(y < self.height && x < self.width);
-        unsafe { self.data.get_unchecked_mut(y * self.width + x) }
-    }
 }
 
 // TODO: remove duplicated codes (`evolmino.rs` has the same code)
