@@ -56,7 +56,8 @@ pub fn solve_chainedb(clues: &[Vec<Option<i32>>]) -> Option<Vec<Vec<Option<bool>
                     is_black.at((y, x))
                         & !is_black.at((y - 1, x))
                         & !is_black.at((y, x - 1))
-                        & is_black.at((y - 1, x - 1)),
+                        & is_black.at((y - 1, x - 1))
+                        & group_id.at((y, x)).ne(group_id.at((y - 1, x - 1))),
                 );
             }
             if y > 0 && x + 1 < w {
@@ -64,7 +65,8 @@ pub fn solve_chainedb(clues: &[Vec<Option<i32>>]) -> Option<Vec<Vec<Option<bool>
                     is_black.at((y, x))
                         & !is_black.at((y - 1, x))
                         & !is_black.at((y, x + 1))
-                        & is_black.at((y - 1, x + 1)),
+                        & is_black.at((y - 1, x + 1))
+                        & group_id.at((y, x)).ne(group_id.at((y - 1, x + 1))),
                 );
             }
             if y + 1 < h && x > 0 {
@@ -72,7 +74,8 @@ pub fn solve_chainedb(clues: &[Vec<Option<i32>>]) -> Option<Vec<Vec<Option<bool>
                     is_black.at((y, x))
                         & !is_black.at((y + 1, x))
                         & !is_black.at((y, x - 1))
-                        & is_black.at((y + 1, x - 1)),
+                        & is_black.at((y + 1, x - 1))
+                        & group_id.at((y, x)).ne(group_id.at((y + 1, x - 1))),
                 );
             }
             if y + 1 < h && x + 1 < w {
@@ -80,7 +83,8 @@ pub fn solve_chainedb(clues: &[Vec<Option<i32>>]) -> Option<Vec<Vec<Option<bool>
                     is_black.at((y, x))
                         & !is_black.at((y + 1, x))
                         & !is_black.at((y, x + 1))
-                        & is_black.at((y + 1, x + 1)),
+                        & is_black.at((y + 1, x + 1))
+                        & group_id.at((y, x)).ne(group_id.at((y + 1, x + 1))),
                 );
             }
 
@@ -456,6 +460,13 @@ mod tests {
             [0, 1, 0, 1, 1, 0],
         ]);
         assert_eq!(ans, expected);
+    }
+
+    #[test]
+    fn test_chainedb_problem2() {
+        let problem = deserialize_problem("https://puzz.link/p?chainedb/4/3/g7p").unwrap();
+        let ans = solve_chainedb(&problem);
+        assert!(ans.is_none());
     }
 
     #[test]
