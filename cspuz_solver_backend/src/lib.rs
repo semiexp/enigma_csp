@@ -158,6 +158,8 @@ fn decode_and_solve(url: &[u8]) -> Result<Board, &'static str> {
                 puzzle::soulmates::solve_soulmates(url)
             } else if kudamono.puzzle_kind == "cross-border-parity-loop" {
                 puzzle::cross_border_parity_loop::solve_cross_border_parity_loop(url)
+            } else if kudamono.puzzle_kind == "akari-regional" {
+                puzzle::akari_regions::solve_akari_regions(url)
             } else {
                 Err("unknown puzzle type")
             }
