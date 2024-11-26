@@ -43,7 +43,6 @@ pub fn solve_akari(clues: &[Vec<Option<i32>>]) -> Option<Vec<Vec<Option<bool>>>>
                     for x2 in s..x {
                         horizontal_group[y][x2] = Some(v.clone());
                     }
-                    println!();
                     start = None;
                 }
             }
