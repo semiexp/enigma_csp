@@ -2,6 +2,7 @@ pub mod util;
 
 pub mod akari;
 pub mod akari_regions;
+pub mod akari_rgb;
 pub mod akichiwake;
 pub mod aqre;
 pub mod aquapelago;
