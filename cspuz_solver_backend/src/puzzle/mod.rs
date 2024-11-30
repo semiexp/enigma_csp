@@ -33,6 +33,7 @@ pub mod kakuro;
 pub mod kouchoku;
 pub mod kropki;
 pub mod kurotto;
+pub mod litherslink;
 pub mod lits;
 pub mod lohkous;
 pub mod loop_special;

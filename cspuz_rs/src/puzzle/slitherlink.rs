@@ -94,7 +94,7 @@ impl Combinator<Option<i32>> for SlitherlinkClueCombinator {
 
 type Problem = Vec<Vec<Option<i32>>>;
 
-fn combinator() -> impl Combinator<Problem> {
+pub(crate) fn combinator() -> impl Combinator<Problem> {
     Grid::new(Choice::new(vec![
         Box::new(SlitherlinkClueCombinator),
         Box::new(Spaces::new(None, 'g')),

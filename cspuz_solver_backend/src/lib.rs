@@ -134,6 +134,8 @@ fn solve_puzz_link(puzzle_kind: String, url: &str) -> Result<Board, &'static str
         puzzle::kakuro::solve_kakuro(url)
     } else if puzzle_kind == "doppelblock" {
         puzzle::doppelblock::solve_doppelblock(url)
+    } else if puzzle_kind == "lither" {
+        puzzle::litherslink::solve_litherslink(url)
     } else {
         Err("unknown puzzle type")
     }
