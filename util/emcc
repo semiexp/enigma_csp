@@ -20,22 +20,7 @@ def main():
     assert ext in [".wasm", ".js"]
     output = root + ".js"
 
-    args = [
-        "emcc",
-        "-o",
-        output,
-        "-s",
-        "MODULARIZE=1",
-        "-s",
-        "ALLOW_MEMORY_GROWTH=1",
-        "-s",
-        "FILESYSTEM=0",
-        "--memory-init-file=0",
-        "-s",
-        "ENVIRONMENT=web,worker",
-        "-s",
-        "EXPORT_ES6=1",
-    ] + extra_args
+    args = ["emcc", "-o", output] + extra_args
     subprocess.check_call(args)
 
 

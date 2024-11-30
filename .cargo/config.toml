@@ -1,0 +1,7 @@
+[target.'cfg(target_arch = "wasm32")']
+rustflags = [
+    "-C",
+    "panic=abort",
+    "-C",
+    "link-args=-s MODULARIZE=1 -s ALLOW_MEMORY_GROWTH=1 -s FILESYSTEM=0 --memory-init-file=0 -s ENVIRONMENT=web,worker -s EXPORT_ES6=1",
+]
