@@ -1,16 +1,13 @@
 #!/usr/bin/env python3
 
+# A simple wrapper for emcc that changes the output file extension to .js
+
 import argparse
 import os
 import subprocess
 
 
 def main():
-    path_split = os.environ["PATH"].split(os.pathsep)
-    assert "./util" in path_split
-    path_filtered = [path for path in path_split if path != "./util"]
-    os.environ["PATH"] = os.pathsep.join(path_filtered)
-
     parser = argparse.ArgumentParser()
     parser.add_argument("-o", type=str, required=True)
     overwritten_args, extra_args = parser.parse_known_args()
