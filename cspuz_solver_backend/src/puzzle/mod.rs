@@ -38,6 +38,7 @@ pub mod lits;
 pub mod lohkous;
 pub mod loop_special;
 pub mod masyu;
+pub mod milktea;
 pub mod moonsun;
 pub mod nagenawa;
 pub mod norinori;
