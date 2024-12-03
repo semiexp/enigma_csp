@@ -136,6 +136,8 @@ fn solve_puzz_link(puzzle_kind: String, url: &str) -> Result<Board, &'static str
         puzzle::doppelblock::solve_doppelblock(url)
     } else if puzzle_kind == "lither" {
         puzzle::litherslink::solve_litherslink(url)
+    } else if puzzle_kind == "coffeemilk" {
+        puzzle::coffeemilk::solve_coffeemilk(url)
     } else {
         Err("unknown puzzle type")
     }

@@ -11,6 +11,7 @@ pub mod cave;
 pub mod chainedb;
 pub mod chocobanana;
 pub mod cocktail;
+pub mod coffeemilk;
 pub mod compass;
 pub mod coral;
 pub mod creek;
