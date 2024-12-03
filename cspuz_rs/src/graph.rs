@@ -367,6 +367,49 @@ where
     active_vertices_connected(solver, is_active, &graph)
 }
 
+pub fn active_vertices_connected_via_active_edges<T1, T2>(
+    solver: &mut Solver,
+    is_active_vertex: T1,
+    is_active_edge: T2,
+    graph: &Graph,
+) where
+    T1: IntoIterator,
+    <T1 as IntoIterator>::Item: Operand<Output = Array0DImpl<CSPBoolExpr>>,
+    T2: IntoIterator,
+    <T2 as IntoIterator>::Item: Operand<Output = Array0DImpl<CSPBoolExpr>>,
+{
+    let is_active_vertex: Vec<Value<Array0DImpl<CSPBoolExpr>>> = is_active_vertex
+        .into_iter()
+        .map(|x| x.as_expr_array_value())
+        .collect();
+    let is_active_edge: Vec<Value<Array0DImpl<CSPBoolExpr>>> = is_active_edge
+        .into_iter()
+        .map(|x| x.as_expr_array_value())
+        .collect();
+    assert_eq!(is_active_vertex.len(), graph.n_vertices());
+    assert_eq!(is_active_edge.len(), graph.n_edges());
+
+    let mut is_edge_used = vec![];
+    for i in 0..is_active_edge.len() {
+        let v = solver.bool_var().expr();
+        solver.add_expr(v.imp(&is_active_edge[i]));
+        is_edge_used.push(v);
+    }
+
+    let mut aux_graph = Graph::new(graph.n_vertices() + graph.n_edges());
+    for i in 0..graph.n_edges() {
+        let (u, v) = graph[i];
+        aux_graph.add_edge(i + graph.n_vertices(), u);
+        aux_graph.add_edge(i + graph.n_vertices(), v);
+    }
+
+    let aux_vertices = is_active_vertex
+        .into_iter()
+        .chain(is_edge_used.into_iter())
+        .collect::<Vec<_>>();
+    active_vertices_connected(solver, &aux_vertices, &aux_graph);
+}
+
 pub fn active_vertices_connected_2d_region<T>(
     solver: &mut Solver,
     is_active: T,
