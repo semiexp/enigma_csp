@@ -48,6 +48,7 @@ pub mod nagenawa;
 pub mod norinori;
 pub mod nothree;
 pub mod nurikabe;
+pub mod nurimaze;
 pub mod nurimisaki;
 pub mod parrot_loop;
 pub mod pencils;
