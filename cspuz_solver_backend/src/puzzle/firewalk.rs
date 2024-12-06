@@ -9,7 +9,12 @@ pub fn solve_firewalk(url: &str) -> Result<Board, &'static str> {
 
     let height = fire_cell.len();
     let width = fire_cell[0].len();
-    let mut board = Board::new(BoardKind::Grid, height, width, is_unique(&is_line));
+    let mut board = Board::new(
+        BoardKind::Grid,
+        height,
+        width,
+        is_unique(&(&is_line, &fire_cell_mode)),
+    );
 
     for y in 0..height {
         for x in 0..width {
