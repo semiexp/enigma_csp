@@ -28,6 +28,14 @@ impl<U: UniquenessCheckable, V: UniquenessCheckable> UniquenessCheckable for (&U
     }
 }
 
+impl<U: UniquenessCheckable, V: UniquenessCheckable, W: UniquenessCheckable> UniquenessCheckable
+    for (&U, &V, &W)
+{
+    fn is_unique(&self) -> bool {
+        self.0.is_unique() && self.1.is_unique() && self.2.is_unique()
+    }
+}
+
 impl<T: UniquenessCheckable> UniquenessCheckable for GridEdges<T> {
     fn is_unique(&self) -> bool {
         self.horizontal.is_unique() && self.vertical.is_unique()

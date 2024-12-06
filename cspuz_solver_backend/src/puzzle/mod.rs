@@ -63,6 +63,7 @@ pub mod slalom;
 pub mod slashpack;
 pub mod slitherlink;
 pub mod soulmates;
+pub mod spokes;
 pub mod square_jam;
 pub mod statue_park;
 pub mod stostone;
