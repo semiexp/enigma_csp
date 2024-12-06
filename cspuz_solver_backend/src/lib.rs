@@ -140,6 +140,8 @@ fn solve_puzz_link(puzzle_kind: String, url: &str) -> Result<Board, &'static str
         puzzle::coffeemilk::solve_coffeemilk(url)
     } else if puzzle_kind == "nurimaze" {
         puzzle::nurimaze::solve_nurimaze(url)
+    } else if puzzle_kind == "firewalk" {
+        puzzle::firewalk::solve_firewalk(url)
     } else {
         Err("unknown puzzle type")
     }

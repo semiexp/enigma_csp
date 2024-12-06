@@ -26,6 +26,7 @@ pub mod doppelblock;
 pub mod evolmino;
 pub mod fillomino;
 pub mod firefly;
+pub mod firewalk;
 pub mod fivecells;
 pub mod guidearrow;
 pub mod hashi;
