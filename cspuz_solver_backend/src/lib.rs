@@ -172,6 +172,8 @@ fn decode_and_solve(url: &[u8]) -> Result<Board, &'static str> {
                 puzzle::akari_rgb::solve_akari_rgb(url)
             } else if kudamono.puzzle_kind == "milk-tea" {
                 puzzle::milktea::solve_milktea(url)
+            } else if kudamono.puzzle_kind == "seiza" {
+                puzzle::seiza::solve_seiza(url)
             } else {
                 Err("unknown puzzle type")
             }

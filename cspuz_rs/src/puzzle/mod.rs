@@ -58,6 +58,7 @@ pub mod reflect;
 pub mod ringring;
 pub mod sasahigane;
 pub mod scrabble;
+pub mod seiza;
 pub mod shakashaka;
 pub mod shikaku;
 pub mod shimaguni;

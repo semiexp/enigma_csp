@@ -54,6 +54,7 @@ pub mod polyominous;
 pub mod reflect;
 pub mod ringring;
 pub mod sashigane;
+pub mod seiza;
 pub mod shakashaka;
 pub mod shikaku;
 pub mod shimaguni;
