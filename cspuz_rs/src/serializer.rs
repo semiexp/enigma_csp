@@ -1368,6 +1368,97 @@ where
     }
 }
 
+pub struct KudamonoBorder;
+
+impl Combinator<InnerGridEdges<Vec<Vec<bool>>>> for KudamonoBorder {
+    fn deserialize(
+        &self,
+        ctx: &Context,
+        input: &[u8],
+    ) -> Option<(usize, Vec<InnerGridEdges<Vec<Vec<bool>>>>)> {
+        // TODO: consumes the entire input
+        let height = ctx.height.unwrap();
+        let width = ctx.width.unwrap();
+
+        let mut border = InnerGridEdges {
+            vertical: vec![vec![false; width - 1]; height],
+            horizontal: vec![vec![false; width]; height - 1],
+        };
+
+        let mut idx = 0;
+        let mut pos = 0;
+
+        while idx < input.len() {
+            if '0' as u8 <= input[idx] && input[idx] <= '9' as u8 {
+                let mut num_end = idx;
+                let mut n = 0;
+                while num_end < input.len()
+                    && '0' as u8 <= input[num_end]
+                    && input[num_end] <= '9' as u8
+                {
+                    n *= 10;
+                    n += (input[num_end] - '0' as u8) as usize;
+                    num_end += 1;
+                }
+                pos += n;
+                idx = num_end;
+            } else {
+                let mut y = height - pos % (height + 1);
+                let mut x = pos / (height + 1);
+
+                if input[idx] != 'R' as u8
+                    && input[idx] != 'L' as u8
+                    && input[idx] != 'U' as u8
+                    && input[idx] != 'D' as u8
+                {
+                    return None;
+                }
+
+                while idx < input.len() {
+                    if input[idx] == 'L' as u8 {
+                        if x == 0 || y == 0 || y == height {
+                            return None;
+                        }
+                        border.horizontal[y - 1][x - 1] = true;
+                        x -= 1;
+                    } else if input[idx] == 'R' as u8 {
+                        if x >= width || y == 0 || y == height {
+                            return None;
+                        }
+                        border.horizontal[y - 1][x] = true;
+                        x += 1;
+                    } else if input[idx] == 'U' as u8 {
+                        if y == 0 || x == 0 || x == width {
+                            return None;
+                        }
+                        border.vertical[y - 1][x - 1] = true;
+                        y -= 1;
+                    } else if input[idx] == 'D' as u8 {
+                        if y >= height || x == 0 || x == width {
+                            return None;
+                        }
+                        border.vertical[y][x - 1] = true;
+                        y += 1;
+                    } else {
+                        break;
+                    }
+                    idx += 1;
+                }
+            }
+        }
+
+        Some((idx, vec![border]))
+    }
+
+    fn serialize(
+        &self,
+        _ctx: &Context,
+        _input: &[InnerGridEdges<Vec<Vec<bool>>>],
+    ) -> Option<(usize, Vec<u8>)> {
+        unimplemented!();
+    }
+}
+
 fn lexicographic_order(n: usize) -> Vec<usize> {
     if n < 10 {
         return (0..n).collect();

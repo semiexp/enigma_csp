@@ -2,7 +2,7 @@ use super::util;
 use crate::graph;
 use crate::serializer::{
     get_kudamono_url_info_detailed, parse_kudamono_dimension, Choice, Combinator, Context, DecInt,
-    Dict, KudamonoGrid, Optionalize, PrefixAndSuffix,
+    Dict, KudamonoBorder, KudamonoGrid, Optionalize, PrefixAndSuffix,
 };
 use crate::solver::{count_true, Solver};
 
@@ -144,10 +144,16 @@ pub fn deserialize_problem(url: &str) -> Option<Problem> {
         board = vec![vec![CBPLCell::Empty; width]; height];
     }
 
-    let mut border = graph::InnerGridEdges {
-        horizontal: vec![vec![false; width]; height - 1],
-        vertical: vec![vec![false; width - 1]; height],
-    };
+    let mut border;
+    if let Some(p) = parsed.get("SIE") {
+        border = KudamonoBorder.deserialize(&ctx, p.as_bytes())?.1.pop()?;
+    } else {
+        border = graph::InnerGridEdges {
+            horizontal: vec![vec![false; width]; height - 1],
+            vertical: vec![vec![false; width - 1]; height],
+        };
+    }
+
     for y in 0..height {
         for x in 0..width {
             if board[y][x] == CBPLCell::Blocked {
@@ -162,71 +168,6 @@ pub fn deserialize_problem(url: &str) -> Option<Problem> {
                 }
                 if x < width - 1 {
                     border.vertical[y][x] = true;
-                }
-            }
-        }
-    }
-
-    if let Some(p) = parsed.get("SIE") {
-        let data = p.as_bytes();
-        let mut idx = 0;
-        let mut pos = 0;
-
-        while idx < data.len() {
-            if '0' as u8 <= data[idx] && data[idx] <= '9' as u8 {
-                let mut num_end = idx;
-                let mut n = 0;
-                while num_end < data.len()
-                    && '0' as u8 <= data[num_end]
-                    && data[num_end] <= '9' as u8
-                {
-                    n *= 10;
-                    n += (data[num_end] - '0' as u8) as usize;
-                    num_end += 1;
-                }
-                pos += n;
-                idx = num_end;
-            } else {
-                let mut y = height - pos % (height + 1);
-                let mut x = pos / (height + 1);
-
-                if data[idx] != 'R' as u8
-                    && data[idx] != 'L' as u8
-                    && data[idx] != 'U' as u8
-                    && data[idx] != 'D' as u8
-                {
-                    return None;
-                }
-
-                while idx < data.len() {
-                    if data[idx] == 'L' as u8 {
-                        if x == 0 || y == 0 || y == height {
-                            return None;
-                        }
-                        border.horizontal[y - 1][x - 1] = true;
-                        x -= 1;
-                    } else if data[idx] == 'R' as u8 {
-                        if x >= width || y == 0 || y == height {
-                            return None;
-                        }
-                        border.horizontal[y - 1][x] = true;
-                        x += 1;
-                    } else if data[idx] == 'U' as u8 {
-                        if y == 0 || x == 0 || x == width {
-                            return None;
-                        }
-                        border.vertical[y - 1][x - 1] = true;
-                        y -= 1;
-                    } else if data[idx] == 'D' as u8 {
-                        if y >= height || x == 0 || x == width {
-                            return None;
-                        }
-                        border.vertical[y][x - 1] = true;
-                        y += 1;
-                    } else {
-                        break;
-                    }
-                    idx += 1;
                 }
             }
         }
