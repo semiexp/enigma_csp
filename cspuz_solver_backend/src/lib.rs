@@ -142,6 +142,8 @@ fn solve_puzz_link(puzzle_kind: String, url: &str) -> Result<Board, &'static str
         puzzle::nurimaze::solve_nurimaze(url)
     } else if puzzle_kind == "firewalk" {
         puzzle::firewalk::solve_firewalk(url)
+    } else if puzzle_kind == "nikoji" {
+        puzzle::nikoji::solve_nikoji(url)
     } else {
         Err("unknown puzzle type")
     }

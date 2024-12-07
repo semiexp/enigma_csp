@@ -44,6 +44,7 @@ pub mod masyu;
 pub mod milktea;
 pub mod moonsun;
 pub mod nagenawa;
+pub mod nikoji;
 pub mod norinori;
 pub mod nothree;
 pub mod nurikabe;
