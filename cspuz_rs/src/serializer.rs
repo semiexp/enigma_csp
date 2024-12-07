@@ -1268,6 +1268,76 @@ where
     }
 }
 
+pub struct KudamonoSequence<S, T>
+where
+    S: Combinator<T>,
+    T: Clone + PartialEq,
+{
+    base_serializer: S,
+    empty: T,
+    len: usize,
+}
+
+impl<S, T> KudamonoSequence<S, T>
+where
+    S: Combinator<T>,
+    T: Clone + PartialEq,
+{
+    pub fn new(base_serializer: S, empty: T, len: usize) -> KudamonoSequence<S, T> {
+        KudamonoSequence {
+            base_serializer,
+            empty,
+            len,
+        }
+    }
+}
+
+impl<S, T> Combinator<Vec<T>> for KudamonoSequence<S, T>
+where
+    S: Combinator<T>,
+    T: Clone + PartialEq,
+{
+    fn serialize(&self, ctx: &Context, input: &[Vec<T>]) -> Option<(usize, Vec<u8>)> {
+        if input.len() == 0 {
+            return None;
+        }
+        let data = &input[0];
+
+        let mut ret = vec![];
+        let mut last_nonempty = 0;
+
+        for i in 0..self.len {
+            if data[i] == self.empty {
+                continue;
+            }
+            ret.extend(self.base_serializer.serialize(ctx, &[data[i].clone()])?.1);
+            ret.extend(DecInt.serialize(ctx, &[(i - last_nonempty) as i32])?.1);
+            last_nonempty = i;
+        }
+
+        Some((1, ret))
+    }
+
+    fn deserialize(&self, ctx: &Context, input: &[u8]) -> Option<(usize, Vec<Vec<T>>)> {
+        let mut ret = vec![self.empty.clone(); self.len];
+
+        let mut sequencer = Sequencer::new(input);
+        let mut pos = 0;
+
+        while sequencer.n_read() < input.len() {
+            let mut item = sequencer.deserialize(ctx, &self.base_serializer)?;
+            assert_eq!(item.len(), 1);
+            let gap = sequencer.deserialize(ctx, &DecInt)?;
+            assert_eq!(item.len(), 1);
+
+            pos += gap[0] as usize;
+            ret[pos] = item.swap_remove(0);
+        }
+
+        Some((sequencer.n_read(), vec![ret]))
+    }
+}
+
 pub struct KudamonoGrid<S, T>
 where
     S: Combinator<T>,
@@ -1311,24 +1381,15 @@ where
         let y_ord = kudamono_order(height, ctx.kudamono_v2?);
         let x_ord = kudamono_order(width, ctx.kudamono_v2?);
 
-        let mut ret = vec![];
-        let mut last_nonempty = 0;
+        let mut data_flat = vec![];
         for i in 0..(height * width) {
             let x = x_ord[i / height];
             let y = height - 1 - y_ord[i % height];
-            if data[y][x] == self.empty {
-                continue;
-            }
-            ret.extend(
-                self.base_serializer
-                    .serialize(ctx, &[data[y][x].clone()])?
-                    .1,
-            );
-            ret.extend(DecInt.serialize(ctx, &[(i - last_nonempty) as i32])?.1);
-            last_nonempty = i;
+            data_flat.push(data[y][x].clone());
         }
 
-        Some((1, ret))
+        KudamonoSequence::new(&self.base_serializer, self.empty.clone(), height * width)
+            .serialize(ctx, &[data_flat])
     }
 
     fn deserialize(&self, ctx: &Context, input: &[u8]) -> Option<(usize, Vec<Vec<Vec<T>>>)> {
@@ -1337,34 +1398,20 @@ where
         let y_ord = kudamono_order(height, ctx.kudamono_v2?);
         let x_ord = kudamono_order(width, ctx.kudamono_v2?);
 
-        let mut ret = vec![];
-        let mut row = vec![];
-        for _ in 0..width {
-            row.push(self.empty.clone());
-        }
-        for _ in 0..height {
-            ret.push(row.clone());
-        }
-        let mut sequencer = Sequencer::new(input);
-        let mut pos = 0;
+        let (n_read, ret_flat) =
+            KudamonoSequence::new(&self.base_serializer, self.empty.clone(), height * width)
+                .deserialize(ctx, input)?;
+        assert_eq!(ret_flat.len(), 1);
+        let ret_flat = ret_flat.into_iter().next().unwrap();
 
-        while sequencer.n_read() < input.len() {
-            let mut item = sequencer.deserialize(ctx, &self.base_serializer)?;
-            assert_eq!(item.len(), 1);
-            let gap = sequencer.deserialize(ctx, &DecInt)?;
-            assert_eq!(item.len(), 1);
-
-            pos += gap[0] as usize;
-            if pos >= height * width {
-                return None;
-            }
-
-            let y = height - 1 - y_ord[pos % height];
-            let x = x_ord[pos / height];
-            ret[y][x] = item.swap_remove(0);
+        let mut ret = vec![vec![self.empty.clone(); width]; height];
+        for i in 0..(height * width) {
+            let y = height - 1 - y_ord[i % height];
+            let x = x_ord[i / height];
+            ret[y][x] = ret_flat[i].clone();
         }
 
-        Some((sequencer.n_read(), vec![ret]))
+        Some((n_read, vec![ret]))
     }
 }
 
