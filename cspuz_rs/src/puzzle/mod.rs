@@ -37,6 +37,7 @@ pub mod inverse_litso;
 pub mod kakuro;
 pub mod kouchoku;
 pub mod kropki;
+pub mod kropki_pairs;
 pub mod kurotto;
 pub mod litherslink;
 pub mod lits;

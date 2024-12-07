@@ -176,6 +176,8 @@ fn decode_and_solve(url: &[u8]) -> Result<Board, &'static str> {
                 puzzle::seiza::solve_seiza(url)
             } else if kudamono.puzzle_kind == "spokes" {
                 puzzle::spokes::solve_spokes(url)
+            } else if kudamono.puzzle_kind == "kropki-pairs" {
+                puzzle::kropki_pairs::solve_kropki_pairs(url)
             } else {
                 Err("unknown puzzle type")
             }
