@@ -180,6 +180,8 @@ fn decode_and_solve(url: &[u8]) -> Result<Board, &'static str> {
                 puzzle::spokes::solve_spokes(url)
             } else if kudamono.puzzle_kind == "kropki-pairs" {
                 puzzle::kropki_pairs::solve_kropki_pairs(url)
+            } else if kudamono.puzzle_kind == "letter-weights" {
+                puzzle::letter_weights::solve_letter_weights(url)
             } else {
                 Err("unknown puzzle type")
             }

@@ -39,6 +39,7 @@ pub mod kouchoku;
 pub mod kropki;
 pub mod kropki_pairs;
 pub mod kurotto;
+pub mod letter_weights;
 pub mod litherslink;
 pub mod lits;
 pub mod lohkous;

@@ -1118,6 +1118,12 @@ impl<'a> Solver<'a> {
         })
     }
 
+    pub fn int_var_from_domain(&mut self, domain: Vec<i32>) -> IntVar {
+        Value(Array0DImpl {
+            data: self.solver.new_int_var_from_list(domain),
+        })
+    }
+
     pub fn int_var_1d(&mut self, len: usize, low: i32, high: i32) -> IntVarArray1D {
         Value(Array1DImpl {
             data: (0..len)
