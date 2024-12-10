@@ -7,6 +7,7 @@ pub mod akichiwake;
 pub mod aqre;
 pub mod aquapelago;
 pub mod araf;
+pub mod archipelago;
 pub mod ayeheya;
 pub mod barns;
 pub mod castle_wall;
