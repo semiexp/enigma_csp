@@ -184,6 +184,8 @@ fn decode_and_solve(url: &[u8]) -> Result<Board, &'static str> {
                 puzzle::kropki_pairs::solve_kropki_pairs(url)
             } else if kudamono.puzzle_kind == "letter-weights" {
                 puzzle::letter_weights::solve_letter_weights(url)
+            } else if kudamono.puzzle_kind == "sniping-arrow" {
+                puzzle::sniping_arrow::solve_sniping_arrow(url)
             } else {
                 Err("unknown puzzle type")
             }
