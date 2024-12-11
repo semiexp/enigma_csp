@@ -48,6 +48,7 @@ pub mod loop_special;
 pub mod masyu;
 pub mod milktea;
 pub mod moonsun;
+pub mod multiplication_link;
 pub mod nagenawa;
 pub mod nikoji;
 pub mod norinori;
