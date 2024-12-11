@@ -79,6 +79,7 @@ pub mod statue_park;
 pub mod stostone;
 pub mod sudoku;
 pub mod tapa;
+pub mod timebomb;
 pub mod tontonbeya;
 pub mod tricklayer;
 pub mod yajilin;

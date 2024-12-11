@@ -146,6 +146,8 @@ fn solve_puzz_link(puzzle_kind: String, url: &str) -> Result<Board, &'static str
         puzzle::nikoji::solve_nikoji(url)
     } else if puzzle_kind == "archipelago" {
         puzzle::archipelago::solve_archipelago(url)
+    } else if puzzle_kind == "timebomb" {
+        puzzle::timebomb::solve_timebomb(url)
     } else {
         Err("unknown puzzle type")
     }
