@@ -33,6 +33,7 @@ pub mod guidearrow;
 pub mod hashi;
 pub mod herugolf;
 pub mod heyawake;
+pub mod hidato;
 pub mod icewalk;
 pub mod inverse_litso;
 pub mod kakuro;

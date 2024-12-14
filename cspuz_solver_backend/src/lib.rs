@@ -190,6 +190,8 @@ fn decode_and_solve(url: &[u8]) -> Result<Board, &'static str> {
                 puzzle::sniping_arrow::solve_sniping_arrow(url)
             } else if kudamono.puzzle_kind == "multiplication-link" {
                 puzzle::multiplication_link::solve_multiplication_link(url)
+            } else if kudamono.puzzle_kind == "hidoku" {
+                puzzle::hidato::solve_hidato(url)
             } else {
                 Err("unknown puzzle type")
             }
