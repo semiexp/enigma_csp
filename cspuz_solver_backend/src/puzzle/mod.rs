@@ -76,6 +76,7 @@ pub mod statue_park;
 pub mod stostone;
 pub mod sudoku;
 pub mod tapa;
+pub mod the_longest;
 pub mod timebomb;
 pub mod tontonbeya;
 pub mod tricklayer;

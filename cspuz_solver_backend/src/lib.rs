@@ -192,6 +192,8 @@ fn decode_and_solve(url: &[u8]) -> Result<Board, &'static str> {
                 puzzle::multiplication_link::solve_multiplication_link(url)
             } else if kudamono.puzzle_kind == "hidoku" {
                 puzzle::hidato::solve_hidato(url)
+            } else if kudamono.puzzle_kind == "the-longest" {
+                puzzle::the_longest::solve_the_longest(url)
             } else {
                 Err("unknown puzzle type")
             }
