@@ -312,6 +312,7 @@ impl SAT {
         inputs: Vec<Lit>,
         constr: Box<dyn PropagatorGenerator>,
     ) -> bool {
+        #[allow(unreachable_patterns)]
         match self {
             SAT::Glucose(solver) => {
                 let propagator = constr.generate(inputs);
