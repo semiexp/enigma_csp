@@ -98,7 +98,22 @@ pub mod tests {
         X: IntoIterator<Item = Y>,
         Y: IntoIterator<Item = i32>,
     {
-        to_option_2d(to_bool_2d(array))
+        array
+            .into_iter()
+            .map(|row| {
+                row.into_iter()
+                    .map(|x| {
+                        if x == 1 {
+                            Some(true)
+                        } else if x == 0 {
+                            Some(false)
+                        } else {
+                            None
+                        }
+                    })
+                    .collect()
+            })
+            .collect()
     }
 
     pub fn check_all_some<T>(input: &[Vec<Option<T>>]) {

@@ -1,6 +1,7 @@
 extern crate enigma_csp;
 
 pub mod graph;
+pub mod hex;
 pub mod items;
 pub mod puzzle;
 pub mod serializer;

@@ -1,4 +1,4 @@
-#![allow(static_mut_refs)]  // TODO: remove this
+#![allow(static_mut_refs)] // TODO: remove this
 
 extern crate cspuz_rs;
 
@@ -7,7 +7,9 @@ mod puzzle;
 mod uniqueness;
 
 use board::Board;
-use cspuz_rs::serializer::{get_kudamono_url_info, url_to_puzzle_kind};
+use cspuz_rs::serializer::{
+    get_kudamono_url_info, get_kudamono_url_info_detailed, url_to_puzzle_kind,
+};
 
 static mut SHARED_ARRAY: Vec<u8> = vec![];
 
@@ -163,39 +165,44 @@ fn decode_and_solve(url: &[u8]) -> Result<Board, &'static str> {
     match puzzle_kind {
         Ok(puzzle_kind) => solve_puzz_link(puzzle_kind, url),
         Err(_) => {
-            let kudamono = get_kudamono_url_info(url).ok_or("failed to parse URL")?;
-            if kudamono.puzzle_kind == "tricklayer" {
+            let puzzle_kind = *get_kudamono_url_info_detailed(url)
+                .ok_or("failed to parse URL")?
+                .get("G")
+                .ok_or("failed to parse URL")?;
+            if puzzle_kind == "tricklayer" {
                 puzzle::tricklayer::solve_tricklayer(url)
-            } else if kudamono.puzzle_kind == "parrot-loop" {
+            } else if puzzle_kind == "parrot-loop" {
                 puzzle::parrot_loop::solve_parrot_loop(url)
-            } else if kudamono.puzzle_kind == "crosswall" {
+            } else if puzzle_kind == "crosswall" {
                 puzzle::crosswall::solve_crosswall(url)
-            } else if kudamono.puzzle_kind == "soulmates" {
+            } else if puzzle_kind == "soulmates" {
                 puzzle::soulmates::solve_soulmates(url)
-            } else if kudamono.puzzle_kind == "cross-border-parity-loop" {
+            } else if puzzle_kind == "cross-border-parity-loop" {
                 puzzle::cross_border_parity_loop::solve_cross_border_parity_loop(url)
-            } else if kudamono.puzzle_kind == "akari-regional" {
+            } else if puzzle_kind == "akari-regional" {
                 puzzle::akari_regions::solve_akari_regions(url)
-            } else if kudamono.puzzle_kind == "akari-rgb" {
+            } else if puzzle_kind == "akari-rgb" {
                 puzzle::akari_rgb::solve_akari_rgb(url)
-            } else if kudamono.puzzle_kind == "milk-tea" {
+            } else if puzzle_kind == "milk-tea" {
                 puzzle::milktea::solve_milktea(url)
-            } else if kudamono.puzzle_kind == "seiza" {
+            } else if puzzle_kind == "seiza" {
                 puzzle::seiza::solve_seiza(url)
-            } else if kudamono.puzzle_kind == "spokes" {
+            } else if puzzle_kind == "spokes" {
                 puzzle::spokes::solve_spokes(url)
-            } else if kudamono.puzzle_kind == "kropki-pairs" {
+            } else if puzzle_kind == "kropki-pairs" {
                 puzzle::kropki_pairs::solve_kropki_pairs(url)
-            } else if kudamono.puzzle_kind == "letter-weights" {
+            } else if puzzle_kind == "letter-weights" {
                 puzzle::letter_weights::solve_letter_weights(url)
-            } else if kudamono.puzzle_kind == "sniping-arrow" {
+            } else if puzzle_kind == "sniping-arrow" {
                 puzzle::sniping_arrow::solve_sniping_arrow(url)
-            } else if kudamono.puzzle_kind == "multiplication-link" {
+            } else if puzzle_kind == "multiplication-link" {
                 puzzle::multiplication_link::solve_multiplication_link(url)
-            } else if kudamono.puzzle_kind == "hidoku" {
+            } else if puzzle_kind == "hidoku" {
                 puzzle::hidato::solve_hidato(url)
-            } else if kudamono.puzzle_kind == "the-longest" {
+            } else if puzzle_kind == "the-longest" {
                 puzzle::the_longest::solve_the_longest(url)
+            } else if puzzle_kind == "slicy" {
+                puzzle::slicy::solve_slicy(url)
             } else {
                 Err("unknown puzzle type")
             }

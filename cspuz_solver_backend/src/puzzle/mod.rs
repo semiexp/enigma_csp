@@ -67,6 +67,7 @@ pub mod shimaguni;
 pub mod simpleloop;
 pub mod slalom;
 pub mod slashpack;
+pub mod slicy;
 pub mod slitherlink;
 pub mod sniping_arrow;
 pub mod soulmates;

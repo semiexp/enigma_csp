@@ -1,4 +1,4 @@
-#![allow(static_mut_refs)]  // TODO: remove this
+#![allow(static_mut_refs)] // TODO: remove this
 
 use std::collections::HashMap;
 
