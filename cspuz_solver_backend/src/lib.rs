@@ -1,3 +1,5 @@
+#![allow(static_mut_refs)]  // TODO: remove this
+
 extern crate cspuz_rs;
 
 pub mod board;
