@@ -7,9 +7,7 @@ mod puzzle;
 mod uniqueness;
 
 use board::Board;
-use cspuz_rs::serializer::{
-    get_kudamono_url_info, get_kudamono_url_info_detailed, url_to_puzzle_kind,
-};
+use cspuz_rs::serializer::{get_kudamono_url_info_detailed, url_to_puzzle_kind};
 
 static mut SHARED_ARRAY: Vec<u8> = vec![];
 
