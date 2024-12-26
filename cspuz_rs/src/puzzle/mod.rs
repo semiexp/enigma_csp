@@ -24,6 +24,7 @@ pub mod crosswall;
 pub mod curvedata;
 pub mod dbchoco;
 pub mod doppelblock;
+pub mod double_lits;
 pub mod evolmino;
 pub mod fillomino;
 pub mod firefly;

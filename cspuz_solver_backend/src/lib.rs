@@ -163,10 +163,11 @@ fn decode_and_solve(url: &[u8]) -> Result<Board, &'static str> {
     match puzzle_kind {
         Ok(puzzle_kind) => solve_puzz_link(puzzle_kind, url),
         Err(_) => {
-            let puzzle_kind = *get_kudamono_url_info_detailed(url)
-                .ok_or("failed to parse URL")?
-                .get("G")
-                .ok_or("failed to parse URL")?;
+            let puzzle_info = get_kudamono_url_info_detailed(url).ok_or("failed to parse URL")?;
+
+            let puzzle_kind = *puzzle_info.get("G").unwrap_or(&"");
+            let puzzle_variant = *puzzle_info.get("V").unwrap_or(&"");
+
             if puzzle_kind == "tricklayer" {
                 puzzle::tricklayer::solve_tricklayer(url)
             } else if puzzle_kind == "parrot-loop" {
@@ -201,6 +202,8 @@ fn decode_and_solve(url: &[u8]) -> Result<Board, &'static str> {
                 puzzle::the_longest::solve_the_longest(url)
             } else if puzzle_kind == "slicy" {
                 puzzle::slicy::solve_slicy(url)
+            } else if puzzle_kind == "lits" && puzzle_variant == "double" {
+                puzzle::double_lits::solve_double_lits(url)
             } else {
                 Err("unknown puzzle type")
             }
