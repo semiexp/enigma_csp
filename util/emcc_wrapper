@@ -17,6 +17,9 @@ def main():
     assert ext in [".wasm", ".js"]
     output = root + ".js"
 
+    if os.path.basename(root) == "cspuz_solver_backend":
+        extra_args += ["-s", "EXPORTED_FUNCTIONS=_solve_problem,_malloc,_free"]
+
     args = ["emcc", "-o", output] + extra_args
     subprocess.check_call(args)
 

@@ -9,7 +9,7 @@ struct Opaque {
     _private: [u8; 0],
 }
 
-extern "C" {
+extern "C-unwind" {
     fn Glucose_CreateSolver() -> *mut Opaque;
     fn Glucose_DestroySolver(solver: *mut Opaque);
     fn Glucose_NewVar(solver: *mut Opaque) -> i32;
@@ -356,7 +356,7 @@ impl<'a> Model<'a> {
 
 // Interface for implementing custom constraints in Rust
 
-extern "C" {
+extern "C-unwind" {
     fn Glucose_AddRustExtraConstraint(solver: *mut Opaque, trait_object: *mut c_void) -> i32;
     fn Glucose_CustomPropagatorCopyReason(reason_vec: *mut c_void, n_lits: i32, lits: *const Lit);
     fn Glucose_SolverValue(solver: *mut Opaque, lit: Lit) -> i32;
@@ -416,7 +416,7 @@ pub unsafe trait CustomPropagator {
 }
 
 #[no_mangle]
-extern "C" fn Glucose_CallCustomPropagatorInitialize(
+extern "C-unwind" fn Glucose_CallCustomPropagatorInitialize(
     solver: *mut Opaque,
     wrapper_object: *mut c_void,
     trait_object: *mut c_void,
@@ -435,7 +435,7 @@ extern "C" fn Glucose_CallCustomPropagatorInitialize(
 }
 
 #[no_mangle]
-extern "C" fn Glucose_CallCustomPropagatorPropagate(
+extern "C-unwind" fn Glucose_CallCustomPropagatorPropagate(
     solver: *mut Opaque,
     wrapper_object: *mut c_void,
     trait_object: *mut c_void,
@@ -460,7 +460,7 @@ extern "C" fn Glucose_CallCustomPropagatorPropagate(
 }
 
 #[no_mangle]
-extern "C" fn Glucose_CallCustomPropagatorCalcReason(
+extern "C-unwind" fn Glucose_CallCustomPropagatorCalcReason(
     solver: *mut Opaque,
     trait_object: *mut c_void,
     p: Lit,
@@ -487,7 +487,7 @@ extern "C" fn Glucose_CallCustomPropagatorCalcReason(
 }
 
 #[no_mangle]
-extern "C" fn Glucose_CallCustomPropagatorUndo(
+extern "C-unwind" fn Glucose_CallCustomPropagatorUndo(
     solver: *mut Opaque,
     trait_object: *mut c_void,
     p: Lit,
