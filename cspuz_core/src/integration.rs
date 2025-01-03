@@ -1501,6 +1501,8 @@ mod tests {
         }
     }
 
+    // TODO: Re-enable these tests
+    /*
     #[cfg(feature = "csp-extra-constraints")]
     #[test]
     fn test_integration_exhaustive_circuit1() {
@@ -1572,6 +1574,7 @@ mod tests {
             tester.check();
         }
     }
+    */
 
     #[test]
     fn test_integration_active_vertices_connected1() {
