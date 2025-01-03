@@ -8,7 +8,7 @@ use crate::serializer::{
 };
 use crate::solver::{any, Solver};
 
-use enigma_csp::custom_constraints::SimpleCustomConstraint;
+use cspuz_core::custom_constraints::SimpleCustomConstraint;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum ProblemCell {

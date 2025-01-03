@@ -7,10 +7,10 @@ edition = "2021"
 
 [features]
 default = ["csp-extra-constraints", "generator"]
-csp-extra-constraints = ["enigma_csp/csp-extra-constraints"]
+csp-extra-constraints = ["cspuz_core/csp-extra-constraints"]
 generator = ["rand"]
 
 [dependencies]
-enigma_csp = { path = "../enigma_csp", default-features = false }
+cspuz_core = { path = "../cspuz_core", default-features = false }
 cspuz_rs_macro = { path = "../cspuz_rs_macro" }
 rand = { version = "0.8.5", optional = true }

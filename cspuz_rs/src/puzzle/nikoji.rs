@@ -5,7 +5,7 @@ use crate::serializer::{
 };
 use crate::solver::Solver;
 
-use enigma_csp::custom_constraints::SimpleCustomConstraint;
+use cspuz_core::custom_constraints::SimpleCustomConstraint;
 
 pub fn solve_nikoji(
     clues: &[Vec<Option<i32>>],

@@ -36,7 +36,7 @@ fn build_glucose() {
     let puzzle_solver_minimal_flag = "-DPUZZLE_SOLVER_MINIMAL=0";
 
     if arch == "wasm32" {
-        // TODO: enigma_csp can be built for wasm32-unknown-emscripten target, but the produced
+        // TODO: cspuz_core can be built for wasm32-unknown-emscripten target, but the produced
         // library is hard to use (only a .wasm file is generated without any glue .js files).
         cpp17_build()
             .cpp(true)

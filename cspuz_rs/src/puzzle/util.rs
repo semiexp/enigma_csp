@@ -69,7 +69,7 @@ impl<T: Clone> IndexMut<(usize, usize)> for Grid<T> {
 
 #[cfg(test)]
 pub mod tests {
-    use enigma_csp::custom_constraints::SimpleCustomConstraint;
+    use cspuz_core::custom_constraints::SimpleCustomConstraint;
 
     pub fn to_option_2d<X, Y, T>(array: X) -> Vec<Vec<Option<T>>>
     where

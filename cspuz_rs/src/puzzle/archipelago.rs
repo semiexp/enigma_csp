@@ -7,7 +7,7 @@ use crate::serializer::{
 use crate::solver::{Solver, TRUE};
 use std::collections::VecDeque;
 
-use enigma_csp::custom_constraints::SimpleCustomConstraint;
+use cspuz_core::custom_constraints::SimpleCustomConstraint;
 
 pub fn solve_archipelago(clues: &[Vec<Option<i32>>]) -> Option<Vec<Vec<Option<bool>>>> {
     let (h, w) = util::infer_shape(clues);

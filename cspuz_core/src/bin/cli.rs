@@ -1,4 +1,4 @@
-extern crate enigma_csp;
+extern crate cspuz_core;
 
 #[allow(unused)]
 use std::io;
@@ -7,8 +7,8 @@ use std::io;
 fn main() {
     let stdin = io::stdin();
     let mut lock = stdin.lock();
-    let config = enigma_csp::config::Config::parse_from_args();
-    let (res, _) = enigma_csp::csugar_cli::csugar_cli(&mut lock, config);
+    let config = cspuz_core::config::Config::parse_from_args();
+    let (res, _) = cspuz_core::csugar_cli::csugar_cli(&mut lock, config);
     print!("{}", res);
 }
 

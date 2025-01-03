@@ -263,7 +263,7 @@ fn solver_with_perf(_input: String) -> (String, HashMap<String, f64>) {
 }
 
 #[pymodule]
-pub fn enigma_csp(_py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
+pub fn cspuz_core(_py: Python, m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(solver, m)?)?;
     m.add_function(wrap_pyfunction!(solver_with_perf, m)?)?;
     m.add_function(wrap_pyfunction!(set_config, m)?)?;

@@ -1,4 +1,4 @@
-extern crate enigma_csp;
+extern crate cspuz_core;
 
 pub mod graph;
 pub mod hex;

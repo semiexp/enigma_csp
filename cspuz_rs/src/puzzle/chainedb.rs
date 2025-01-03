@@ -6,7 +6,7 @@ use crate::serializer::{
 use crate::solver::{any, Solver};
 use std::collections::VecDeque;
 
-use enigma_csp::custom_constraints::SimpleCustomConstraint;
+use cspuz_core::custom_constraints::SimpleCustomConstraint;
 
 pub fn solve_chainedb(clues: &[Vec<Option<i32>>]) -> Option<Vec<Vec<Option<bool>>>> {
     let (h, w) = util::infer_shape(clues);

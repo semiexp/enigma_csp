@@ -1,16 +1,16 @@
 use std::ops::{Add, BitAnd, BitOr, BitXor, Bound, Not, RangeBounds, Sub};
 
 use crate::items::Arrow;
-pub use enigma_csp::csp::BoolExpr as CSPBoolExpr;
-pub use enigma_csp::csp::BoolVar as CSPBoolVar;
-pub use enigma_csp::csp::IntExpr as CSPIntExpr;
-pub use enigma_csp::csp::IntVar as CSPIntVar;
-use enigma_csp::csp::{Assignment, Stmt};
-use enigma_csp::custom_constraints::PropagatorGenerator;
-use enigma_csp::domain::Domain;
-use enigma_csp::integration::IntegratedSolver;
-use enigma_csp::integration::Model as IntegratedModel;
-pub use enigma_csp::integration::PerfStats;
+pub use cspuz_core::csp::BoolExpr as CSPBoolExpr;
+pub use cspuz_core::csp::BoolVar as CSPBoolVar;
+pub use cspuz_core::csp::IntExpr as CSPIntExpr;
+pub use cspuz_core::csp::IntVar as CSPIntVar;
+use cspuz_core::csp::{Assignment, Stmt};
+use cspuz_core::custom_constraints::PropagatorGenerator;
+use cspuz_core::domain::Domain;
+use cspuz_core::integration::IntegratedSolver;
+use cspuz_core::integration::Model as IntegratedModel;
+pub use cspuz_core::integration::PerfStats;
 
 #[derive(Clone)]
 pub struct Value<T>(T);

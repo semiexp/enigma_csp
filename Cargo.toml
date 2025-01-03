@@ -1,7 +1,7 @@
 [workspace]
 
 members = [
-    "enigma_csp",
+    "cspuz_core",
     "cspuz_rs",
     "cspuz_rs_macro",
     "cspuz_solver_backend",

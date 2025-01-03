@@ -24,7 +24,7 @@ pub mod sat;
 mod util;
 
 #[cfg(not(target_arch = "wasm32"))]
-pub use pyo3_binding::enigma_csp;
+pub use pyo3_binding::cspuz_core;
 
 #[cfg(target_arch = "wasm32")]
 mod wasm;
