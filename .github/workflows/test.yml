@@ -35,9 +35,10 @@ jobs:
         cd emsdk
         ./emsdk install latest
         ./emsdk activate latest
-        source ./emsdk_env.sh
     - name: Build
-      run: cargo build --target wasm32-unknown-emscripten --verbose --no-default-features
+      run: |
+        source ${{ runner.temp }}/emsdk/emsdk_env.sh
+        cargo build --target wasm32-unknown-emscripten --verbose --no-default-features
     - name: Run tests
       run: |
         mkdir ${{ runner.temp }}/test
