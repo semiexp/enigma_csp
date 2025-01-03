@@ -21,3 +21,31 @@ jobs:
       run: cargo build --verbose
     - name: Run tests
       run: cargo test --verbose
+  rust-wasm-latest:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        submodules: recursive
+    - uses: actions/setup-node@v4
+      with:
+        node-version: '22.x'
+    - name: Setup environment
+      run: |
+        rustup target add wasm32-unknown-emscripten
+        cd ${{ runner.temp }}
+        git clone https://github.com/emscripten-core/emsdk.git
+        cd emsdk
+        ./emsdk install latest
+        ./emsdk activate latest
+    - name: Build
+      run: |
+        source ${{ runner.temp }}/emsdk/emsdk_env.sh
+        cargo build --target wasm32-unknown-emscripten --verbose --no-default-features
+    - name: Run tests
+      run: |
+        mkdir ${{ runner.temp }}/test
+        cp target/wasm32-unknown-emscripten/debug/deps/cspuz_solver_backend.js target/wasm32-unknown-emscripten/debug/deps/cspuz_solver_backend.wasm ${{ runner.temp }}/test
+        cp tests/test_cspuz_solver_backend.js ${{ runner.temp }}/test
+        cd ${{ runner.temp }}/test
+        node test_cspuz_solver_backend.js
