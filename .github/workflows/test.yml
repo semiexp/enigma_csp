@@ -45,7 +45,8 @@ jobs:
     - name: Run tests
       run: |
         mkdir ${{ runner.temp }}/test
-        cp target/wasm32-unknown-emscripten/debug/deps/cspuz_solver_backend.js target/wasm32-unknown-emscripten/debug/deps/cspuz_solver_backend.wasm ${{ runner.temp }}/test
+        cp target/wasm32-unknown-emscripten/debug/deps/cspuz_solver_backend.js ${{ runner.temp }}/test/cspuz_solver_backend.mjs
+        cp target/wasm32-unknown-emscripten/debug/deps/cspuz_solver_backend.wasm ${{ runner.temp }}/test
         cp tests/test_cspuz_solver_backend.js ${{ runner.temp }}/test
         cd ${{ runner.temp }}/test
         node test_cspuz_solver_backend.js
