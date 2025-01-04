@@ -1,6 +1,8 @@
-const assert = require("assert");
+(async () => {
+  const assert = await import("assert");
+  const m = await import("./cspuz_solver_backend.mjs");
+  const module = await m.default();
 
-require("./cspuz_solver_backend").default().then((module) => {
   const url = "https://puzz.link/p?nurikabe/6/6/m8n8i9u";
   const urlEncoded = new TextEncoder().encode(url);
   const buf = module._malloc(urlEncoded.length);
@@ -17,4 +19,4 @@ require("./cspuz_solver_backend").default().then((module) => {
   const expected = JSON.parse(expectedStr);
 
   assert.deepStrictEqual(actual, expected);
-});
+})();
